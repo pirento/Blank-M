@@ -1,0 +1,133 @@
+<%
+const titles = { signin: 'Welcome back.', reset: 'Reset your password', recover: 'Choose a new password', activate: 'Activate your workspace' };
+const descriptions = {
+  signin: 'Use your username or invited email and password.',
+  reset: 'We will send a secure recovery link.',
+  recover: 'Set a new password for your invited account.',
+  activate: 'Choose a password to complete your invitation.',
+};
+const submitLabels = { signin: 'Sign in', reset: 'Send recovery link', recover: 'Save new password', activate: 'Activate account' };
+const changesPassword = mode === 'activate' || mode === 'recover';
+%>
+<!doctype html>
+<html lang="en">
+  <head>
+    <%- include('../partials/head') %>
+  </head>
+  <body>
+    <div class="login-layout blank-login">
+      <aside class="login-aside">
+        <a href="/" aria-label="Pirento Blank home" class="focus-ring login-brand inline-flex min-h-6 items-center"><%- include('../partials/brand') %></a>
+        <div>
+          <span class="section-index">YOUR PRIVATE WORKSPACE</span>
+          <h1>A clear head. <br />A considered <br />trade.</h1>
+          <p>Research, plan and review.<br />All in one place.</p>
+        </div>
+        <span class="fineprint">PIRENTO BLANK / MEMBER ACCESS</span>
+      </aside>
+      <main class="login" data-login data-mode="<%= mode %>">
+        <a href="/" class="focus-ring back-link inline-flex min-h-6 items-center"><%- icon('arrow-left', { size: 14 }) %> Back to homepage</a>
+        <span class="eyebrow"><%= mode === 'signin' ? 'MEMBER LOGIN' : 'MEMBER ACCESS' %></span>
+        <h2><%= titles[mode] %></h2>
+        <p class="muted"><%= descriptions[mode] %></p>
+        <% if (mode === 'signin') { %>
+        <div class="notice">Member login · Use your invited email, or the username saved in Settings.</div>
+        <% } %>
+        <% if (changesPassword && !passwordUser) { %>
+        <div class="mt-8 border border-caution bg-caution-soft p-4 text-sm leading-6 text-muted">
+          This invitation or recovery session is missing or expired. Open the latest link from your email, or request a new recovery link.
+        </div>
+        <% } else { %>
+        <% if (mode === 'reset' && !mailConfigured) { %>
+        <p role="note" class="mt-8 border border-line bg-elevated px-3 py-2 text-sm text-muted" data-reset-unavailable>
+          Password reset email is not set up for this workspace. Ask your workspace administrator for a
+          one-time reset link.
+        </p>
+        <% } %>
+        <form data-login-form class="login-form space-y-5<%= mode === 'signin' ? '' : ' mt-8' %>" novalidate>
+          <% if (changesPassword && passwordUser) { %>
+          <p class="break-words text-sm text-muted">Setting a password for <strong><%= passwordUser %></strong></p>
+          <% } %>
+          <% if (!changesPassword) { %>
+          <div>
+            <label class="<%= LABEL_CLASS %>" for="email"><%= mode === 'signin' ? 'Username / invited email' : 'Invited email' %></label>
+            <input
+              id="email"
+              name="identifier"
+              type="<%= mode === 'signin' ? 'text' : 'email' %>"
+              autocomplete="<%= mode === 'signin' ? 'username' : 'email' %>"
+              autocapitalize="none"
+              spellcheck="false"
+              maxlength="320"
+              placeholder="<%= mode === 'signin' ? 'your_username or you@company.com' : 'you@company.com' %>"
+              class="<%= FIELD_CLASS %>"
+            />
+            <p id="email-error" role="alert" class="mt-1 text-xs text-negative" hidden></p>
+          </div>
+          <% } %>
+          <% if (mode !== 'reset') { %>
+          <div>
+            <div class="flex items-center justify-between">
+              <label class="<%= LABEL_CLASS %>" for="password"><%= changesPassword ? 'New password' : 'Password' %></label>
+              <% if (mode === 'signin') { %>
+              <a href="/login?mode=reset" class="focus-ring mb-1.5 min-h-6 rounded text-xs font-medium text-accent">Forgot password?</a>
+              <% } %>
+            </div>
+            <div class="relative">
+              <input
+                id="password"
+                name="password"
+                type="password"
+                autocomplete="<%= changesPassword ? 'new-password' : 'current-password' %>"
+                class="<%= FIELD_CLASS %> pr-11"
+              />
+              <button
+                type="button"
+                data-toggle-password
+                aria-label="Show password"
+                class="focus-ring absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-control text-muted hover:text-fg"
+              >
+                <%- icon('eye', { size: 16 }) %>
+              </button>
+            </div>
+            <p id="password-error" role="alert" class="mt-1 text-xs text-negative" hidden></p>
+          </div>
+          <% } %>
+          <p data-login-error role="alert" class="border border-negative bg-negative-soft px-3 py-2 text-sm text-negative" <%= initialError ? '' : 'hidden' %>><%= initialError || '' %></p>
+          <p data-login-success role="status" class="border border-positive bg-positive-soft px-3 py-2 text-sm text-positive" hidden></p>
+          <button type="submit" class="<%= buttonClass('default', 'lg', 'login-submit w-full') %>">
+            <span data-submit-label><%= submitLabels[mode] %></span>
+            <%- icon('arrow-right', { size: 17 }) %>
+          </button>
+        </form>
+        <% } %>
+
+        <% if (mode === 'signin' && googleEnabled) { %>
+        <div class="my-6 flex items-center gap-3 text-xs text-subtle">
+          <span class="h-px flex-1 bg-line"></span>or<span class="h-px flex-1 bg-line"></span>
+        </div>
+        <a href="/auth/google" class="<%= buttonClass('outline', 'lg', 'w-full') %>">
+          <svg viewBox="0 0 18 18" aria-hidden="true" class="h-4 w-4">
+            <path fill="#4285F4" d="M17.64 9.205c0-.638-.057-1.252-.164-1.841H9v3.482h4.844a4.14 4.14 0 0 1-1.797 2.715v2.258h2.909c1.702-1.567 2.684-3.878 2.684-6.614Z" />
+            <path fill="#34A853" d="M9 18c2.43 0 4.468-.806 5.956-2.181l-2.91-2.258c-.805.54-1.835.86-3.046.86-2.344 0-4.328-1.585-5.037-3.714H.956v2.332A9 9 0 0 0 9 18Z" />
+            <path fill="#FBBC05" d="M3.963 10.707A5.41 5.41 0 0 1 3.681 9c0-.592.102-1.168.282-1.707V4.961H.956A9 9 0 0 0 0 9c0 1.452.347 2.827.956 4.039l3.007-2.332Z" />
+            <path fill="#EA4335" d="M9 3.58c1.321 0 2.507.455 3.441 1.346l2.582-2.582C13.464.892 11.426 0 9 0A9 9 0 0 0 .956 4.961l3.007 2.332C4.672 5.165 6.656 3.58 9 3.58Z" />
+          </svg>
+          <span class="ml-2">Continue with Google</span>
+        </a>
+        <% } %>
+        <% if (mode === 'reset') { %>
+        <a href="/login" class="focus-ring mt-6 block min-h-6 w-full rounded-control text-center text-sm font-medium text-accent">Return to sign in</a>
+        <% } %>
+        <% if (mode === 'signin') { %>
+        <div class="login-preview">
+          <span>Here to look around?</span>
+          <a href="/prototype/index.html" class="focus-ring text-button inline-flex min-h-6 items-center">Explore without credentials</a>
+        </div>
+        <small>Your account requires an active membership. Ask your workspace administrator for an invitation.</small>
+        <% } %>
+      </main>
+    </div>
+    <script type="module" src="/js/pages/login.js" nonce="<%= cspNonce %>"></script>
+  </body>
+</html>

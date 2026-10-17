@@ -1,0 +1,19 @@
+<div class="mx-auto max-w-6xl space-y-6 py-6">
+  <div class="workspace-pagehead">
+    <div>
+      <h1><%= t('Insights') %></h1>
+      <p><%= t('Where your P&L comes from: days, setups, mistakes, emotions, R-multiples and strategies.') %></p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <label for="insights-period" class="sr-only">Period</label>
+      <select id="insights-period" class="<%= FIELD_CLASS %> w-auto" data-period>
+        <option value="all">All time</option>
+        <option value="90d">Last 90 days</option>
+        <option value="ytd">This year</option>
+        <option value="30d">Last 30 days</option>
+      </select>
+    </div>
+  </div>
+  <div data-coach></div>
+  <div data-insights></div>
+</div>

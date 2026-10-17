@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <%- include('../partials/head') %>
+  </head>
+  <body>
+    <main class="login mx-auto px-6 py-16" style="max-width: 520px" data-auth-link data-purpose="<%= purpose %>">
+      <a href="/" aria-label="Pirento Blank home" class="focus-ring inline-flex min-h-6 items-center"><%- include('../partials/brand') %></a>
+      <h1 class="mt-10 mb-4 text-[32px] font-normal leading-tight tracking-tight">
+        <%= purpose === 'activate' ? 'Activating your invitation…' : 'Opening your recovery link…' %>
+      </h1>
+      <p role="status" class="text-sm text-muted" data-auth-link-status>Checking the secure link.</p>
+      <a href="/login<%= purpose === 'recover' ? '?mode=reset' : '' %>" class="focus-ring mt-6 inline-flex min-h-6 items-center text-accent underline" data-auth-link-retry hidden>
+        <%= purpose === 'recover' ? 'Request a new recovery link' : 'Return to sign in' %>
+      </a>
+    </main>
+    <script type="module" src="/js/pages/auth-link.js" nonce="<%= cspNonce %>"></script>
+  </body>
+</html>

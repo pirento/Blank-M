@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <%- include('../partials/head') %>
+    <meta name="robots" content="noindex, nofollow" />
+  </head>
+  <body>
+    <main class="mx-auto w-full max-w-6xl space-y-6 px-4 py-8 sm:px-6">
+      <header class="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <a href="/" aria-label="Pirento Blank home" class="focus-ring inline-flex min-h-6 items-center"><%- include('../partials/brand') %></a>
+          <h1 class="mt-6 text-[28px] font-normal leading-tight tracking-tight"><%= shared.label || 'Shared trading journal' %></h1>
+          <p class="mt-1 text-sm text-muted">
+            Read-only view shared by a Blank member · link expires
+            <%= new Date(shared.expiresAt).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium' }) %>.
+            Capital and balances are not shared<%= shared.includeNotes ? '' : '; trade notes are hidden' %>.
+          </p>
+        </div>
+      </header>
+      <div data-share></div>
+    </main>
+    <script type="application/json" id="page-data"><%- safeJson({ shared }) %></script>
+    <script src="/vendor/chart.umd.min.js" nonce="<%= cspNonce %>"></script>
+    <script type="module" src="/js/pages/share.js" nonce="<%= cspNonce %>"></script>
+  </body>
+</html>

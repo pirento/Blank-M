@@ -1,0 +1,25 @@
+{
+  "name": "Pirento Blank",
+  "short_name": "Blank",
+  "description": "Trading journal, planning and review.",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#090b0c",
+  "theme_color": "#090b0c",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    { "name": "Journal", "url": "/journal" },
+    { "name": "Watchlist", "url": "/watchlist" },
+    { "name": "Trade book", "url": "/transactions" }
+  ]
+}

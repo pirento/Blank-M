@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <%- include('../partials/head', { title: 'Verify authenticator' }) %>
+  </head>
+  <body>
+    <main class="flex min-h-dvh items-center justify-center bg-canvas px-4 py-8 text-fg">
+      <div class="w-full max-w-md rounded-card border border-line bg-surface">
+        <div class="flex flex-col items-start gap-4 border-b border-line px-4 py-4 sm:px-5">
+          <%- include('../partials/brand') %>
+          <div>
+            <h3 class="text-base font-normal text-fg">Verify your authenticator</h3>
+            <p class="mt-1 text-xs text-muted">Enter your current code to unlock this workspace.</p>
+          </div>
+        </div>
+        <div class="space-y-5 p-4 sm:p-5" data-mfa-challenge>
+          <p role="status" data-mfa-loading>Checking authenticators…</p>
+          <form data-mfa-form class="space-y-4" hidden>
+            <div class="space-y-2" data-factor-picker hidden>
+              <label class="<%= LABEL_CLASS %>" for="mfa-factor">Authenticator</label>
+              <select id="mfa-factor" class="<%= FIELD_CLASS %>"></select>
+            </div>
+            <div class="space-y-2">
+              <label class="<%= LABEL_CLASS %>" for="mfa-signin-code">Authenticator code</label>
+              <input
+                id="mfa-signin-code"
+                inputmode="numeric"
+                autocomplete="one-time-code"
+                pattern="[0-9]{6}"
+                maxlength="6"
+                placeholder="6-digit code"
+                required
+                class="<%= FIELD_CLASS %>"
+              />
+            </div>
+            <button type="submit" class="<%= buttonClass('default', 'default', 'w-full') %>" disabled>Verify and continue</button>
+          </form>
+          <p data-mfa-none hidden>No supported authenticator is available. Contact your workspace administrator for account recovery.</p>
+          <p role="alert" class="text-sm text-negative" data-mfa-error hidden></p>
+          <p class="text-xs leading-relaxed text-muted">
+            Keep a secure backup in your authenticator app. Blank does not issue recovery codes. If every authenticator is lost, a workspace administrator must arrange identity-verified recovery; password reset alone does not bypass this check.
+          </p>
+          <div class="flex flex-wrap gap-3">
+            <button type="button" data-mfa-retry class="<%= buttonClass('outline') %>">Retry check</button>
+            <button type="button" data-sign-out class="<%= buttonClass('ghost') %>">Sign out</button>
+          </div>
+        </div>
+      </div>
+    </main>
+    <script type="module" src="/js/pages/mfa-challenge.js" nonce="<%= cspNonce %>"></script>
+  </body>
+</html>

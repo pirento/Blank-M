@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="<%= locals.lang || 'en' %>">
+  <head>
+    <%- include('../partials/head') %>
+  </head>
+  <body>
+    <div class="workspace-shell">
+      <a
+        href="#main-content"
+        class="focus-ring sr-only fixed left-4 top-4 z-[70] rounded-control bg-surface px-4 py-2 focus:not-sr-only"
+      >
+        Skip to content
+      </a>
+      <div class="flex min-w-0 flex-1 flex-col">
+        <%- include('../partials/topbar') %>
+        <main id="main-content" tabindex="-1" class="workspace-main">
+          <div class="page-enter mx-auto w-full"><%- body %></div>
+        </main>
+      </div>
+      <%- include('../partials/dock') %>
+    </div>
+    <%- include('../partials/menu-template') %>
+    <script type="application/json" id="nav-data"><%- safeJson(allNavLinks.filter((link) => isAdmin || link.path !== '/users')) %></script>
+    <% if (locals.lang && locals.lang !== 'en') { %>
+    <script type="application/json" id="i18n"><%- safeJson(i18nCatalog) %></script>
+    <% } %>
+    <% if (locals.pageData) { %>
+    <script type="application/json" id="page-data"><%- safeJson(pageData) %></script>
+    <% } %>
+    <% for (const file of locals.vendor || []) { %>
+    <script src="/vendor/<%= file %>" nonce="<%= cspNonce %>"></script>
+    <% } %>
+    <script type="module" src="/js/core/shell.js" nonce="<%= cspNonce %>"></script>
+    <% if (locals.script) { %>
+    <script type="module" src="/js/pages/<%= script %>.js" nonce="<%= cspNonce %>"></script>
+    <% } %>
+  </body>
+</html>

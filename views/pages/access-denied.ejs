@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <%- include('../partials/head') %>
+  </head>
+  <body>
+    <main class="flex min-h-dvh flex-col items-center justify-center gap-4 bg-canvas px-6 text-center text-fg">
+      <%- include('../partials/brand') %>
+      <h1 class="mt-4 text-xl font-semibold">Workspace access unavailable</h1>
+      <% if (currentUser) { %><p class="text-sm text-muted">Signed in as <%= currentUser.email %></p><% } %>
+      <p role="alert" class="max-w-md text-sm text-muted" data-access-message>
+        <%= locals.error || 'This account does not have active workspace access. Ask your administrator to check your invitation.' %>
+      </p>
+      <div class="flex flex-wrap justify-center gap-3">
+        <a href="<%= currentPath %>" class="<%= buttonClass('outline') %>">Retry access check</a>
+        <form method="post" action="/auth/logout">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+          <button type="submit" class="<%= buttonClass() %>">Sign out</button>
+        </form>
+      </div>
+    </main>
+  </body>
+</html>

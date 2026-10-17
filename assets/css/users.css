@@ -1,0 +1,117 @@
+.admin-reference-panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: 3px;
+  padding: 24px;
+  margin-bottom: 22px;
+}
+.admin-reference-panel h2 {
+  font-size: 20px;
+  font-weight: 400;
+  line-height: 1.25;
+  letter-spacing: -0.5px;
+  margin-bottom: 20px;
+}
+.admin-reference-intro {
+  color: var(--color-muted);
+  font-size: 14px;
+  line-height: 1.65;
+  margin-bottom: 20px;
+}
+.admin-reference-invite-form {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(160px, 240px);
+  gap: 22px 26px;
+  max-width: 880px;
+}
+.admin-reference-invite-form > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 7px;
+}
+.admin-reference-invite-form label {
+  font-size: 13px;
+  font-weight: 400;
+}
+.admin-reference-invite-form input,
+.admin-reference-invite-form select {
+  min-height: 43px;
+  font-size: 15px;
+}
+.admin-reference-invite-form > button {
+  justify-self: start;
+  min-height: 40px;
+}
+.admin-reference-note {
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.6;
+  margin-top: 20px;
+}
+.admin-reference-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.admin-reference-heading > span {
+  font: 11px var(--font-mono);
+  color: var(--color-muted);
+}
+.admin-reference-empty {
+  padding: 12px 0;
+  font-size: 14px;
+  color: var(--color-muted);
+}
+.admin-reference-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 17px 0;
+  border-bottom: 1px solid var(--color-line);
+  font-size: 14px;
+}
+.admin-reference-row:first-child {
+  padding-top: 0;
+}
+.admin-reference-row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+.admin-reference-actions {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.admin-reference-error {
+  color: var(--color-negative);
+  font-size: 13px;
+  margin-bottom: 20px;
+}
+@media (max-width: 760px) {
+  .admin-reference-panel {
+    padding: 20px 16px;
+    margin-bottom: 18px;
+  }
+  .admin-reference-panel h2 {
+    font-size: 18px;
+  }
+  .admin-reference-intro {
+    font-size: 13px;
+  }
+  .admin-reference-invite-form {
+    grid-template-columns: 1fr;
+    gap: 19px;
+  }
+  .admin-reference-invite-form input,
+  .admin-reference-invite-form select {
+    font-size: 16px;
+  }
+  .admin-reference-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+}

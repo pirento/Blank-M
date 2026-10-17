@@ -1,0 +1,10 @@
+# A flat node_modules (no symlinks): uploads and unzip tools on any host keep it intact.
+nodeLinker: hoisted
+allowBuilds:
+  '@parcel/watcher': true
+  core-js: false
+  mongodb-memory-server: false
+# @tailwindcss/cli pins @parcel/watcher 2.5.1, whose micromatch→braces carries
+# GHSA-vfj7-8cjw-p6xm. 2.6.0 replaces micromatch with picomatch.
+overrides:
+  '@parcel/watcher': 2.6.0

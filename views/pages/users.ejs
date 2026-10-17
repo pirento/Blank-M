@@ -1,0 +1,41 @@
+<div class="admin-reference">
+  <div class="workspace-pagehead">
+    <div>
+      <h1><%= t('Administration') %></h1>
+      <p><%= t('Membership and invitation controls.') %></p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <button type="button" class="<%= buttonClass('outline', 'sm') %>" data-refresh-all>
+        <%- icon('refresh-cw', { size: 14, className: 'mr-2' }) %> Refresh
+      </button>
+    </div>
+  </div>
+  <p role="alert" class="admin-reference-error" data-load-error hidden></p>
+
+  <section class="admin-reference-panel" aria-labelledby="admin-invite-heading">
+    <h2 id="admin-invite-heading">Invite a member</h2>
+    <div class="mb-5 flex flex-wrap gap-2" role="group" aria-label="Invitation method" data-methods></div>
+    <div data-invite></div>
+  </section>
+
+  <section class="admin-reference-panel" aria-labelledby="admin-members-heading">
+    <div class="admin-reference-heading">
+      <h2 id="admin-members-heading">Members</h2>
+      <span data-member-count>00</span>
+    </div>
+    <p class="admin-reference-intro">Accepted memberships and their current workspace access.</p>
+    <div data-members></div>
+  </section>
+
+  <section class="admin-reference-panel" aria-labelledby="admin-invitations-heading">
+    <div class="admin-reference-heading">
+      <h2 id="admin-invitations-heading">Invitations</h2>
+      <span data-invitation-count>00</span>
+    </div>
+    <p class="admin-reference-intro">Private links and email invitations, including their latest status.</p>
+    <div data-private></div>
+    <h3 class="mt-6 mb-3 text-base font-normal">Email invitations</h3>
+    <div data-email-invitations></div>
+    <p class="admin-reference-note">Review failed invitations before resending. Revoke a pending invitation to remove workspace access. Dates are shown in IST.</p>
+  </section>
+</div>

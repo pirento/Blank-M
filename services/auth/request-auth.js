@@ -1,0 +1,31 @@
+/**
+ * Authenticated member lookup for API handlers (and the administrator check).
+ */
+import { authenticatedApi } from '../../middleware/auth.js';
+import { HttpError } from '../errors.js';
+
+/**
+ * The authenticated member for an API request, in the shape the original
+ * handlers used: `user.id`, the workspace profile and an opaque session token.
+ */
+export async function authenticateRequest(req) {
+  const auth = authenticatedApi(req);
+  return {
+    user: { id: auth.user._id, email: auth.user.email },
+    profile: { role: auth.user.role, status: auth.user.status },
+    token: auth.session.sessionId,
+    session: auth.session,
+  };
+}
+
+/**
+ * The authenticated request as for authenticateRequest, or HttpError 403 when the member is not an
+ * administrator.
+ */
+export async function requireAdmin(req) {
+  const auth = await authenticateRequest(req);
+  if (auth.profile.role !== 'admin') {
+    throw new HttpError('Administrator access is required.', 403);
+  }
+  return auth;
+}

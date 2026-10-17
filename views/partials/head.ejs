@@ -1,0 +1,35 @@
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta
+  name="description"
+  content="Blank is a private trading journal for the Indian market with true net P&L, deterministic backtesting, Zerodha market data and OpenAI-powered review."
+/>
+<meta name="theme-color" content="#090b0c" />
+<meta name="color-scheme" content="dark light" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Blank — Trading intelligence, without the noise" />
+<meta property="og:description" content="Record the decision, price the real costs, review the process and improve." />
+<meta property="og:image" content="/blank-og-card.png" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="csrf-token" content="<%= locals.csrfToken || '' %>" />
+<meta name="blank-session" content="<%= locals.sessionIdentity || '' %>" />
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="manifest" href="/manifest.webmanifest" />
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<title><%= locals.fullTitle || (locals.title ? `${title} · Blank` : 'Blank — Trading intelligence, without the noise') %></title>
+<script nonce="<%= cspNonce %>">
+  (function () {
+    var theme = 'light';
+    try {
+      var stored = window.localStorage.getItem('blank_theme');
+      if (stored === 'light' || stored === 'dark') theme = stored;
+    } catch (error) {}
+    document.documentElement.classList.add(theme);
+  })();
+</script>
+<script type="importmap" nonce="<%= cspNonce %>">
+  { "imports": { "zod": "/vendor/zod/index.js" } }
+</script>
+<link rel="stylesheet" href="/css/app.css" />
+<script type="module" src="/js/core/theme.js" nonce="<%= cspNonce %>"></script>

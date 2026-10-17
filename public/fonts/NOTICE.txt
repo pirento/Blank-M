@@ -1,0 +1,18 @@
+Pirento Blank prototype fonts
+
+Nimbus Sans Regular and Bold; Nimbus Mono PS Regular.
+Copyright 2015 URW Software; 2013, 2014 (URW)++ Design & Development.
+These unmodified font assets are licensed under GNU AGPL version 3 with the
+PostScript/PDF font exception stated in LICENSE. They are not SIL OFL fonts.
+See COPYING for the complete AGPL text and its no-warranty terms.
+
+The OTF files are exact copies from the supplied prototype and match upstream
+release 20200910 byte for byte. They have not been subsetted, converted or modified.
+The complete upstream release, including all font formats, metrics, metadata,
+license and documentation, is available alongside the served fonts at
+urw-base35-fonts-20200910-source.tar.gz. Upstream supplies the font files
+directly; no additional build scripts exist in this release.
+
+Upstream: https://github.com/ArtifexSoftware/urw-base35-fonts
+Source release: https://github.com/ArtifexSoftware/urw-base35-fonts/tree/20200910
+Source archive SHA-256: e0d9b7f11885fdfdc4987f06b2aa0565ad2a4af52b22e5ebf79e1a98abd0ae2f

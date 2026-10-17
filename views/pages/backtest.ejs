@@ -1,0 +1,122 @@
+<%
+  const field = `${FIELD_CLASS} border-line-strong`;
+  const dateAgo = (() => { const d = new Date(`${today}T00:00:00Z`); d.setUTCDate(d.getUTCDate() - 365); return d.toISOString().slice(0, 10); })();
+%>
+<div class="space-y-6 py-6">
+  <div class="workspace-pagehead">
+    <div>
+      <h1><%= t('Strategy Backtesting') %></h1>
+      <p><%= t('Simulated on real daily candles, net of brokerage and statutory charges.') %></p>
+    </div>
+  </div>
+  <p class="text-sm text-muted">
+    Long-only research simulation on daily candles. Signals fill at the next open; if a bar
+    reaches both stop and target, the stop is assumed first. Results do not approve a strategy
+    or place trades.
+  </p>
+  <% if (!workspace) { %>
+    <p role="alert" class="text-sm text-muted">Backtesting is paused because fee settings could not be loaded.</p>
+  <% } %>
+
+  <div class="grid grid-cols-1 gap-8 lg:grid-cols-3">
+    <div class="col-span-1 rounded-card border border-line bg-surface">
+      <div class="flex items-start justify-between gap-4 border-b border-line px-4 py-4 sm:px-5">
+        <h3 class="flex items-center gap-2 text-base font-normal text-fg"><%- icon('settings-2', { size: 18 }) %> Engine Config</h3>
+      </div>
+      <div class="p-4 sm:p-5">
+        <form class="space-y-4" data-backtest-form novalidate>
+          <fieldset class="min-w-0 space-y-4" <%= workspace ? '' : 'disabled' %>>
+            <div class="space-y-2">
+              <label for="bt-saved-strategy" class="<%= LABEL_CLASS %>">Saved draft for evidence (optional)</label>
+              <select id="bt-saved-strategy" name="strategyId" class="<%= field %>">
+                <option value="">Unlinked simulation</option>
+                <% for (const strategy of (workspace?.strategies ?? [])) { %>
+                  <option value="<%= strategy.id %>"><%= strategy.name %> · <%= strategy.date %> · <%= strategy.id.slice(0, 8) %></option>
+                <% } %>
+              </select>
+              <p class="text-xs text-muted">This freezes the written draft as context. The engine tests only the selected indicator rules below; it does not interpret prose.</p>
+            </div>
+            <div class="space-y-2">
+              <label for="bt-symbol" class="<%= LABEL_CLASS %>">Asset symbol (NSE)</label>
+              <input id="bt-symbol" name="symbol" value="RELIANCE" placeholder="RELIANCE" required class="<%= field %>">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div class="space-y-2">
+                <label for="bt-from" class="<%= LABEL_CLASS %>">Start date</label>
+                <input id="bt-from" name="from" type="date" value="<%= dateAgo %>" required class="<%= field %>">
+              </div>
+              <div class="space-y-2">
+                <label for="bt-to" class="<%= LABEL_CLASS %>">End date</label>
+                <input id="bt-to" name="to" type="date" value="<%= today %>" required class="<%= field %>">
+              </div>
+            </div>
+            <p class="text-xs text-muted">Date range uses UTC boundaries: the start date is included and the end date is excluded.</p>
+            <div class="space-y-2">
+              <label for="bt-capital" class="<%= LABEL_CLASS %>">Initial capital (₹)</label>
+              <input id="bt-capital" name="capital" type="number" min="1" value="100000" required class="<%= field %>">
+            </div>
+            <div class="space-y-2">
+              <label for="bt-size" class="<%= LABEL_CLASS %>">Position size (% of equity)</label>
+              <input id="bt-size" name="size" type="number" min="1" max="100" value="100" class="<%= field %>">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div class="space-y-2">
+                <label for="bt-sl" class="<%= LABEL_CLASS %>">Stop loss %</label>
+                <input id="bt-sl" name="stopLoss" type="number" min="0" step="0.1" value="0" class="<%= field %>">
+              </div>
+              <div class="space-y-2">
+                <label for="bt-tp" class="<%= LABEL_CLASS %>">Take profit %</label>
+                <input id="bt-tp" name="takeProfit" type="number" min="0" step="0.1" value="0" class="<%= field %>">
+              </div>
+            </div>
+            <div class="mt-4 space-y-4 border-t border-line pt-4">
+              <div class="space-y-2">
+                <label for="bt-strategy" class="<%= LABEL_CLASS %>">Strategy</label>
+                <select id="bt-strategy" name="kind" class="<%= field %>">
+                  <option value="sma-cross">SMA crossover</option>
+                  <option value="ema-cross">EMA crossover</option>
+                  <option value="rsi-reversion">RSI mean reversion</option>
+                </select>
+                <p class="text-xs leading-relaxed text-muted" data-kind-description></p>
+              </div>
+              <div class="grid grid-cols-3 gap-2" data-rsi-fields hidden>
+                <div class="space-y-2">
+                  <label for="bt-rsi" class="<%= LABEL_CLASS %>">Period</label>
+                  <input id="bt-rsi" name="rsiPeriod" type="number" min="2" value="14" class="<%= field %>">
+                </div>
+                <div class="space-y-2">
+                  <label for="bt-os" class="<%= LABEL_CLASS %>">Oversold</label>
+                  <input id="bt-os" name="rsiOversold" type="number" min="1" max="99" value="30" class="<%= field %>">
+                </div>
+                <div class="space-y-2">
+                  <label for="bt-ob" class="<%= LABEL_CLASS %>">Overbought</label>
+                  <input id="bt-ob" name="rsiOverbought" type="number" min="1" max="99" value="70" class="<%= field %>">
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-4" data-ma-fields>
+                <div class="space-y-2">
+                  <label for="bt-fast" class="<%= LABEL_CLASS %>">Fast period</label>
+                  <input id="bt-fast" name="fastPeriod" type="number" min="2" value="10" class="<%= field %>">
+                </div>
+                <div class="space-y-2">
+                  <label for="bt-slow" class="<%= LABEL_CLASS %>">Slow period</label>
+                  <input id="bt-slow" name="slowPeriod" type="number" min="3" value="50" class="<%= field %>">
+                </div>
+              </div>
+            </div>
+            <p role="alert" class="mt-1 text-xs text-negative" data-form-error hidden></p>
+            <button type="submit" class="<%= buttonClass('default', 'default', 'mt-4 w-full') %>" data-run>Run backtest</button>
+          </fieldset>
+          <button type="button" class="<%= buttonClass('outline') %>" data-cancel hidden>Cancel simulation</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="col-span-1 flex flex-col rounded-card border border-line bg-elevated lg:col-span-2">
+      <div class="flex items-start justify-between gap-4 border-b border-line px-4 py-4 sm:px-5">
+        <h3 class="text-base font-normal text-fg">Backtest Results</h3>
+      </div>
+      <div class="flex-1 p-4 sm:p-5" data-results></div>
+    </div>
+  </div>
+</div>

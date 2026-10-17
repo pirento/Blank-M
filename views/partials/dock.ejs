@@ -1,0 +1,19 @@
+<div class="workspace-dock hide-on-print">
+  <span class="workspace-dock-caption" aria-hidden="true"><%= t('Workspace') %></span>
+  <nav aria-label="<%= t('Primary') %>" class="workspace-dock-nav">
+    <% for (const link of primaryLinks) { const active = currentPath === link.path; %>
+    <a
+      href="<%= link.path %>"
+      <% if (active) { %>aria-current="page"<% } %>
+      class="focus-ring workspace-dock-link"
+    >
+      <%- icon(link.icon, { size: 18 }) %>
+      <span><%= link.name %></span>
+      <% if (link.path === '/watchlist' && locals.workspace && workspace.watchlist.length) { %>
+      <sup aria-label="<%= workspace.watchlist.length %> instruments"><%= workspace.watchlist.length %></sup>
+      <% } %>
+    </a>
+    <% } %>
+  </nav>
+  <span class="workspace-dock-caption" aria-hidden="true">0.3</span>
+</div>

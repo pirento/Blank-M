@@ -1,0 +1,15 @@
+<div class="space-y-6 py-6">
+  <div class="workspace-pagehead">
+    <div>
+      <h1><%= t('Import trades') %></h1>
+      <p><%= t('Preview and import your broker CSV or Excel workbook.') %></p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2" data-head-actions></div>
+  </div>
+  <% if (!workspace) { %>
+    <p role="alert" class="text-sm text-muted">Import is paused because account data could not be loaded.</p>
+  <% } %>
+  <input type="file" class="sr-only" data-file-input tabindex="-1" aria-hidden="true"
+    accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+  <div class="space-y-6" data-import-root></div>
+</div>

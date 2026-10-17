@@ -1,0 +1,12 @@
+# crontab -e  (server clock in UTC; adjust if your server uses another timezone)
+# Load the same APP_URL and CRON_SECRET the server uses, e.g. from /srv/blank/.env.
+
+# Daily 02:00 UTC (07:30 IST): remove expired temporary voice-note uploads.
+0 2 * * * cd /srv/blank && set -a && . ./.env && set +a && node scripts/maintenance-voice-notes.js >> /var/log/blank-cron.log 2>&1
+
+# Monday 02:30 UTC (08:00 IST): weekly report emails for members who opted in.
+30 2 * * 1 cd /srv/blank && set -a && . ./.env && set +a && node scripts/send-weekly-reports.js >> /var/log/blank-cron.log 2>&1
+
+# Every 5 minutes, Monday–Friday 03:45–10:00 UTC (09:15–15:30 IST): paper trade stops/targets
+# and price alerts.
+*/5 3-10 * * 1-5 cd /srv/blank && set -a && . ./.env && set +a && node scripts/price-checks.js >> /var/log/blank-cron.log 2>&1

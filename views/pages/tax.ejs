@@ -1,0 +1,16 @@
+<div class="mx-auto max-w-5xl space-y-6 py-6">
+  <div class="workspace-pagehead">
+    <div>
+      <h1><%= t('Tax report') %></h1>
+      <p><%= t('Your journal summarised by Indian financial year, for ITR working with your CA.') %></p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <label for="tax-year" class="sr-only">Financial year</label>
+      <select id="tax-year" class="<%= FIELD_CLASS %> w-auto" data-year></select>
+      <button type="button" class="<%= buttonClass('outline') %>" data-tax-csv>
+        <%- icon('download', { size: 14, className: 'mr-2' }) %> Download CSV
+      </button>
+    </div>
+  </div>
+  <div data-tax></div>
+</div>

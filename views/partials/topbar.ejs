@@ -1,0 +1,34 @@
+<% const currentLink = allNavLinks.find((item) => item.path === currentPath); %>
+<header class="workspace-topbar hide-on-print">
+  <a href="/dashboard" aria-label="Blank overview" class="focus-ring shrink-0 rounded-control">
+    <%- include('brand', { brandClass: 'workspace-brand' }) %>
+  </a>
+  <div class="workspace-breadcrumb">
+    <span><%= t('Workspace') %></span>
+    <span aria-hidden="true">/</span>
+    <span class="text-fg"><%= currentLink ? currentLink.name : t('Page not found') %></span>
+  </div>
+  <div class="workspace-topbar-actions">
+    <span class="workspace-session-status" data-market-status title="Indicative NSE equity hours (09:15–15:30 IST) and listed holidays. Verify exchange notices.">Market <b>unverified</b></span>
+    <time class="workspace-clock" data-ist-clock></time>
+    <a href="/settings" class="focus-ring workspace-topbar-control">
+      <%- icon('link-2', { size: 14 }) %>
+      <span><%= t('Account settings') %></span>
+    </a>
+    <button
+      type="button"
+      data-open-menu
+      aria-label="<%= t('Open menu') %><%= memberEmail ? ` for ${memberEmail}` : '' %>"
+      title="<%= memberEmail %>"
+      aria-haspopup="dialog"
+      aria-expanded="false"
+      class="focus-ring workspace-avatar"
+    >
+      <%= memberInitials %>
+    </button>
+  </div>
+</header>
+<div class="workspace-environment-strip">
+  <span><b><%= t('MEMBER WORKSPACE') %></b> <%= t('Your research and plans · Live execution unavailable') %></span>
+  <span class="status-end"><%= t('Broker connection in Settings') %></span>
+</div>

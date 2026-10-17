@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <%- include('../partials/head') %>
+  </head>
+  <body>
+    <main class="login blank-invitation mx-auto px-6 py-16" style="max-width: 520px" data-invitation>
+      <a href="/" aria-label="Pirento Blank home" class="focus-ring inline-flex min-h-6 items-center"><%- include('../partials/brand') %></a>
+      <h1 class="mt-10 mb-4 text-[32px] font-normal leading-tight tracking-tight" data-invitation-title>Accept your invitation.</h1>
+      <div class="space-y-5" data-invitation-accepted hidden>
+        <p role="status" class="text-sm text-muted">
+          Membership created for <span class="break-all" data-accepted-email></span>. Sign in using your invited email and chosen password.
+        </p>
+        <a href="/login" class="focus-ring inline-flex min-h-6 items-center text-accent underline">Sign in</a>
+      </div>
+      <p role="alert" class="text-sm text-muted" data-invitation-missing hidden>
+        Open the complete private invitation link provided by your administrator. The token is removed from the address bar after opening; re-open the original link if you refreshed this page.
+      </p>
+      <div data-invitation-form-wrap hidden>
+        <p class="mb-6 text-sm text-muted">
+          Choose the password for your invited membership. Private links expire after 48 hours and can be accepted once.
+        </p>
+        <form class="space-y-5" data-invitation-form>
+          <div class="space-y-2">
+            <label class="<%= LABEL_CLASS %>" for="invitation-password">New password · at least 12 characters</label>
+            <input
+              id="invitation-password"
+              type="password"
+              required
+              minlength="12"
+              maxlength="128"
+              autocomplete="new-password"
+              class="<%= FIELD_CLASS %>"
+            />
+          </div>
+          <p id="invitation-error" role="alert" class="mt-1 text-xs text-negative" hidden></p>
+          <button type="submit" class="<%= buttonClass() %>">Create my membership</button>
+        </form>
+        <p role="status" class="mt-5 text-sm text-muted" data-invitation-review hidden>
+          Your administrator can inspect the invitation’s status. No successful activation has been confirmed.
+        </p>
+      </div>
+    </main>
+    <script type="module" src="/js/pages/accept-invitation.js" nonce="<%= cspNonce %>"></script>
+  </body>
+</html>

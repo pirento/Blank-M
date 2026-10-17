@@ -1,0 +1,22 @@
+<div class="space-y-6 py-6">
+  <div class="workspace-pagehead">
+    <div>
+      <h1><%= t('Rules & strategy') %></h1>
+      <p><%= t('Write your process. Keep revisions explicit.') %></p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <button type="button" class="<%= buttonClass() %>" data-new-strategy <%= workspace ? '' : 'disabled' %>>
+        <%- icon('plus', { size: 16, className: 'mr-2' }) %> New strategy
+      </button>
+    </div>
+  </div>
+  <% if (!workspace) { %>
+    <p role="alert" class="text-sm text-muted">Your strategy and rules could not be loaded. Reload before making changes.</p>
+  <% } %>
+  <div class="space-y-6" data-written-editors></div>
+  <div data-evidence-panel></div>
+  <details class="rr-library">
+    <summary data-library-summary>Strategy library</summary>
+    <div data-library></div>
+  </details>
+</div>

@@ -1,0 +1,15 @@
+<div class="space-y-6 py-6" data-calculator>
+  <div class="workspace-pagehead">
+    <div>
+      <h1><%= t('Risk calculator') %></h1>
+      <p data-calculator-description>Manual planning · All prices and margin inputs are illustrative.</p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <a class="<%= buttonClass('outline') %>" href="/orders">Order review <%- icon('arrow-right', { size: 14, className: 'ml-2' }) %></a>
+    </div>
+  </div>
+  <p role="alert" class="mt-1 text-xs text-negative" data-strategy-missing hidden>
+    The selected strategy is no longer available. Choose a current strategy or clear the selection before saving.
+  </p>
+  <div data-calculator-root></div>
+</div>

@@ -1,0 +1,35 @@
+# Local or single-server deployment: the app plus MongoDB.
+# Usage: cp .env.example .env  (set SESSION_SECRET, APP_URL, …)  then  docker compose up -d --build
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    # Matches the 30 s request drain in server.js (Docker's default is 10 s).
+    stop_grace_period: 35s
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      MONGODB_URI: mongodb://mongo:27017/blank
+      # The app listens on localhost only; put Nginx (HTTPS) in front of it.
+      # Production session cookies are Secure, so sign-in needs HTTPS.
+      TRUST_PROXY: 'true'
+    ports:
+      - '127.0.0.1:3000:3000'
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ['CMD', 'mongosh', '--quiet', '--eval', 'db.adminCommand("ping").ok']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  mongo-data:

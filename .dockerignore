@@ -1,0 +1,11 @@
+node_modules
+.git
+.github
+coverage
+tests
+docs
+public/css/app.css
+.env
+.env.*
+!.env.example
+*.log

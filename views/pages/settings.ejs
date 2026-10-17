@@ -1,0 +1,48 @@
+<%
+  const member = pageData;
+  const loginMethod = member.loginMethod === 'oauth' ? 'Google' : 'Invited email + password';
+%>
+<div class="space-y-6 py-6">
+  <div class="workspace-pagehead">
+    <div>
+      <h1><%= t('Settings') %></h1>
+      <p><%= t('Your profile, broker connection and planning preferences.') %></p>
+    </div>
+  </div>
+
+  <div class="settings-reference-grid">
+    <div class="rounded-card border border-line bg-surface">
+      <div class="border-b border-line px-4 py-4 sm:px-5"><h3 class="text-base font-normal text-fg">Profile &amp; session</h3></div>
+      <div class="p-4 sm:p-5">
+        <p class="mb-4 break-all text-sm"><%= member.email || 'No verified email available' %></p>
+        <dl class="preference-ledger">
+          <div><dt>Login method</dt><dd><%= loginMethod %></dd></div>
+          <div><dt>Timezone</dt><dd>Asia/Kolkata</dd></div>
+          <div><dt>Membership</dt><dd><%= member.role %> · <%= member.status %></dd></div>
+        </dl>
+        <button type="button" class="<%= buttonClass('outline', 'default', 'mt-5') %>" data-sign-out>Sign out</button>
+      </div>
+    </div>
+    <div data-broker></div>
+    <div data-dhan></div>
+  </div>
+  <div data-capital></div>
+  <div data-risk-limits></div>
+  <div data-mfa></div>
+  <div data-username></div>
+  <div data-sessions></div>
+  <div data-live-trading></div>
+  <div data-email-reports></div>
+  <div data-language></div>
+  <div data-notifications></div>
+  <div data-telegram></div>
+  <div data-share-links></div>
+  <div data-backup></div>
+  <div class="grid gap-6 xl:grid-cols-2">
+    <div data-ai></div>
+    <div class="xl:col-span-2" data-model-routing <%= member.role === 'admin' ? '' : 'hidden' %>></div>
+    <div class="xl:col-span-2" data-charges></div>
+    <div data-fo-charges-futures></div>
+    <div data-fo-charges-options></div>
+  </div>
+</div>

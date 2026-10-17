@@ -1,0 +1,213 @@
+<%
+const PROCESS = [
+  { title: 'Start with the market.', description: 'Review market conditions and an explained shortlist. Save the instruments that fit your process.', tools: 'Today + Watchlist' },
+  { title: 'Put numbers to the idea.', description: 'Choose your capital, stop and account risk. Review position size, costs and the planned outcome.', tools: 'Calculator + Orders' },
+  { title: 'Keep an honest record.', description: 'Compare the plan with actual executions. Review results, rules and strategy changes.', tools: 'Trade book + Reports' },
+];
+const FEATURES = [
+  { title: 'Risk in plain sight.', description: 'Account risk and stop distance are separate controls. See the quantity, stop, target and estimated cost together.' },
+  { title: 'Reasoning you can review.', description: 'AI explanations are designed to reference market evidence and your own records. Strategy suggestions remain drafts until reviewed.' },
+  { title: 'A workspace by invitation.', description: 'The production platform is planned around private accounts, admin invitations and separate broker connections.' },
+  { title: 'Your record, kept together.', description: 'The full build connects execution history, import reconciliation and day, week or month reports.' },
+];
+const QUESTIONS = [
+  { question: 'Can this preview place real trades?', answer: 'No. The public preview uses fictional prices and is disconnected from trading. Blank is a journal and research workspace; it does not place, edit or cancel orders.' },
+  { question: 'How will Zerodha connect?', answer: 'Broker access needs a configured integration and a separate authorization. The existing Zerodha Kite integration is for read-only market research. Signing in to Blank does not connect a broker, and this preview connects to no provider.' },
+  { question: 'Does AI control the account?', answer: 'No. AI features support research and review when configured. They cannot execute trades. Their output can be incomplete or incorrect, and you remain responsible for your trading decisions.' },
+  { question: 'Who can access the platform?', answer: 'The public preview is open to everyone. The member workspace requires an active invitation and sign-in with the invited email. Viewing this page does not create an account or grant member access.' },
+];
+const SAMPLE_WATCHLIST = [
+  { symbol: 'RELIANCE', name: 'Reliance Industries', price: '1420.50', change: '+1.28%', up: true },
+  { symbol: 'HDFCBANK', name: 'HDFC Bank', price: '985.80', change: '−0.54%', up: false },
+  { symbol: 'ICICIBANK', name: 'ICICI Bank', price: '1348.20', change: '+0.83%', up: true },
+];
+// Deterministic illustration only; never read from a quote service.
+const SAMPLE_CANDLES = Array.from({ length: 46 }, (_, index) => {
+  const base = 1420.5 * (0.976 + (0.024 * index) / 45 + 0.004 * Math.sin(index * 0.72));
+  const open = base + 1420.5 * 0.002 * Math.sin(index * 2.1);
+  const close = base + 1420.5 * 0.0025 * Math.cos(index * 1.8);
+  return { open, close, high: Math.max(open, close) + 1420.5 * 0.0025, low: Math.min(open, close) - 1420.5 * 0.002, volume: 15 + Math.abs(Math.sin(index * 1.2)) * 30 + (index % 7) * 3 };
+});
+const high = Math.max(...SAMPLE_CANDLES.map((c) => c.high)) + 1420.5 * 0.003;
+const low = Math.min(...SAMPLE_CANDLES.map((c) => c.low)) - 1420.5 * 0.003;
+const y = (value) => 24 + ((high - value) / (high - low)) * 205;
+const pitch = 700 / SAMPLE_CANDLES.length;
+%>
+<!doctype html>
+<html lang="en">
+  <head>
+    <%- include('../partials/head', { fullTitle: 'Pirento Blank | Trade with intention' }) %>
+  </head>
+  <body>
+    <div class="blank-landing">
+      <a class="landing-skip-link" href="#main-content">Skip to content</a>
+      <header class="landing-header">
+        <a href="/" aria-label="Pirento Blank home" class="landing-brand-link"><%- include('../partials/brand') %></a>
+        <nav aria-label="Public navigation" class="landing-nav">
+          <a href="#about">Platform</a>
+          <a href="#process">How it works</a>
+          <a href="#features">Features</a>
+          <a href="/login" class="landing-button">Get started <%- icon('arrow-right', { size: 17 }) %></a>
+        </nav>
+      </header>
+      <main id="main-content" tabindex="-1">
+        <section class="landing-hero" aria-labelledby="landing-title">
+          <div class="landing-hero-label">
+            <p class="landing-eyebrow">INDEPENDENT THINKING. DISCIPLINED TRADING.</p>
+            <span class="landing-edition">PIRENTO / BLANK</span>
+          </div>
+          <div class="landing-hero-heading">
+            <h1 id="landing-title">Trade with<br /><span>intention.</span></h1>
+            <div class="landing-hero-aside">
+              <p>One private workspace.<br />From the first market idea<br />to the last trade review.</p>
+              <div class="landing-actions">
+                <a href="/prototype/index.html" class="landing-button">Explore the prototype <%- icon('arrow-right', { size: 17 }) %></a>
+              </div>
+              <small class="landing-fineprint">Built around your process.<br />Designed to connect with Zerodha.</small>
+            </div>
+          </div>
+          <figure id="preview" class="landing-preview" aria-labelledby="preview-caption">
+            <div class="landing-product-stage">
+              <div class="landing-terminal">
+                <div class="landing-terminal-top">
+                  <%- include('../partials/brand', { brandClass: 'landing-terminal-brand' }) %>
+                  <span class="landing-terminal-caption">THE TRADING WORKSPACE</span>
+                  <span class="landing-sample-label">SAMPLE DATA</span>
+                </div>
+                <div class="landing-terminal-body">
+                  <div class="landing-terminal-watch" aria-label="Fictional sample watchlist">
+                    <p class="landing-mini-heading">YOUR WATCHLIST <span>03</span></p>
+                    <ul class="landing-stock-list">
+                      <% SAMPLE_WATCHLIST.forEach((stock, index) => { %>
+                      <li class="landing-mini-stock<%= index === 0 ? ' is-selected' : '' %>">
+                        <div><strong><%= stock.symbol %></strong><span><%= stock.name %></span></div>
+                        <div><strong><%= stock.price %></strong><span class="<%= stock.up ? 'is-positive' : 'is-negative' %>"><%= stock.change %></span></div>
+                      </li>
+                      <% }) %>
+                    </ul>
+                    <p class="landing-terminal-note">Research.<br />Set your risk.<br />Make the call.</p>
+                  </div>
+                  <div class="landing-terminal-chart">
+                    <div class="landing-chart-heading">
+                      <div>
+                        <span class="landing-mini-heading">RELIANCE / NSE</span>
+                        <p class="landing-preview-price">1,420<span>.50</span></p>
+                      </div>
+                      <span class="landing-pill">EXAMPLE SESSION</span>
+                    </div>
+                    <svg viewBox="0 0 790 300" role="img" aria-label="Fictional RELIANCE five-minute candlestick example, not live market data" class="landing-candle-chart">
+                      <% for (let index = 0; index < 5; index++) { const value = high - ((high - low) * index) / 4; %>
+                      <g>
+                        <line x1="0" y1="<%= y(value) %>" x2="710" y2="<%= y(value) %>" class="landing-chart-grid" />
+                        <text x="726" y="<%= y(value) + 4 %>" class="landing-chart-axis"><%= value.toFixed(2) %></text>
+                      </g>
+                      <% } %>
+                      <% SAMPLE_CANDLES.forEach((candle, index) => { const x = index * pitch + pitch / 2; %>
+                      <g class="<%= candle.close >= candle.open ? 'is-positive' : 'is-negative' %>">
+                        <line x1="<%= x %>" x2="<%= x %>" y1="<%= y(candle.high) %>" y2="<%= y(candle.low) %>" stroke="currentColor" stroke-width="1.2" />
+                        <rect x="<%= x - pitch * 0.24 %>" y="<%= Math.min(y(candle.open), y(candle.close)) %>" width="<%= pitch * 0.48 %>" height="<%= Math.max(1.5, Math.abs(y(candle.open) - y(candle.close))) %>" fill="currentColor" />
+                        <rect x="<%= x - pitch * 0.24 %>" y="<%= 282 - candle.volume * 0.55 %>" width="<%= pitch * 0.48 %>" height="<%= candle.volume * 0.55 %>" fill="currentColor" opacity="0.15" />
+                      </g>
+                      <% }) %>
+                      <text x="0" y="298" class="landing-chart-axis">SESSION START</text>
+                      <text x="560" y="298" class="landing-chart-axis">ILLUSTRATIVE BARS</text>
+                    </svg>
+                    <dl class="landing-terminal-measures">
+                      <div><dt>ACCOUNT RISK</dt><dd>1.00%</dd></div>
+                      <div><dt>RISK : REWARD</dt><dd>1 : 3</dd></div>
+                      <div><dt>ORDER STATUS</dt><dd>Not submitted</dd></div>
+                    </dl>
+                  </div>
+                </div>
+                <div class="landing-terminal-bottom" aria-hidden="true">
+                  <span>Overview</span><span>Today</span><span>Watchlist</span><span class="is-selected">Calculator</span><span>Orders</span><span>Trade book</span><span>Reports</span>
+                </div>
+              </div>
+            </div>
+            <figcaption id="preview-caption" class="landing-preview-caption">
+              <span>01 — THE WORKSPACE</span>
+              <span>Interface preview · Fictional prices · Trading disconnected</span>
+            </figcaption>
+          </figure>
+        </section>
+
+        <section id="about" class="landing-section landing-intro" aria-labelledby="about-heading">
+          <div>
+            <p class="landing-section-index">01 / THE PLATFORM</p>
+            <h2 id="about-heading">A place for your<br />whole trading day.</h2>
+          </div>
+          <div class="landing-intro-copy">
+            <p>Pirento Blank brings research, position sizing, order review and your trading journal into one focused workspace.</p>
+            <p>Keep the reasoning beside the numbers. Understand what you planned, what happened, and what deserves a closer look tomorrow. Your funds remain in your brokerage account.</p>
+            <a href="#process" class="landing-text-link">See the process <%- icon('arrow-right', { size: 20 }) %></a>
+          </div>
+        </section>
+
+        <section id="process" class="landing-section landing-split landing-process-section" aria-labelledby="process-heading">
+          <div>
+            <p class="landing-section-index">02 / THE PROCESS</p>
+            <h2 id="process-heading">Less switching.<br />More perspective.</h2>
+          </div>
+          <ol class="landing-process-list">
+            <% PROCESS.forEach((step, index) => { %>
+            <li class="landing-process-row">
+              <span class="landing-process-number" aria-hidden="true">0<%= index + 1 %></span>
+              <div>
+                <h3><%= step.title %></h3>
+                <p><%= step.description %></p>
+                <span class="landing-process-tag"><%= step.tools %></span>
+              </div>
+            </li>
+            <% }) %>
+          </ol>
+        </section>
+
+        <section id="features" class="landing-section landing-split landing-feature-section" aria-labelledby="features-heading">
+          <div>
+            <p class="landing-section-index">03 / WHY PIRENTO BLANK</p>
+            <h2 id="features-heading">The details<br />make the difference.</h2>
+          </div>
+          <div class="landing-feature-list">
+            <% FEATURES.forEach((feature, index) => { %>
+            <article>
+              <span class="landing-feature-number" aria-hidden="true">0<%= index + 1 %></span>
+              <h3><%= feature.title %></h3>
+              <p><%= feature.description %></p>
+            </article>
+            <% }) %>
+          </div>
+        </section>
+
+        <section id="questions" class="landing-section landing-split landing-faq-section" aria-labelledby="questions-heading">
+          <div>
+            <p class="landing-section-index">BEFORE YOU BEGIN</p>
+            <h2 id="questions-heading">A few things<br />to know.</h2>
+          </div>
+          <div class="landing-questions">
+            <% QUESTIONS.forEach(({ question, answer }) => { %>
+            <details>
+              <summary><%= question %> <%- icon('plus', { size: 19 }) %></summary>
+              <p><%= answer %></p>
+            </details>
+            <% }) %>
+          </div>
+        </section>
+
+        <section class="landing-closing" aria-labelledby="closing-heading">
+          <div>
+            <p class="landing-section-index">YOUR NEXT TRADING DAY</p>
+            <h2 id="closing-heading">Start with a plan.</h2>
+          </div>
+          <div class="landing-closing-action">
+            <a href="/prototype/index.html" class="landing-button">Explore the workspace <%- icon('arrow-right', { size: 17 }) %></a>
+          </div>
+        </section>
+      </main>
+      <footer class="landing-footer">
+        <a href="/" aria-label="Pirento Blank home" class="landing-brand-link"><%- include('../partials/brand') %></a>
+        <p>Interface prototype 0.3 · Independent of Zerodha</p>
+        <a href="#about" class="landing-footer-link">Back to the platform ↑</a>
+      </footer>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,22 @@
+# /etc/nginx/sites-available/blank  — reverse proxy in front of the Node server.
+# Replace blank.example.com, then:  sudo certbot --nginx -d blank.example.com
+server {
+    listen 80;
+    server_name blank.example.com;
+
+    # Statement and workbook uploads are limited to 10 MB, backups to 25 MB.
+    client_max_body_size 26m;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Request-Id $request_id;
+        # AI chat streams its answer; do not buffer it.
+        proxy_buffering off;
+        proxy_read_timeout 180s;
+    }
+}

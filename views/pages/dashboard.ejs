@@ -1,0 +1,124 @@
+<div class="reference-page reference-overview">
+  <div class="reference-page-heading">
+    <div>
+      <h1><%= t('Overview') %></h1>
+      <p><%= t('Your market, plans and account at a glance.') %></p>
+    </div>
+    <a href="/today" class="<%= buttonClass('primary', 'sm') %>">Open Today <%- icon('arrow-right', { size: 14, className: 'ml-2' }) %></a>
+  </div>
+
+  <dl class="reference-account-ledger">
+    <div>
+      <dt><%= t('Planning capital') %></dt>
+      <dd class="reference-ledger-value"><%= formatCurrency(workspace.settings.openingBalance) %></dd>
+      <dd class="reference-ledger-hint"><%= t('Manual opening balance') %></dd>
+    </div>
+    <div>
+      <dt><%= t('Realised P&L') %></dt>
+      <dd class="reference-ledger-value">—</dd>
+      <dd class="reference-ledger-hint"><%= t('Broker executions unavailable') %></dd>
+    </div>
+    <div>
+      <dt><%= t('Open positions') %></dt>
+      <dd class="reference-ledger-value">—</dd>
+      <dd class="reference-ledger-hint"><%= t('Awaiting broker data') %></dd>
+    </div>
+    <div>
+      <dt><%= t('Prepared plans') %></dt>
+      <dd class="reference-ledger-value" data-plan-count>—</dd>
+      <dd class="reference-ledger-hint"><%= t('Not submitted') %></dd>
+    </div>
+  </dl>
+
+  <div data-risk-today></div>
+
+  <div class="reference-overview-grid">
+    <section aria-label="Market workspace" class="reference-market-workspace">
+      <div class="reference-panel-heading">
+        <h2><%= t('Market workspace') %></h2>
+        <span class="reference-pill"><%= t('Research only') %></span>
+      </div>
+      <div class="reference-market-split">
+        <aside class="reference-instrument-list" aria-label="Your instruments">
+          <div class="reference-list-heading">
+            <span><%= t('Your watchlist') %></span>
+            <span><%= String(workspace.watchlist.length).padStart(2, '0') %></span>
+          </div>
+          <div data-instruments>
+            <% if (!workspace.watchlist.length) { %>
+            <p class="reference-instrument-empty"><%= t('Your watchlist is empty. Save an instrument to start your research.') %></p>
+            <% } %>
+          </div>
+          <a href="/today" class="focus-ring reference-list-add"><%- icon('plus', { size: 16 }) %> Find instruments</a>
+          <a href="/watchlist" class="focus-ring reference-list-add">
+            <%= workspace.watchlist.length ? 'Manage watchlist' : 'Add instruments' %> <%- icon('arrow-right', { size: 13 }) %>
+          </a>
+        </aside>
+        <div class="reference-chart-surface" data-chart-surface></div>
+      </div>
+    </section>
+    <aside class="reference-account-rail" aria-label="Account and playbook">
+      <section class="reference-broker-card" aria-label="Trading account">
+        <div class="reference-panel-heading">
+          <h2><%= t('Trading account') %></h2>
+          <%- icon('link-2', { size: 15, className: 'text-muted' }) %>
+        </div>
+        <div class="reference-broker-name">
+          <span class="reference-broker-initial" aria-hidden="true">Z</span>
+          <div>
+            <p class="text-sm font-medium">Zerodha</p>
+            <p class="mt-1 text-[11px] text-muted" aria-live="polite" data-broker-status><%= t('Checking connection…') %></p>
+          </div>
+        </div>
+        <dl class="reference-broker-summary">
+          <div class="flex justify-between gap-3"><dt class="text-muted"><%= t('Available margin') %></dt><dd><%= t('Unavailable') %></dd></div>
+          <div class="flex justify-between gap-3"><dt class="text-muted"><%= t('Used margin') %></dt><dd><%= t('Unavailable') %></dd></div>
+          <div class="flex justify-between gap-3"><dt class="text-muted"><%= t('Order submission') %></dt><dd><%= t('Disabled') %></dd></div>
+        </dl>
+        <p class="my-4 text-[11px] leading-5 text-muted">
+          Your journal balance is not a broker-confirmed balance. Linking an account does not enable order submission.
+        </p>
+        <a href="/settings" class="<%= buttonClass('primary', 'sm', 'w-full') %>">Connect account <%- icon('arrow-right', { size: 13, className: 'ml-2' }) %></a>
+      </section>
+      <section class="reference-strategy-card">
+        <p class="reference-eyebrow"><%= t('Your playbook') %></p>
+        <h2><%= workspace.strategies[0]?.name || 'A process of your own' %></h2>
+        <span class="reference-pill reference-pill-outline"><%= t('Research draft') %></span>
+        <p><%= t('Your entry conditions, exits and risk rules stay attached to the plan.') %></p>
+        <small>
+          <%= workspace.strategies.length %> saved <%= workspace.strategies.length === 1 ? 'strategy' : 'strategies' %> ·
+          <%= workspace.rules.length %> <%= workspace.rules.length === 1 ? 'rule' : 'rules' %>
+        </small>
+        <a href="/strategy" class="focus-ring reference-text-link">Review strategy <%- icon('arrow-right', { size: 13 }) %></a>
+      </section>
+    </aside>
+  </div>
+
+  <div class="reference-overview-bottom">
+    <section class="reference-plans-ledger" aria-label="Recent plans">
+      <div class="reference-panel-heading">
+        <h2><%= t('Recent plans') %> <span class="reference-count" data-recent-count>—</span></h2>
+        <a href="/orders" class="focus-ring reference-text-link">All orders <%- icon('arrow-right', { size: 14 }) %></a>
+      </div>
+      <div data-recent-plans></div>
+    </section>
+    <section class="reference-review-note">
+      <span class="reference-eyebrow"><%= t('End-of-day review') %></span>
+      <h2><%= t('The record matters.') %></h2>
+      <p><%= t('Executed trades, estimated costs and planned outcomes remain clearly separated.') %></p>
+      <a href="/transactions" class="focus-ring reference-text-link">Open trade book <%- icon('arrow-right', { size: 14 }) %></a>
+    </section>
+  </div>
+
+  <div class="flex flex-wrap items-end justify-between gap-4 border-t border-line pt-7">
+    <div>
+      <h2 class="text-lg font-semibold"><%= t('Your trading record') %></h2>
+      <p class="mt-1 text-xs leading-6 text-muted" data-record-summary></p>
+    </div>
+    <div role="group" aria-label="Date range" class="flex gap-1 self-start rounded-card bg-elevated p-1" data-range-picker></div>
+  </div>
+
+  <dl class="reference-journal-ledger" data-journal-ledger></dl>
+  <div data-checklist></div>
+  <div class="space-y-4" data-record></div>
+</div>
