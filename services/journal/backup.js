@@ -35,10 +35,14 @@ import {
 } from './workspace.js';
 
 export const BACKUP_FORMAT = 'pirento-blank-backup';
-export /** Execution details from a backup, or none when they do not validate. */
-function restoredExecution(trade) {
+/**
+ * Execution details from a backup. A field that does not validate is dropped on
+ * its own; the others (stop-loss, times, orders) are kept.
+ */
+export function restoredExecution(trade) {
   const { values, errors } = parseTradeExecution(trade, trade);
-  return Object.keys(errors).length ? {} : values;
+  for (const key of Object.keys(errors)) values[key] = key === 'exitLegs' ? [] : null;
+  return values;
 }
 
 const BACKUP_VERSION = 1;

@@ -170,3 +170,33 @@ describe('data backup', () => {
     expect(response.status).toBe(400);
   });
 });
+
+describe('restoring execution details', () => {
+  it('drops only the fields that do not validate', async () => {
+    const { restoredExecution } = await import('../../services/journal/backup.js');
+    const trade = { type: 'Long', entryPrice: 100, quantity: 100 };
+    // Legs that no longer add up to the quantity (say after a hand edit).
+    const values = restoredExecution({
+      ...trade,
+      stopLoss: 95,
+      entryTime: '09:20',
+      exitTime: '15:00',
+      entryOrders: 2,
+      exitLegs: [
+        { price: 105, quantity: 60 },
+        { price: 106, quantity: 30 },
+      ],
+    });
+    expect(values).toMatchObject({
+      stopLoss: 95,
+      entryTime: '09:20',
+      exitTime: '15:00',
+      entryOrders: 2,
+      exitLegs: [],
+    });
+    // An exit time before the entry is dropped; the entry time stays.
+    expect(
+      restoredExecution({ ...trade, entryTime: '10:00', exitTime: '09:00', stopLoss: 120 }),
+    ).toMatchObject({ entryTime: '10:00', exitTime: null, stopLoss: null });
+  });
+});
