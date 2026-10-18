@@ -88,6 +88,15 @@ theek hone par "OK again". Chalu karne ke liye:
   jaata hai; Telegram par khabar aati hai. Intraday (MIS) mein Zerodha GTT nahi deta.
 - **Live price:** Watchlist mein Zerodha ka live price (har second tak). Iske liye Kite Connect app
   mein market data (paid plan) chahiye; free Personal app mein purana refresh hi chalega.
+- **Kahan kamaate, kahan gawaate hain:** Insights page par naya section. Hafte ke din × entry time
+  (09:15–10:00 … 14:00–15:30) ki table mein har khaane ka net P&L aur trades; hara = munafa,
+  laal = nuksaan. Neeche setup, mistake, emotion aur symbol ke Best/Worst (kam se kam 3 trades
+  wale hi). Entry time na bhara ho to trade "Unknown time" mein jaata hai.
+- **Options payoff:** menu → Trading tools → "Options payoff". 6 leg tak (Buy/Sell, Call/Put/Future,
+  strike, premium, lots, lot size — NIFTY ke liye 75) bhariye, ya preset dabaiye (Long call, Bull
+  call spread, Short straddle, Iron condor). Expiry aur aaj ka payoff chart, breakeven, max
+  profit/loss ("Unlimited" bhi) aur Greeks (delta, gamma, theta/din, vega/1% IV) dikhte hain. Sab
+  kuch browser mein hi hota hai; server par kuch nahi jaata, koi order nahi lagta.
 
 ## Tarika 2: Hostinger "Node.js app" (managed hosting)
 

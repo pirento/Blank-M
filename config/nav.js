@@ -20,6 +20,7 @@ export const SECONDARY_NAV_GROUPS = [
       { name: 'Journal', path: '/journal', icon: 'book-open' },
       { name: 'Import', path: '/import', icon: 'upload' },
       { name: 'Paper trading', path: '/paper', icon: 'beaker' },
+      { name: 'Options payoff', path: '/options', icon: 'chart-spline' },
     ],
   },
   {

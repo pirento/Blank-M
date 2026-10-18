@@ -48,6 +48,7 @@ const WORKSPACE_PAGES = [
   ['/insights', 'insights', ['trades', 'strategies'], CHARTS],
   ['/tax', 'tax', ['trades']],
   ['/paper', 'paper', []],
+  ['/options', 'options', []],
 ];
 for (const [path, view, data, vendor] of WORKSPACE_PAGES) {
   router.get(path, requirePageAuth, wrap(pages.workspacePage(view, { data, vendor })));

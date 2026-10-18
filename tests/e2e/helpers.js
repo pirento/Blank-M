@@ -30,6 +30,7 @@ export const WORKSPACE_PAGES = [
   '/insights',
   '/tax',
   '/paper',
+  '/options',
   '/strategy',
   '/reports',
   '/analytics',

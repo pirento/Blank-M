@@ -59,6 +59,7 @@ export const CLIENT_ICONS = [
   'calendar',
   'calendar-days',
   'candlestick-chart',
+  'chart-spline',
   'check',
   'check-check',
   'check-circle-2',
