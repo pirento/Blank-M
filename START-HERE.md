@@ -81,6 +81,11 @@ theek hone par "OK again". Chalu karne ke liye:
 - **Roz ka automatic journal:** Settings → "Daily automatic journal" on kariye. Har trading din
   shaam ~4:15 baje aaj ke Zerodha/Dhan trades journal mein khud aa jaate hain aur din ka P&L
   Telegram par aata hai. Zerodha ke liye us din Blank mein Zerodha login hona chahiye.
+- **Pre-market plan Telegram par:** Settings → "Pre-market plan on Telegram" on kariye. Har trading
+  din subah ~8:45 baje (market khulne se pehle) Telegram par chhota plan aata hai: watchlist, pichhle
+  din ka P&L, aapki baar-baar wali galtiyan, aapke rules aur aaj ki risk limits, aur AI key ho to
+  4–6 focus points. Ye investment advice nahi hai. Server par cron line
+  `scripts/premarket-plan.js` (`deploy/crontab.example`) lagani hogi.
 - **Chart par trade replay:** Transactions mein har trade ke aage candle icon. Us din ke chart par
   entry, exit aur stop-loss dikhte hain (NSE equity). Entry/exit time bhara ho to point bhi lagte hain.
 - **Order ke saath stop-loss/target:** Orders → live order (delivery/CNC buy) mein "Place my

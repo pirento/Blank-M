@@ -125,6 +125,7 @@ describe('AI coach', () => {
       weeklyReportEmail: true,
       weeklyAiCoach: true,
       dailyAutoImport: false,
+      premarketPlan: false,
     });
     const user = await User.findById(userId).lean();
     await sendWeeklyReport(user, { start: '2026-10-05', end: '2026-10-11', type: 'weekly' });

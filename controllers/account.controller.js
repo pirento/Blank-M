@@ -1,6 +1,6 @@
 /**
  * Account endpoints: signed-in devices, data backup export/restore, email
- * report preferences, the weekly report job and live order settings.
+ * report preferences, the scheduled report jobs and live order settings.
  */
 import multer from 'multer';
 import { z } from 'zod';
@@ -19,6 +19,7 @@ import { hasOpenAiKey } from '../services/ai/openai-key.js';
 import { requireMethod } from '../services/http.js';
 import { authorizeMaintenance } from '../services/maintenance/authorize.js';
 import { runDailyImports as runDailyImportsNow } from '../services/broker/daily-import.js';
+import { runPremarketPlans as runPremarketPlansNow } from '../services/ai/premarket-plan.js';
 import {
   lastCompletedWeek,
   sendWeeklyReport,
@@ -107,21 +108,25 @@ export async function importBackup(req, res) {
 
 /* --------------------------------- weekly report email --------------------------------- */
 
-/** GET /api/account/notifications: weekly email and AI coach opt-ins, and whether email and AI are set up. */
+/**
+ * GET /api/account/notifications: weekly email, AI coach, daily journal and pre-market plan opt-ins,
+ * and whether email and AI are set up.
+ */
 export async function getNotifications(req, res) {
   const row = await AccountSettings.findById(req.member.userId).lean();
   res.json({
     weeklyReportEmail: Boolean(row?.weeklyReportEmail),
     weeklyAiCoach: Boolean(row?.weeklyAiCoach),
     dailyAutoImport: Boolean(row?.dailyAutoImport),
+    premarketPlan: Boolean(row?.premarketPlan),
     emailConfigured: isMailConfigured(),
     aiConfigured: hasOpenAiKey(),
   });
 }
 
 /**
- * PUT /api/account/notifications { weeklyReportEmail?, weeklyAiCoach?, dailyAutoImport? }: saves
- * the report opt-ins. 503 when turning on email or AI the server cannot provide.
+ * PUT /api/account/notifications { weeklyReportEmail?, weeklyAiCoach?, dailyAutoImport?,
+ * premarketPlan? }: saves the report opt-ins. 503 when turning on email or AI the server cannot provide.
  */
 export async function saveNotifications(req, res) {
   const parsed = z
@@ -129,6 +134,7 @@ export async function saveNotifications(req, res) {
       weeklyReportEmail: z.boolean().optional(),
       weeklyAiCoach: z.boolean().optional(),
       dailyAutoImport: z.boolean().optional(),
+      premarketPlan: z.boolean().optional(),
     })
     .refine((value) => Object.values(value).some((item) => item !== undefined))
     .safeParse(req.body);
@@ -148,6 +154,7 @@ export async function saveNotifications(req, res) {
     weeklyReportEmail: Boolean(row.weeklyReportEmail),
     weeklyAiCoach: Boolean(row.weeklyAiCoach),
     dailyAutoImport: Boolean(row.dailyAutoImport),
+    premarketPlan: Boolean(row.premarketPlan),
   });
 }
 
@@ -177,6 +184,14 @@ export async function runDailyImports(req, res) {
   if (!requireMethod(req, res, 'POST')) return;
   if (!authorizeMaintenance(req, res)) return;
   res.json(await runDailyImportsNow());
+}
+
+/** Scheduled (before the open): today's pre-market plan on Telegram for members who opted in. */
+export async function runPremarketPlans(req, res) {
+  res.setHeader('Cache-Control', 'private, no-store');
+  if (!requireMethod(req, res, 'POST')) return;
+  if (!authorizeMaintenance(req, res)) return;
+  res.json(await runPremarketPlansNow());
 }
 
 /* ------------------------------------ live orders ------------------------------------ */

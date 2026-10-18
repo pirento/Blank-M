@@ -17,6 +17,10 @@ const accountSettingsSchema = new mongoose.Schema(
     dailyAutoImport: { type: Boolean, default: false },
     /** The last trading date (IST) the daily import ran for. */
     dailyAutoImportFor: { type: String, default: null },
+    /** Opt-in: before the open, send a short pre-market plan to Telegram. */
+    premarketPlan: { type: Boolean, default: false },
+    /** The last trading date (IST) the pre-market plan was sent for. */
+    premarketPlanFor: { type: String, default: null },
     /** { dailyLossLimit, maxTradesPerDay, monthlyProfitGoal } (shared/risk-limits.js). */
     riskLimits: { type: mongoose.Schema.Types.Mixed, default: null },
     /** The member's own opt-in to place live orders (also requires the server switch). */

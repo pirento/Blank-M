@@ -307,7 +307,7 @@ Common browser helpers live in `public/js/core/` (`dom.js` element builder, card
 | `broker.js`        | Settings page — broker connection.                                         |
 | `capital.js`       | Settings page — capital preferences.                                       |
 | `charges.js`       | Settings page — charges.                                                   |
-| `daily-journal.js` | Settings page — daily automatic journal (broker fills after the close).    |
+| `daily-journal.js` | Settings page — daily automatic journal and pre-market plan on Telegram.   |
 | `email-reports.js` | Settings page — email reports.                                             |
 | `live-trading.js`  | Settings page — live orders.                                               |
 | `mfa.js`           | Settings page — MFA settings.                                              |
@@ -350,6 +350,7 @@ Common browser helpers live in `public/js/core/` (`dom.js` element builder, card
 | `create-admin.js`            | Bootstrap the first administrator.                   |
 | `dev-memory.js`              | Local preview without installing MongoDB             |
 | `daily-import.js`            | Scheduled daily automatic journal (after the close). |
+| `premarket-plan.js`          | Scheduled pre-market plan on Telegram (08:45 IST).   |
 | `maintenance-voice-notes.js` | Scheduled voice-note cleanup (run daily from cron).  |
 | `send-weekly-reports.js`     | Scheduled weekly report emails.                      |
 
@@ -382,6 +383,7 @@ Common browser helpers live in `public/js/core/` (`dom.js` element builder, card
 | `journal-index.js`          | Private journal search index                          |
 | `openai-key.js`             | Reads the OpenAI API key from the server environment. |
 | `openai.js`                 | OpenAI access for Blank AI                            |
+| `premarket-plan.js`         | Pre-market plan on Telegram before the open           |
 | `research-archive-store.js` | Saved research runs in MongoDB.                       |
 | `research-archive.js`       | Saved research runs                                   |
 | `research-universe.js`      | The NIFTY 500 research universe                       |
