@@ -8,6 +8,7 @@ import { requirePremium } from '../services/billing/membership.js';
 import * as market from '../controllers/market.controller.js';
 import * as kite from '../controllers/kite.controller.js';
 import * as dhan from '../controllers/dhan.controller.js';
+import { brokerHandlers } from '../controllers/brokers.controller.js';
 import * as ai from '../controllers/ai.controller.js';
 import * as adminAi from '../controllers/admin-ai.controller.js';
 import * as admin from '../controllers/admin.controller.js';
@@ -27,6 +28,9 @@ import * as billing from '../controllers/billing.controller.js';
 import * as adminPanel from '../controllers/admin-panel.controller.js';
 
 const router = Router();
+const upstox = brokerHandlers('upstox');
+const fyers = brokerHandlers('fyers');
+const angel = brokerHandlers('angel');
 
 /**
  * Premium gates by feature key (services/billing/plan.js). They only bite when the
@@ -82,6 +86,25 @@ router.post('/dhan/connect', requireApiAuth, premium.brokers, wrap(dhan.connect)
 router.post('/dhan/disconnect', requireApiAuth, wrap(dhan.disconnect));
 router.get('/dhan/fills', requireApiAuth, premium.brokers, wrap(dhan.fills));
 router.post('/dhan/fills/import', requireApiAuth, premium.brokers, wrap(dhan.importToJournal));
+// Upstox and Fyers log in over OAuth. Their callbacks are GET (CSRF-safe) and check the
+// member and login state themselves, so a failure can redirect back to Settings.
+router.get('/upstox', requireApiAuth, wrap(upstox.status));
+router.post('/upstox/authorize', requireApiAuth, premium.brokers, wrap(upstox.authorize));
+router.get('/upstox/callback', wrap(upstox.callback));
+router.post('/upstox/disconnect', requireApiAuth, wrap(upstox.disconnect));
+router.get('/upstox/fills', requireApiAuth, premium.brokers, wrap(upstox.fills));
+router.post('/upstox/fills/import', requireApiAuth, premium.brokers, wrap(upstox.importToJournal));
+router.get('/fyers', requireApiAuth, wrap(fyers.status));
+router.post('/fyers/authorize', requireApiAuth, premium.brokers, wrap(fyers.authorize));
+router.get('/fyers/callback', wrap(fyers.callback));
+router.post('/fyers/disconnect', requireApiAuth, wrap(fyers.disconnect));
+router.get('/fyers/fills', requireApiAuth, premium.brokers, wrap(fyers.fills));
+router.post('/fyers/fills/import', requireApiAuth, premium.brokers, wrap(fyers.importToJournal));
+router.get('/angel', requireApiAuth, wrap(angel.status));
+router.post('/angel/connect', requireApiAuth, premium.brokers, wrap(angel.connect));
+router.post('/angel/disconnect', requireApiAuth, wrap(angel.disconnect));
+router.get('/angel/fills', requireApiAuth, premium.brokers, wrap(angel.fills));
+router.post('/angel/fills/import', requireApiAuth, premium.brokers, wrap(angel.importToJournal));
 
 /* ---------------------------------- billing ---------------------------------- */
 router.post('/billing/razorpay/webhook', wrap(billing.webhook));

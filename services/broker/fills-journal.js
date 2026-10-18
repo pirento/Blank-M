@@ -1,5 +1,5 @@
 /**
- * Today's broker fills (Zerodha or Dhan) as journal trades: preview the round
+ * Today's broker fills (Zerodha, Dhan, Upstox, Fyers or Angel One) as journal trades: preview the round
  * trips and import the chosen ones. Fills are always re-read from the broker
  * on the server, so the browser only chooses which round trips to add. Each
  * round trip has an ID derived from its fills, so importing twice never
@@ -12,7 +12,10 @@ import { computeTradeEconomics, validateTradeInput } from '../../shared/pnl.js';
 import { chargesForSegment } from '../../shared/segments.js';
 import { HttpError } from '../errors.js';
 import { loadAccountSettings, toTrade } from '../journal/workspace.js';
+import { readAngelFills } from './angel.js';
 import { readDhanFills } from './dhan.js';
+import { readFyersFills } from './fyers.js';
+import { readUpstoxFills } from './upstox.js';
 import { readBrokerPortfolio } from './portfolio.js';
 
 /**
@@ -44,7 +47,10 @@ export function carriedFromSnapshot(snapshot) {
   return carried;
 }
 
-/** Where fills come from. `read` returns { tradingDate, fetchedAt, trades, carried? }. */
+/**
+ * Where fills come from. `read` returns { tradingDate, fetchedAt, trades,
+ * carried?, skipped? } (skipped: broker rows that could not be read).
+ */
 const SOURCES = {
   kite: {
     label: 'Zerodha',
@@ -54,6 +60,9 @@ const SOURCES = {
     },
   },
   dhan: { label: 'Dhan', read: (userId) => readDhanFills(userId) },
+  upstox: { label: 'Upstox', read: (userId) => readUpstoxFills(userId) },
+  fyers: { label: 'Fyers', read: (userId) => readFyersFills(userId) },
+  angel: { label: 'Angel One', read: (userId) => readAngelFills(userId) },
 };
 
 function sourceOf(broker) {
@@ -124,7 +133,7 @@ async function readTrips(broker, userId, assertAccess) {
     fetchedAt: snapshot.fetchedAt,
     candidates,
     open,
-    skipped,
+    skipped: [...(snapshot.skipped ?? []), ...skipped],
   };
 }
 

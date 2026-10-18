@@ -1,6 +1,6 @@
 /**
  * The daily automatic journal: after the close, for each member who opted in,
- * adds today's Zerodha and Dhan round trips to the journal and sends the day's
+ * adds today's Zerodha, Dhan, Upstox, Fyers and Angel One round trips to the journal and sends the day's
  * summary to their Telegram chat. Runs from a scheduled job once per trading
  * day per member; imports are idempotent, so a re-run never duplicates trades.
  */
@@ -12,7 +12,10 @@ import { HttpError } from '../errors.js';
 import { createLogger, errorName } from '../logger.js';
 import { activeConnection } from '../market/kite/connection.js';
 import { sendToMember, summaryFor } from '../telegram/bot.js';
+import { angelStatus } from './angel.js';
 import { dhanStatus } from './dhan.js';
+import { fyersStatus } from './fyers.js';
+import { upstoxStatus } from './upstox.js';
 import { importAllFills } from './fills-journal.js';
 
 const log = createLogger('daily-import');
@@ -24,6 +27,21 @@ const BROKERS = [
     connected: async (userId) => Boolean(await activeConnection(userId)),
   },
   { key: 'dhan', label: 'Dhan', connected: async (userId) => (await dhanStatus(userId)).connected },
+  {
+    key: 'upstox',
+    label: 'Upstox',
+    connected: async (userId) => (await upstoxStatus(userId)).connected,
+  },
+  {
+    key: 'fyers',
+    label: 'Fyers',
+    connected: async (userId) => (await fyersStatus(userId)).connected,
+  },
+  {
+    key: 'angel',
+    label: 'Angel One',
+    connected: async (userId) => (await angelStatus(userId)).connected,
+  },
 ];
 
 /** Imports today's fills from each connected broker; returns one line per broker. */

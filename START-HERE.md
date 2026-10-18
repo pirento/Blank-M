@@ -79,7 +79,7 @@ theek hone par "OK again". Chalu karne ke liye:
 ## Trading ke naye features
 
 - **Roz ka automatic journal:** Settings → "Daily automatic journal" on kariye. Har trading din
-  shaam ~4:15 baje aaj ke Zerodha/Dhan trades journal mein khud aa jaate hain aur din ka P&L
+  shaam ~4:15 baje aaj ke Zerodha/Dhan/Upstox/Fyers/Angel One trades journal mein khud aa jaate hain aur din ka P&L
   Telegram par aata hai. Zerodha ke liye us din Blank mein Zerodha login hona chahiye.
 - **Pre-market plan Telegram par:** Settings → "Pre-market plan on Telegram" on kariye. Har trading
   din subah ~8:45 baje (market khulne se pehle) Telegram par chhota plan aata hai: watchlist, pichhle
@@ -91,6 +91,13 @@ theek hone par "OK again". Chalu karne ke liye:
 - **Order ke saath stop-loss/target:** Orders → live order (delivery/CNC buy) mein "Place my
   stop-loss … as soon as this order fills" tick kariye. Fill hote hi (5 minute ke andar) GTT lag
   jaata hai; Telegram par khabar aati hai. Intraday (MIS) mein Zerodha GTT nahi deta.
+- **Upstox, Fyers, Angel One connection (naya):** Settings mein teeno ke card hain — aaj ke fills
+  journal mein laane ke liye (sirf padhna, koi order nahi jaata). Upstox/Fyers ke liye admin ko app
+  keys (`UPSTOX_API_KEY`, `UPSTOX_API_SECRET`, `FYERS_APP_ID`, `FYERS_SECRET_ID`) daalni hongi aur
+  broker ke developer console mein callback `https://<aapka-domain>/api/upstox/callback` (ya
+  `/api/fyers/callback`) register karna hoga. Angel One mein member apni SmartAPI key, client code,
+  PIN aur TOTP daalta hai (PIN/TOTP save nahi hote). Ye connections naye hain aur asli account par
+  test nahi hue — pehle ek asli account se ek din ke trades import karke check kariye.
 - **Live price:** Watchlist mein Zerodha ka live price (har second tak). Iske liye Kite Connect app
   mein market data (paid plan) chahiye; free Personal app mein purana refresh hi chalega.
 - **Kahan kamaate, kahan gawaate hain:** Insights page par naya section. Hafte ke din × entry time
