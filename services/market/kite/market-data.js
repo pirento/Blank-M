@@ -32,7 +32,8 @@ export function resetKiteMarketDataPause() {
 }
 const HISTORY_TTL_MS = 5 * 60_000;
 
-async function instrumentToken(symbol) {
+/** Kite instrument token for an NSE symbol (refreshing the instrument master once if missing), or null. */
+export async function instrumentToken(symbol) {
   const find = async () => {
     const data = await Instrument.findOne({ exchange: 'NSE', tradingSymbol: symbol }).lean();
     return typeof data?.instrumentToken === 'number' ? data.instrumentToken : null;

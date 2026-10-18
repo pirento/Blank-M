@@ -6,6 +6,7 @@ import { $, $$, h, icon, pageData, buttonClass, render } from '../core/dom.js';
 import { api } from '../core/api.js';
 import { notify, notifyError, reloadWith } from '../core/toast.js';
 import { fetchQuote } from '../lib/quotes.js';
+import { watchLiveQuotes } from '../lib/live-quotes.js';
 import { requestSymbol } from '../lib/ai.js';
 import { aiGate } from '../components/ai-gate.js';
 import { createPriceAlerts } from '../components/price-alerts.js';
@@ -28,6 +29,30 @@ function bindRow(row) {
   const changeCell = $('[data-change]', row);
   const refresh = $('[data-refresh]', row);
   let token = 0;
+  // The last verified snapshot: live prices reuse its currency and previous close.
+  let snapshot = null;
+  const paintChange = (quote) => {
+    const change =
+      quote && Number.isFinite(quote.previousClose) && quote.previousClose > 0
+        ? ((quote.price - quote.previousClose) / quote.previousClose) * 100
+        : null;
+    render(
+      changeCell,
+      change !== null && Number.isFinite(change)
+        ? h(
+            'span',
+            { class: change >= 0 ? 'text-positive' : 'text-negative' },
+            `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`,
+            h('span', { class: 'sr-only' }, ' from previous close'),
+          )
+        : h(
+            'span',
+            { class: 'text-muted' },
+            '—',
+            h('span', { class: 'sr-only' }, 'Change unavailable'),
+          ),
+    );
+  };
   const load = async () => {
     const current = ++token;
     refresh.disabled = true;
@@ -50,13 +75,7 @@ function bindRow(row) {
     if (current !== token) return;
     const valid = quote?.symbol === symbol ? quote : null;
     const validPrice = valid?.price != null && Number.isFinite(valid.price) && valid.price > 0;
-    const change =
-      validPrice &&
-      valid.previousClose != null &&
-      Number.isFinite(valid.previousClose) &&
-      valid.previousClose > 0
-        ? ((valid.price - valid.previousClose) / valid.previousClose) * 100
-        : null;
+    snapshot = validPrice ? valid : null;
     const source =
       valid?.source === 'kite'
         ? 'Zerodha Kite'
@@ -76,26 +95,25 @@ function bindRow(row) {
           : 'Quote could not be verified. Refresh to try again.',
       ),
     );
-    render(
-      changeCell,
-      change !== null && Number.isFinite(change)
-        ? h(
-            'span',
-            { class: change >= 0 ? 'text-positive' : 'text-negative' },
-            `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`,
-            h('span', { class: 'sr-only' }, ' from previous close'),
-          )
-        : h(
-            'span',
-            { class: 'text-muted' },
-            '—',
-            h('span', { class: 'sr-only' }, 'Change unavailable'),
-          ),
-    );
+    paintChange(validPrice ? valid : null);
     refresh.disabled = false;
     render(refresh, icon('refresh-cw', 14));
   };
   refresh.addEventListener('click', () => void load());
+  liveUpdaters.set(symbol, (price) => {
+    if (!snapshot) return;
+    const quote = { ...snapshot, price };
+    const time = new Date().toLocaleTimeString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      hour12: false,
+    });
+    render(
+      quoteCell,
+      h('p', { class: 'font-mono tnum' }, priceText(quote)),
+      h('p', { class: 'mt-1 text-xs leading-5 text-muted' }, `Zerodha Kite live · ${time} IST`),
+    );
+    paintChange(quote);
+  });
   const remove = $('[data-remove]', row);
   remove.addEventListener('click', async () => {
     if (remove.disabled) return;
@@ -193,4 +211,7 @@ render($('[data-alerts]'), alerts.element);
 for (const row of $$('[data-watch-row]')) {
   $('[data-alert]', row).addEventListener('click', () => alerts.prefill(row.dataset.symbol));
 }
+const liveUpdaters = new Map();
 $$('[data-watch-row]').forEach(bindRow);
+// Live Zerodha prices when available; otherwise the snapshots above stay as they are.
+watchLiveQuotes([...liveUpdaters.keys()], (symbol, price) => liveUpdaters.get(symbol)?.(price));

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { MEMBERS, signIn } from './helpers.js';
+import { MEMBERS, signIn, trackErrors } from './helpers.js';
 
 // Settings cards with their own member, so account.spec.js stays under the
 // per-account sign-in limit (10 per 15 minutes).
@@ -94,4 +94,19 @@ test('risk limits are saved and shown on the overview', async ({ page }) => {
   for (const id of ['#risk-daily-loss', '#risk-max-trades']) await page.fill(id, '');
   await page.getByRole('button', { name: 'Save risk limits' }).click();
   await expect(page.locator('[data-risk-limits]')).toContainText('Risk limits saved.');
+});
+
+test('the daily automatic journal can be turned on and off', async ({ page }) => {
+  const errors = trackErrors(page);
+  await signIn(page, MEMBERS.settings);
+  await page.goto('/settings');
+  const card = page.locator('[data-daily-journal]');
+  const toggle = card.getByLabel('Add today’s broker fills to my journal after the close');
+  await toggle.check();
+  await expect(card).toContainText('Today’s fills will be added after the close.');
+  await page.reload();
+  await expect(toggle).toBeChecked();
+  await toggle.uncheck();
+  await expect(card).toContainText('The daily automatic journal is off.');
+  expect(errors).toEqual([]);
 });

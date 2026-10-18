@@ -934,3 +934,33 @@
     break-inside: avoid;
   }
 }
+/* Trade replay marks on the candle chart: entry, exit and stop-loss. */
+.reference-mark-entry {
+  stroke: var(--color-fg);
+  fill: var(--color-fg);
+}
+.reference-mark-exit {
+  stroke: var(--color-positive);
+  fill: var(--color-positive);
+}
+.reference-mark-stop {
+  stroke: var(--color-negative);
+  fill: var(--color-negative);
+}
+.reference-mark-line {
+  stroke-width: 1;
+  stroke-dasharray: 6 4;
+  fill: none;
+}
+.reference-candles svg text.reference-mark-label {
+  font-weight: 700;
+}
+.reference-candles svg text.reference-mark-entry {
+  fill: var(--color-fg);
+}
+.reference-candles svg text.reference-mark-exit {
+  fill: var(--color-positive);
+}
+.reference-candles svg text.reference-mark-stop {
+  fill: var(--color-negative);
+}

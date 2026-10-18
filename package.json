@@ -25,7 +25,8 @@
     "dev:memory": "node scripts/dev-memory.js",
     "maintenance:weekly-reports": "node scripts/send-weekly-reports.js",
     "test:e2e": "playwright test",
-    "maintenance:price-checks": "node scripts/price-checks.js"
+    "maintenance:price-checks": "node scripts/price-checks.js",
+    "maintenance:daily-import": "node scripts/daily-import.js"
   },
   "dependencies": {
     "@tailwindcss/cli": "^4.1.14",

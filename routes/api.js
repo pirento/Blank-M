@@ -29,12 +29,14 @@ const router = Router();
 router.get('/health', wrap(market.health));
 // These enforce GET themselves, including consistent 405 responses.
 router.all('/quote', wrap(market.quote));
+router.get('/quotes/stream', requireApiAuth, wrap(market.quoteStream));
 router.all('/history', wrap(market.history));
 router.post('/instruments/refresh', wrap(market.refreshInstrumentMaster));
 router.all('/research/runs', wrap(handleResearchRuns));
 router.all('/maintenance/voice-notes', wrap(handleVoiceNoteCleanup));
 router.all('/maintenance/weekly-reports', wrap(account.runWeeklyReports));
 router.all('/maintenance/price-checks', wrap(paper.runPriceChecks));
+router.all('/maintenance/daily-import', wrap(account.runDailyImports));
 
 /* ------------------------------------- AI ------------------------------------ */
 router.post('/ai/chat', wrap(ai.handleChat));

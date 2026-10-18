@@ -70,11 +70,16 @@ export function validateChartHistory(payload, symbol, range, now = Date.now()) {
 }
 
 /** Exact-owner reads, with a bounded body and cancellation before and after the request. */
-export async function fetchChartHistory(accountId, symbol, interval, signal) {
+export async function fetchChartHistory(
+  accountId,
+  symbol,
+  interval,
+  signal,
+  range = chartRange(interval),
+) {
   if (!/^[A-Z0-9][A-Z0-9.\-^=&]{0,29}$/.test(symbol)) throw new Error('Select a valid instrument.');
   signal.throwIfAborted();
   if (!accountId) throw new Error('Sign in again to load the chart.');
-  const range = chartRange(interval);
   const params = new URLSearchParams({ symbol, interval, ...range });
   // The session identity header binds this read to the login that rendered the page.
   const response = await fetch(`/api/history?${params}`, {

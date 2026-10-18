@@ -21,6 +21,8 @@ const liveOrderSchema = new mongoose.Schema(
     brokerOrderId: { type: String, default: null },
     error: { type: String, default: null },
     tradingDate: { type: String, required: true },
+    /** Place the stop-loss/target GTT automatically once the entry fills (CNC buys only). */
+    autoGtt: { type: Boolean, default: false },
     /** Stop-loss/target GTT placed after the entry filled (CNC only). */
     gttStatus: { type: String, enum: ['placed', 'rejected', 'unknown', null], default: null },
     gttTriggerId: { type: String, default: null },

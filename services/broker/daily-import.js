@@ -1,0 +1,91 @@
+/**
+ * The daily automatic journal: after the close, for each member who opted in,
+ * adds today's Zerodha and Dhan round trips to the journal and sends the day's
+ * summary to their Telegram chat. Runs from a scheduled job once per trading
+ * day per member; imports are idempotent, so a re-run never duplicates trades.
+ */
+import { AccountSettings, User } from '../../models/index.js';
+import { MARKET_CLOSE_MINUTE, getMarketStatus, toIst } from '../../shared/market.js';
+import { accessProblem } from '../auth/accounts.js';
+import { HttpError } from '../errors.js';
+import { createLogger, errorName } from '../logger.js';
+import { activeConnection } from '../market/kite/connection.js';
+import { sendToMember, summaryFor } from '../telegram/bot.js';
+import { dhanStatus } from './dhan.js';
+import { importAllFills } from './fills-journal.js';
+
+const log = createLogger('daily-import');
+
+const BROKERS = [
+  {
+    key: 'kite',
+    label: 'Zerodha',
+    connected: async (userId) => Boolean(await activeConnection(userId)),
+  },
+  { key: 'dhan', label: 'Dhan', connected: async (userId) => (await dhanStatus(userId)).connected },
+];
+
+/** Imports today's fills from each connected broker; returns one line per broker. */
+async function importForMember(user) {
+  const assertAccess = async () => {
+    if (await accessProblem(user)) throw new HttpError('Blank access is not active.', 403);
+  };
+  const lines = [];
+  for (const broker of BROKERS) {
+    if (!(await broker.connected(user._id))) continue;
+    try {
+      const result = await importAllFills(user._id, assertAccess, broker.key);
+      const open = result.open?.length ? `, ${result.open.length} still open` : '';
+      lines.push(`${broker.label}: added ${result.added.length} round trips${open}.`);
+    } catch (error) {
+      log.warn('daily import failed', { broker: broker.key, error: errorName(error) });
+      lines.push(`${broker.label}: could not read today's fills (${error.message ?? 'error'}).`);
+    }
+  }
+  return lines.length
+    ? lines
+    : ['No broker connected today. Log in to Zerodha in Blank during the day to import fills.'];
+}
+
+/**
+ * Runs the daily import for every opted-in member not yet done today. Does
+ * nothing before the close or on weekends and NSE holidays.
+ */
+export async function runDailyImports({ now = new Date(), limit = 200 } = {}) {
+  const status = getMarketStatus(now);
+  const ist = toIst(now);
+  if (status === 'closed-weekend' || status === 'closed-holiday') {
+    return { ran: false, reason: 'not a trading day' };
+  }
+  if (ist.minutesSinceMidnight <= MARKET_CLOSE_MINUTE) {
+    return { ran: false, reason: 'the market has not closed yet' };
+  }
+  const today = ist.date;
+  const due = await AccountSettings.find({
+    dailyAutoImport: true,
+    dailyAutoImportFor: { $ne: today },
+  })
+    .limit(limit)
+    .lean();
+  let done = 0;
+  let skipped = 0;
+  let failed = 0;
+  for (const settings of due) {
+    const user = await User.findById(settings._id);
+    if (!user || (await accessProblem(user))) {
+      skipped += 1;
+      continue;
+    }
+    try {
+      const lines = await importForMember(user);
+      const summary = await summaryFor(user._id, today, today, `Today (${today})`);
+      await sendToMember(user._id, ['Daily journal', ...lines, '', summary].join('\n'));
+      await AccountSettings.updateOne({ _id: user._id }, { $set: { dailyAutoImportFor: today } });
+      done += 1;
+    } catch (error) {
+      log.warn('daily import run failed', { error: errorName(error) });
+      failed += 1;
+    }
+  }
+  return { ran: true, date: today, done, skipped, failed, moreMayRemain: due.length === limit };
+}

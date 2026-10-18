@@ -134,14 +134,18 @@ function gttLine(plan, order) {
                 ? 'negative'
                 : 'caution',
           ),
-          h(
-            'span',
-            { class: 'text-xs text-muted' },
-            `stop ₹${gtt.stop}${gtt.target ? ` · target ₹${gtt.target}` : ''}${gtt.triggerId ? ` · GTT ${gtt.triggerId}` : ''}`,
-          ),
+          gtt.stop
+            ? h(
+                'span',
+                { class: 'text-xs text-muted' },
+                `stop ₹${gtt.stop}${gtt.target ? ` · target ₹${gtt.target}` : ''}${gtt.triggerId ? ` · GTT ${gtt.triggerId}` : ''}`,
+              )
+            : null,
           gtt.error ? h('span', { class: 'w-full text-xs text-negative' }, gtt.error) : null,
         ]
-      : null,
+      : order.autoGtt && eligible
+        ? badge('Stop & target: placed automatically once filled', 'caution')
+        : null,
     eligible && (!gtt || gtt.status === 'rejected')
       ? button(t('Place stop & target (GTT)'), {
           variant: 'outline',

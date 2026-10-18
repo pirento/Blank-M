@@ -188,6 +188,7 @@ Common browser helpers live in `public/js/core/` (`dom.js` element builder, card
 | `market-history-chart.js`    | Price history chart for one instrument                                                                                   |
 | `strategy-evidence-panel.js` | Strategy evidence panel                                                                                                  |
 | `trade-form.js`              | One trade form, used both to log a new trade in the Journal and to correct an existing one from the Transactions ledger. |
+| `trade-replay.js`            | Trade replay: the trade day's candles with its entry, exit and stop-loss marked.                                         |
 
 ### `public/js/core/`
 
@@ -209,6 +210,7 @@ Common browser helpers live in `public/js/core/` (`dom.js` element builder, card
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | `ai.js`                | Browser client for the AI endpoints                                                                                          |
 | `import-ledger.js`     | Browser checkpoint for a trade import, so an interrupted import can be resumed or retried without creating duplicate trades. |
+| `live-quotes.js`       | Live Zerodha prices over Server-Sent Events (/api/quotes/stream), when the Kite app has market data.                         |
 | `market-chart.js`      | Loads and validates price history for the market chart.                                                                      |
 | `order-plan-sync.js`   | Syncs browser order plans with their private cloud copy (append-only, per member) and reports sync status.                   |
 | `order-plans-store.js` | Order plans for one member in this browser, kept in sync with the cloud copy.                                                |
@@ -305,6 +307,7 @@ Common browser helpers live in `public/js/core/` (`dom.js` element builder, card
 | `broker.js`        | Settings page — broker connection.                                         |
 | `capital.js`       | Settings page — capital preferences.                                       |
 | `charges.js`       | Settings page — charges.                                                   |
+| `daily-journal.js` | Settings page — daily automatic journal (broker fills after the close).    |
 | `email-reports.js` | Settings page — email reports.                                             |
 | `live-trading.js`  | Settings page — live orders.                                               |
 | `mfa.js`           | Settings page — MFA settings.                                              |
@@ -342,12 +345,13 @@ Common browser helpers live in `public/js/core/` (`dom.js` element builder, card
 
 ### `scripts/`
 
-| File                         | What it does                                        |
-| ---------------------------- | --------------------------------------------------- |
-| `create-admin.js`            | Bootstrap the first administrator.                  |
-| `dev-memory.js`              | Local preview without installing MongoDB            |
-| `maintenance-voice-notes.js` | Scheduled voice-note cleanup (run daily from cron). |
-| `send-weekly-reports.js`     | Scheduled weekly report emails.                     |
+| File                         | What it does                                         |
+| ---------------------------- | ---------------------------------------------------- |
+| `create-admin.js`            | Bootstrap the first administrator.                   |
+| `dev-memory.js`              | Local preview without installing MongoDB             |
+| `daily-import.js`            | Scheduled daily automatic journal (after the close). |
+| `maintenance-voice-notes.js` | Scheduled voice-note cleanup (run daily from cron).  |
+| `send-weekly-reports.js`     | Scheduled weekly report emails.                      |
 
 ### `services/`
 
@@ -394,11 +398,12 @@ Common browser helpers live in `public/js/core/` (`dom.js` element builder, card
 
 ### `services/broker/`
 
-| File             | What it does                                                                                                           |
-| ---------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `flow.js`        | Zerodha login flow security                                                                                            |
-| `live-orders.js` | Live orders through Zerodha                                                                                            |
-| `portfolio.js`   | Reads the member's Zerodha holdings, positions, orders and trades into the shape shared/broker-portfolio.js validates. |
+| File              | What it does                                                                                                           |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `flow.js`         | Zerodha login flow security                                                                                            |
+| `daily-import.js` | After the close: today's Zerodha/Dhan fills into the journal for opted-in members, with a Telegram summary.            |
+| `live-orders.js`  | Live orders through Zerodha                                                                                            |
+| `portfolio.js`    | Reads the member's Zerodha holdings, positions, orders and trades into the shape shared/broker-portfolio.js validates. |
 
 ### `services/journal/`
 
@@ -437,6 +442,7 @@ Common browser helpers live in `public/js/core/` (`dom.js` element builder, card
 | `market-data.js` | Kite market data provider                                                                                                                 |
 | `orders.js`      | Order placement                                                                                                                           |
 | `session.js`     | Kite login lifecycle                                                                                                                      |
+| `ticker.js`      | Live prices from Kite's WebSocket, one connection per member shared by their open pages.                                                  |
 
 ### `shared/`
 

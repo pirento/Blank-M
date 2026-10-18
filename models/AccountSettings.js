@@ -13,6 +13,10 @@ const accountSettingsSchema = new mongoose.Schema(
     weeklyReportSentFor: { type: String, default: null },
     /** Add an AI coach review of the week to the weekly email. */
     weeklyAiCoach: { type: Boolean, default: false },
+    /** Opt-in: after the close, add today's broker fills and send the day's summary to Telegram. */
+    dailyAutoImport: { type: Boolean, default: false },
+    /** The last trading date (IST) the daily import ran for. */
+    dailyAutoImportFor: { type: String, default: null },
     /** { dailyLossLimit, maxTradesPerDay, monthlyProfitGoal } (shared/risk-limits.js). */
     riskLimits: { type: mongoose.Schema.Types.Mixed, default: null },
     /** The member's own opt-in to place live orders (also requires the server switch). */

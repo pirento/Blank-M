@@ -4,6 +4,7 @@
 import { assertRuntimeConfiguration, env } from './config/env.js';
 import { connectDatabase, disconnectDatabase } from './config/database.js';
 import { createApp } from './app.js';
+import { endLiveQuoteStreams } from './controllers/market.controller.js';
 import { hasOpenAiKey } from './services/ai/openai-key.js';
 import { ensureAiConfiguration } from './services/ai/config.js';
 import { createLogger } from './services/logger.js';
@@ -34,6 +35,7 @@ async function start() {
   const shutdown = () => {
     if (stopping) return;
     stopping = true;
+    endLiveQuoteStreams();
     server.close(() => {
       void disconnectDatabase().finally(() => process.exit(0));
     });

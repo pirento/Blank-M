@@ -10,3 +10,7 @@
 # Every 5 minutes, Monday–Friday 03:45–10:00 UTC (09:15–15:30 IST): paper trade stops/targets
 # and price alerts.
 */5 3-10 * * 1-5 cd /srv/blank && set -a && . ./.env && set +a && node scripts/price-checks.js >> /var/log/blank-cron.log 2>&1
+
+# Monday–Friday 10:45 UTC (16:15 IST): today's Zerodha/Dhan fills into the journal for members who
+# turned on "Daily automatic journal", with the day's summary on Telegram.
+45 10 * * 1-5 cd /srv/blank && set -a && . ./.env && set +a && node scripts/daily-import.js >> /var/log/blank-cron.log 2>&1

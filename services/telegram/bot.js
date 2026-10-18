@@ -100,7 +100,8 @@ export function parseLogCommand(args) {
   };
 }
 
-async function summaryFor(userId, from, to, title) {
+/** The member's trades from `from` to `to` (IST dates) as a short chat message. */
+export async function summaryFor(userId, from, to, title) {
   const rows = await Trade.find({ userId, tradeDate: { $gte: from, $lte: to } }).lean();
   const trades = rows.map(toTrade);
   if (!trades.length) return `${title}: no trades.`;

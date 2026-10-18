@@ -37,6 +37,7 @@ import {
 } from '../lib/views.js';
 import { createTradeForm } from '../components/trade-form.js';
 import { openTradeScreenshot } from '../components/trade-screenshot.js';
+import { openTradeReplay } from '../components/trade-replay.js';
 import { createBrokerPortfolio } from '../components/broker-portfolio.js';
 
 const data = pageData();
@@ -449,6 +450,12 @@ function ledgerTable(rows) {
               h(
                 'div',
                 { class: 'flex justify-end gap-1' },
+                button(icon('candlestick-chart', 14), {
+                  variant: 'ghost',
+                  size: 'sm',
+                  'aria-label': `Replay ${trade.symbol} trade on the chart`,
+                  onclick: () => openTradeReplay(trade, { accountId: ownerId }),
+                }),
                 button(icon('image', 14), {
                   variant: 'ghost',
                   size: 'sm',

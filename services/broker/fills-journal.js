@@ -145,10 +145,28 @@ export async function importFills(userId, assertAccess, ids, broker = 'kite') {
   }
   const wanted = new Set(ids.map(String));
   const { candidates } = await readTrips(broker, userId, assertAccess);
+  const { added, skipped } = await saveCandidates(
+    userId,
+    label,
+    candidates.filter((candidate) => wanted.has(candidate.id)),
+  );
+  const unknown = [...wanted].filter((id) => !candidates.some((candidate) => candidate.id === id));
+  return { added, skipped: skipped + unknown.length };
+}
+
+/**
+ * Adds every round trip of today that is not yet in the journal (the daily
+ * automatic import). Also returns the positions still open.
+ */
+export async function importAllFills(userId, assertAccess, broker) {
+  const { candidates, open } = await readTrips(broker, userId, assertAccess);
+  return { ...(await saveCandidates(userId, sourceOf(broker).label, candidates)), open };
+}
+
+async function saveCandidates(userId, label, candidates) {
   const added = [];
   let skipped = 0;
   for (const candidate of candidates) {
-    if (!wanted.has(candidate.id)) continue;
     if (candidate.alreadyInJournal || candidate.problem) {
       skipped += 1;
       continue;
@@ -178,6 +196,5 @@ export async function importFills(userId, assertAccess, ids, broker = 'kite') {
       skipped += 1;
     }
   }
-  const unknown = [...wanted].filter((id) => !candidates.some((candidate) => candidate.id === id));
-  return { added, skipped: skipped + unknown.length };
+  return { added, skipped };
 }

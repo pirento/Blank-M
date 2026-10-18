@@ -18,6 +18,7 @@ import * as shareLinks from '../services/journal/share-links.js';
 import { hasOpenAiKey } from '../services/ai/openai-key.js';
 import { requireMethod } from '../services/http.js';
 import { authorizeMaintenance } from '../services/maintenance/authorize.js';
+import { runDailyImports as runDailyImportsNow } from '../services/broker/daily-import.js';
 import {
   lastCompletedWeek,
   sendWeeklyReport,
@@ -112,19 +113,24 @@ export async function getNotifications(req, res) {
   res.json({
     weeklyReportEmail: Boolean(row?.weeklyReportEmail),
     weeklyAiCoach: Boolean(row?.weeklyAiCoach),
+    dailyAutoImport: Boolean(row?.dailyAutoImport),
     emailConfigured: isMailConfigured(),
     aiConfigured: hasOpenAiKey(),
   });
 }
 
 /**
- * PUT /api/account/notifications { weeklyReportEmail?, weeklyAiCoach? }: saves the
- * weekly report opt-ins. 503 when turning on email or AI the server cannot provide.
+ * PUT /api/account/notifications { weeklyReportEmail?, weeklyAiCoach?, dailyAutoImport? }: saves
+ * the report opt-ins. 503 when turning on email or AI the server cannot provide.
  */
 export async function saveNotifications(req, res) {
   const parsed = z
-    .object({ weeklyReportEmail: z.boolean().optional(), weeklyAiCoach: z.boolean().optional() })
-    .refine((value) => value.weeklyReportEmail !== undefined || value.weeklyAiCoach !== undefined)
+    .object({
+      weeklyReportEmail: z.boolean().optional(),
+      weeklyAiCoach: z.boolean().optional(),
+      dailyAutoImport: z.boolean().optional(),
+    })
+    .refine((value) => Object.values(value).some((item) => item !== undefined))
     .safeParse(req.body);
   if (!parsed.success) throw new HttpError('Choose whether to receive weekly reports.', 400);
   if (parsed.data.weeklyReportEmail && !isMailConfigured()) {
@@ -141,6 +147,7 @@ export async function saveNotifications(req, res) {
   res.json({
     weeklyReportEmail: Boolean(row.weeklyReportEmail),
     weeklyAiCoach: Boolean(row.weeklyAiCoach),
+    dailyAutoImport: Boolean(row.dailyAutoImport),
   });
 }
 
@@ -162,6 +169,14 @@ export async function runWeeklyReports(req, res) {
   if (!requireMethod(req, res, 'POST')) return;
   if (!authorizeMaintenance(req, res)) return;
   res.json(await sendWeeklyReports());
+}
+
+/** Scheduled (after the close): today's broker fills into the journal for members who opted in. */
+export async function runDailyImports(req, res) {
+  res.setHeader('Cache-Control', 'private, no-store');
+  if (!requireMethod(req, res, 'POST')) return;
+  if (!authorizeMaintenance(req, res)) return;
+  res.json(await runDailyImportsNow());
 }
 
 /* ------------------------------------ live orders ------------------------------------ */
@@ -188,8 +203,9 @@ export async function saveLiveTrading(req, res) {
 }
 
 /**
- * POST /api/live-orders { planId, confirmSymbol, idempotencyKey }: sends a reviewed plan
- * to Zerodha. 201 when newly placed, 200 for a replay or any other order status.
+ * POST /api/live-orders { planId, confirmSymbol, idempotencyKey, autoStopTarget? }: sends a
+ * reviewed plan to Zerodha (with autoStopTarget, its stop/target GTT follows once filled).
+ * 201 when newly placed, 200 for a replay or any other order status.
  */
 export async function createLiveOrder(req, res) {
   const parsed = z
@@ -197,6 +213,7 @@ export async function createLiveOrder(req, res) {
       planId: z.string().uuid(),
       confirmSymbol: z.string().max(40),
       idempotencyKey: z.string().uuid(),
+      autoStopTarget: z.boolean().optional(),
     })
     .safeParse(req.body);
   if (!parsed.success) throw new HttpError('Choose a reviewed plan and confirm its symbol.', 400);

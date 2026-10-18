@@ -25,12 +25,17 @@ function svg(tag, attributes = {}, text) {
   return element;
 }
 
-/** Interactive candlestick plot: pointer and arrow keys inspect individual candles. */
-function candlePlot(candles, symbol) {
+/**
+ * Interactive candlestick plot: pointer and arrow keys inspect individual candles.
+ * `marks` (trade replay) draws price lines `{ price, label, kind }` and points
+ * `{ time, price, label, kind }` on the nearest candle; kind is entry, exit or stop.
+ */
+export function candlePlot(candles, symbol, marks = {}) {
   const visible = candles.slice(-120);
   let selected = visible.length - 1;
-  const minimum = Math.min(...visible.map((c) => c.low));
-  const maximum = Math.max(...visible.map((c) => c.high));
+  const lines = marks.lines ?? [];
+  const minimum = Math.min(...visible.map((c) => c.low), ...lines.map((line) => line.price));
+  const maximum = Math.max(...visible.map((c) => c.high), ...lines.map((line) => line.price));
   const padding = Math.max((maximum - minimum) * 0.08, maximum * 0.001, 0.0001);
   const low = Math.max(0, minimum - padding);
   const high = maximum + padding;
@@ -66,6 +71,35 @@ function candlePlot(candles, symbol) {
     );
     plot.append(group);
   });
+  for (const line of lines) {
+    plot.append(
+      svg('line', {
+        x1: 20,
+        x2: 620,
+        y1: y(line.price),
+        y2: y(line.price),
+        class: `reference-mark-line reference-mark-${line.kind}`,
+      }),
+      svg(
+        'text',
+        { x: 24, y: y(line.price) - 4, class: `reference-mark-label reference-mark-${line.kind}` },
+        `${line.label} ${numberText(line.price)}`,
+      ),
+    );
+  }
+  for (const point of marks.points ?? []) {
+    // The candle that contains the time: the last one starting at or before it.
+    const index = visible.findLastIndex((c) => c.time <= point.time);
+    if (index < 0) continue;
+    plot.append(
+      svg('circle', {
+        cx: x(index),
+        cy: y(point.price),
+        r: 5,
+        class: `reference-mark-${point.kind}`,
+      }),
+    );
+  }
   const cursor = svg('line', {
     x1: x(selected),
     x2: x(selected),

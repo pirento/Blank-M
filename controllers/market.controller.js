@@ -24,6 +24,7 @@ import { hasOpenAiKey } from '../services/ai/openai-key.js';
 import { env } from '../config/env.js';
 import { isMailConfigured } from '../services/mailer.js';
 import { createLogger, errorName } from '../services/logger.js';
+import { subscribeLiveQuotes } from '../services/market/kite/ticker.js';
 
 const log = createLogger('market');
 
@@ -145,4 +146,75 @@ export async function refreshInstrumentMaster(req, res) {
       error: status < 500 || error instanceof MarketDataError ? error.message : 'Unexpected error',
     });
   }
+}
+
+/* --------------------------------- live quotes --------------------------------- */
+
+const MAX_STREAMS_PER_MEMBER = 5;
+/** Open live quote streams, ended on shutdown so a reload is not held up by them. */
+const streams = new Set();
+
+/** Ends every live quote stream (browsers reconnect on their own). */
+export function endLiveQuoteStreams() {
+  for (const stream of streams) stream.end();
+}
+
+/**
+ * GET /api/quotes/stream?symbols=A,B: Server-Sent Events with live Zerodha prices
+ * (`data: {"symbol","price"}`, at most one per symbol per second). Without live data for this
+ * member it sends one `event: unavailable` and ends, so the page stops asking and keeps its own
+ * refresh (a non-stream answer would show up as a console error in the browser).
+ */
+export async function quoteStream(req, res) {
+  const raw = String(req.query?.symbols ?? '');
+  const symbols = raw.split(',').filter(Boolean).slice(0, 50).map(assertValidSymbol);
+  const userId = req.member.userId;
+  if (!symbols.length) return res.status(400).json({ error: 'Choose at least one symbol.' });
+  const open = [...streams].filter((stream) => stream.userId === userId).length;
+  if (open >= MAX_STREAMS_PER_MEMBER)
+    return res.status(429).json({ error: 'Too many live pages.' });
+
+  const lastSent = new Map();
+  let unsubscribe = null;
+  let ended = false;
+  const stream = {
+    userId,
+    end: () => {
+      if (ended) return;
+      ended = true;
+      streams.delete(stream);
+      clearInterval(keepAlive);
+      unsubscribe?.();
+      res.end();
+    },
+  };
+  // Proxies close idle connections; a comment every 25 s keeps the stream open.
+  const keepAlive = setInterval(() => res.write(': keep-alive\n\n'), 25_000);
+  unsubscribe = await subscribeLiveQuotes(userId, symbols, {
+    onTick: ({ symbol, price }) => {
+      const now = Date.now();
+      if (now - (lastSent.get(symbol) ?? 0) < 1000) return;
+      lastSent.set(symbol, now);
+      res.write(`data: ${JSON.stringify({ symbol, price })}\n\n`);
+    },
+    onEnd: () => stream.end(),
+  });
+  const headers = {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'private, no-store',
+    Connection: 'keep-alive',
+    // Nginx would otherwise buffer the stream.
+    'X-Accel-Buffering': 'no',
+  };
+  if (!unsubscribe) {
+    clearInterval(keepAlive);
+    res.writeHead(200, headers);
+    return res.end('event: unavailable\ndata: {}\n\n');
+  }
+  if (req.destroyed) return stream.end();
+  streams.add(stream);
+  res.writeHead(200, headers);
+  // Browsers reconnect after this long when the stream ends (for example, Kite closed it).
+  res.write('retry: 30000\n\n');
+  req.on('close', () => stream.end());
 }

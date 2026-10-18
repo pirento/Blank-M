@@ -7,6 +7,7 @@ import * as paper from '../services/journal/paper.js';
 import { checkAllAlerts } from '../services/notifications/price-alerts.js';
 import { authorizeMaintenance } from '../services/maintenance/authorize.js';
 import { requireMethod } from '../services/http.js';
+import { placePendingAutoGtts } from '../services/broker/live-orders.js';
 
 /** GET /api/paper: open and recent closed paper trades, with a summary of the closed ones. */
 export async function list(req, res) {
@@ -39,11 +40,16 @@ export async function remove(req, res) {
 
 /**
  * POST /api/maintenance/price-checks: closes paper trades whose stop or target
- * was crossed and fires price alerts.
+ * was crossed, fires price alerts and places automatic stop/target GTTs for
+ * filled live orders.
  */
 export async function runPriceChecks(req, res) {
   res.setHeader('Cache-Control', 'private, no-store');
   if (!requireMethod(req, res, 'POST')) return;
   if (!authorizeMaintenance(req, res)) return;
-  res.json({ paper: await paper.checkAllPaperTrades(), alerts: await checkAllAlerts() });
+  res.json({
+    paper: await paper.checkAllPaperTrades(),
+    alerts: await checkAllAlerts(),
+    autoGtt: await placePendingAutoGtts(),
+  });
 }

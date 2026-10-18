@@ -121,7 +121,11 @@ describe('AI coach', () => {
       weeklyReportEmail: true,
       weeklyAiCoach: true,
     });
-    expect(toggled.body).toEqual({ weeklyReportEmail: true, weeklyAiCoach: true });
+    expect(toggled.body).toEqual({
+      weeklyReportEmail: true,
+      weeklyAiCoach: true,
+      dailyAutoImport: false,
+    });
     const user = await User.findById(userId).lean();
     await sendWeeklyReport(user, { start: '2026-10-05', end: '2026-10-11', type: 'weekly' });
     expect(mails[0].text).toContain('AI coach (discipline 6/10)');

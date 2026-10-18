@@ -1,6 +1,6 @@
 # Pirento Blank — yahan se shuru kariye
 
-Poori guide: **docs/Pirento-Blank-Deployment-Guide.pdf** (8 pages, step-by-step).
+Poori guide: **docs/Pirento-Blank-Deployment-Guide.pdf** (9 pages, step-by-step).
 
 ## Tarika 1 (recommended): Ubuntu VPS + ek command
 
@@ -75,6 +75,19 @@ theek hone par "OK again". Chalu karne ke liye:
 2. Apne bot ko Telegram par `/chatid` bhejiye; jo number aaye wo `.env` mein
    `ALERT_TELEGRAM_CHAT_ID="..."` likhiye, phir `pm2 reload pirento-blank`.
 3. Test: `pm2 stop pirento-blank`, 5 minute mein alert aayega; phir `pm2 start pirento-blank`.
+
+## Trading ke naye features
+
+- **Roz ka automatic journal:** Settings → "Daily automatic journal" on kariye. Har trading din
+  shaam ~4:15 baje aaj ke Zerodha/Dhan trades journal mein khud aa jaate hain aur din ka P&L
+  Telegram par aata hai. Zerodha ke liye us din Blank mein Zerodha login hona chahiye.
+- **Chart par trade replay:** Transactions mein har trade ke aage candle icon. Us din ke chart par
+  entry, exit aur stop-loss dikhte hain (NSE equity). Entry/exit time bhara ho to point bhi lagte hain.
+- **Order ke saath stop-loss/target:** Orders → live order (delivery/CNC buy) mein "Place my
+  stop-loss … as soon as this order fills" tick kariye. Fill hote hi (5 minute ke andar) GTT lag
+  jaata hai; Telegram par khabar aati hai. Intraday (MIS) mein Zerodha GTT nahi deta.
+- **Live price:** Watchlist mein Zerodha ka live price (har second tak). Iske liye Kite Connect app
+  mein market data (paid plan) chahiye; free Personal app mein purana refresh hi chalega.
 
 ## Tarika 2: Hostinger "Node.js app" (managed hosting)
 

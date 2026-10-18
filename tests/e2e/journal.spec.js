@@ -78,6 +78,12 @@ test('a trade with a stop, times and partial exits', async ({ page }) => {
   await expect(ledger).toContainText('09:20–14:45');
   await expect(ledger).toContainText('SL 97.5');
   await expect(ledger).toContainText('2 exits');
+  // Replay opens the trade day's chart (or says why it cannot, offline).
+  await page.getByRole('button', { name: `Replay ${symbol} trade on the chart` }).click();
+  const replay = page.getByRole('dialog', { name: `${symbol} replay` });
+  await expect(replay).toContainText(/Dashed lines: entry, exit and stop-loss|not available/);
+  await page.keyboard.press('Escape');
+  await expect(replay).toBeHidden();
   // Leave today's P&L as other tests expect it.
   await page.getByRole('button', { name: `Delete ${symbol} trade` }).click();
   await page

@@ -19,6 +19,14 @@ vi.mock('../../services/market/index.js', async (original) => ({
   ...(await original()),
   getQuote: broker.quote,
 }));
+const telegram = vi.hoisted(() => ({ sent: [] }));
+vi.mock('../../services/telegram/bot.js', async (original) => ({
+  ...(await original()),
+  sendToMember: async (userId, text) => {
+    telegram.sent.push({ userId, text });
+    return true;
+  },
+}));
 vi.mock('../../shared/market.js', async (original) => ({
   ...(await original()),
   getMarketStatus: () => broker.market.status,
@@ -31,6 +39,7 @@ const { exportOrderPlanRecords, saveOrderPlan, setOrderPlanReviewed } =
 const { calculateRiskPlan } = await import('../../shared/risk-calculator.js');
 const { DEFAULT_CHARGES } = await import('../../shared/types.js');
 const { currentStep, totpCode } = await import('../../services/auth/totp.js');
+const { placePendingAutoGtts } = await import('../../services/broker/live-orders.js');
 
 let app;
 beforeAll(async () => {
@@ -68,6 +77,7 @@ beforeEach(async () => {
     averagePrice: 100,
   });
   broker.market.status = 'open';
+  telegram.sent = [];
   const store = new Map();
   globalThis.window = {
     localStorage: {
@@ -360,6 +370,73 @@ describe('stop-loss and target GTT', () => {
     const refused = await gtt(account, mis);
     expect(refused.status).toBe(409);
     expect(refused.body.error).toMatch(/CNC/);
+  });
+});
+
+describe('automatic stop-loss and target', () => {
+  it('places the GTT once the entry fills, and only once', async () => {
+    const account = await trader();
+    const plan = await syncedPlan(account, { product: 'CNC', takeProfit: '110' });
+    const placed = await place(account, plan, { autoStopTarget: true });
+    expect(placed.status).toBe(201);
+    const order = placed.body.order;
+    expect(order.autoGtt).toBe(true);
+
+    // Still open at the exchange: nothing is sent yet.
+    broker.read.mockResolvedValue({ status: 'OPEN', quantity: order.quantity, filledQuantity: 0 });
+    expect(await placePendingAutoGtts()).toMatchObject({ checked: 1, waiting: 1, placed: 0 });
+    expect(broker.gtt).not.toHaveBeenCalled();
+    expect(telegram.sent).toEqual([]);
+
+    broker.read.mockResolvedValue({
+      status: 'COMPLETE',
+      quantity: order.quantity,
+      filledQuantity: order.quantity,
+      averagePrice: 100,
+    });
+    expect(await placePendingAutoGtts()).toMatchObject({ placed: 1 });
+    expect(broker.gtt).toHaveBeenCalledWith(
+      account.userId,
+      expect.objectContaining({
+        side: 'SELL',
+        product: 'CNC',
+        quantity: order.quantity,
+        legs: [
+          { trigger: 95, price: 94.5 },
+          { trigger: 110, price: 110 },
+        ],
+      }),
+    );
+    expect(telegram.sent.at(-1).text).toMatch(/Stop-loss ₹95 and target ₹110 placed/);
+    const listed = (await account.agent.get('/api/live-orders')).body.orders[0];
+    expect(listed.gtt).toMatchObject({ status: 'placed', triggerId: '123456' });
+
+    expect(await placePendingAutoGtts()).toMatchObject({ checked: 0 });
+    expect(broker.gtt).toHaveBeenCalledOnce();
+  });
+
+  it('warns on Telegram when the entry was cancelled unfilled', async () => {
+    const account = await trader();
+    const plan = await syncedPlan(account, { product: 'CNC' });
+    await place(account, plan, { autoStopTarget: true });
+    broker.read.mockResolvedValue({ status: 'CANCELLED', quantity: 1, filledQuantity: 0 });
+    expect(await placePendingAutoGtts()).toMatchObject({ failed: 1 });
+    expect(broker.gtt).not.toHaveBeenCalled();
+    expect(telegram.sent.at(-1).text).toMatch(
+      /NOT placed: The entry order is not completely filled/,
+    );
+    const listed = (await account.agent.get('/api/live-orders')).body.orders[0];
+    expect(listed.gtt).toMatchObject({ status: 'rejected' });
+    expect(await placePendingAutoGtts()).toMatchObject({ checked: 0 });
+  });
+
+  it('is offered for delivery buys only', async () => {
+    const account = await trader();
+    const plan = await syncedPlan(account);
+    const refused = await place(account, plan, { autoStopTarget: true });
+    expect(refused.status).toBe(400);
+    expect(refused.body.error).toMatch(/delivery \(CNC\) buys only/);
+    expect(broker.place).not.toHaveBeenCalled();
   });
 });
 

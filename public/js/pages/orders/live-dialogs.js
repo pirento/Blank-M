@@ -29,6 +29,10 @@ export function openLiveOrder(plan, { onDone }) {
         placeholder: plan.symbol,
       });
       const acknowledge = h('input', { type: 'checkbox', class: 'mt-1' });
+      // Zerodha GTTs sell delivery holdings, so the automatic stop is for CNC buys.
+      const canAutoGtt =
+        plan.product === 'CNC' && side === 'BUY' && Number(plan.inputs.stopLoss) > 0;
+      const autoGtt = h('input', { type: 'checkbox', class: 'mt-1', checked: canAutoGtt });
       const submit = button(t('Place order'), { variant: 'destructive', disabled: true });
       const message = h('p', { role: 'alert', class: 'text-sm text-negative', hidden: true });
       const sync = () => {
@@ -44,7 +48,12 @@ export function openLiveOrder(plan, { onDone }) {
         try {
           const { order } = await api('/api/live-orders', {
             method: 'POST',
-            body: { planId: plan.id, confirmSymbol: confirmField.value, idempotencyKey },
+            body: {
+              planId: plan.id,
+              confirmSymbol: confirmField.value,
+              idempotencyKey,
+              autoStopTarget: canAutoGtt && autoGtt.checked,
+            },
             timeout: 45_000,
           });
           close();
@@ -83,8 +92,27 @@ export function openLiveOrder(plan, { onDone }) {
         h(
           'p',
           { class: 'text-xs leading-5 text-muted' },
-          'Only the entry order is sent. Your planned stop and target are NOT placed automatically — set them in Zerodha yourself. Prices can move before the order reaches the exchange; Zerodha may reject the order for margin, price band or other reasons.',
+          canAutoGtt
+            ? 'Prices can move before the order reaches the exchange; Zerodha may reject the order for margin, price band or other reasons.'
+            : 'Only the entry order is sent. Your planned stop and target are NOT placed automatically (that works for delivery buys only) — set them in Zerodha yourself. Prices can move before the order reaches the exchange; Zerodha may reject the order for margin, price band or other reasons.',
         ),
+        canAutoGtt
+          ? h(
+              'label',
+              { class: 'flex items-start gap-2 text-sm' },
+              autoGtt,
+              h(
+                'span',
+                {},
+                `Place my stop-loss ${formatPlanningPrice(plan.inputs.stopLoss)}${plan.inputs.takeProfit ? ` and target ${formatPlanningPrice(plan.inputs.takeProfit)}` : ''} on Zerodha as soon as this order fills`,
+                h(
+                  'span',
+                  { class: 'block text-xs text-muted' },
+                  'Checked every 5 minutes while the market is open, as one GTT (one cancels the other). You get a Telegram message either way.',
+                ),
+              ),
+            )
+          : null,
         h(
           'div',
           { class: 'space-y-2' },
