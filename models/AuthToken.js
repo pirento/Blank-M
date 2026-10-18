@@ -1,5 +1,6 @@
 /**
- * Single-use emailed links: invitation activation and password recovery.
+ * Single-use emailed links (invitation activation, password recovery) and the
+ * one-time code an administrator needs to add their first authenticator.
  * Only a SHA-256 digest of the token is stored.
  */
 import mongoose from 'mongoose';
@@ -8,7 +9,7 @@ import { uuidId } from './helpers.js';
 const authTokenSchema = new mongoose.Schema({
   _id: uuidId,
   tokenHash: { type: String, required: true, unique: true },
-  purpose: { type: String, enum: ['activate', 'recover'], required: true },
+  purpose: { type: String, enum: ['activate', 'recover', 'admin-mfa'], required: true },
   userId: { type: String, required: true },
   email: { type: String, required: true },
   createdAt: { type: Date, default: Date.now },

@@ -17,6 +17,7 @@ router.get('/', pages.landing);
 router.get('/login', wrap(pages.login));
 router.get('/signup', wrap(pages.signup));
 router.get('/invite', pages.invite);
+router.get('/:page(terms|privacy|refunds|contact)', wrap(pages.legal));
 router.get('/auth/link/:purpose(activate|recover)', pages.authLink);
 router.get('/share/:token', wrap(pages.sharedJournal));
 

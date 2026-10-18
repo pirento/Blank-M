@@ -61,6 +61,15 @@ async function razorpay(method, path, body) {
   return payload;
 }
 
+/**
+ * Checks the saved keys with a harmless read (one plan). Returns `{ mode: 'test' | 'live' }`;
+ * throws the same readable error as any other call when Razorpay refuses the keys.
+ */
+export async function checkKeys() {
+  await razorpay('GET', '/plans?count=1');
+  return { mode: process.env.RAZORPAY_KEY_ID.trim().startsWith('rzp_live_') ? 'live' : 'test' };
+}
+
 /** Creates a monthly plan at `priceMonthly` rupees; returns its id. */
 export async function createMonthlyPlan({ name, priceMonthly }) {
   const plan = await razorpay('POST', '/plans', {

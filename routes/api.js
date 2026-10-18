@@ -119,6 +119,7 @@ router.get('/admin/settings', requireApiAdmin, wrap(adminPanel.getSettings));
 router.put('/admin/settings', requireApiAdmin, requireAdminMfa, wrap(adminPanel.saveSettings));
 router.get('/admin/billing', requireApiAdmin, wrap(adminPanel.getBilling));
 router.put('/admin/billing', requireApiAdmin, requireAdminMfa, wrap(adminPanel.saveBilling));
+router.post('/admin/billing/check-keys', requireApiAdmin, wrap(adminPanel.checkRazorpayKeys));
 router.get('/admin/payments', requireApiAdmin, wrap(adminPanel.listPayments));
 router.get('/admin/memberships', requireApiAdmin, wrap(adminPanel.listMemberships));
 router.post(

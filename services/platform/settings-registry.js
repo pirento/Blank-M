@@ -140,6 +140,42 @@ export const PLATFORM_SETTINGS = [
   },
   { key: 'VAPID_SUBJECT', group: 'Push notifications', label: 'Contact (mailto:…)', type: 'text' },
 
+  // Business details shown on the public Terms, Privacy, Refund and Contact pages
+  // (Razorpay checks these pages before it activates live payments).
+  {
+    key: 'BUSINESS_NAME',
+    group: 'Business details (legal pages)',
+    label: 'Legal business name',
+    type: 'text',
+    help: 'As on your PAN/GST, e.g. "Pirento Group" or your own name for a sole proprietorship.',
+  },
+  {
+    key: 'SUPPORT_EMAIL',
+    group: 'Business details (legal pages)',
+    label: 'Support email',
+    type: 'email',
+    pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+  },
+  {
+    key: 'SUPPORT_PHONE',
+    group: 'Business details (legal pages)',
+    label: 'Support phone',
+    type: 'text',
+  },
+  {
+    key: 'BUSINESS_ADDRESS',
+    group: 'Business details (legal pages)',
+    label: 'Registered address (one line)',
+    type: 'text',
+  },
+  {
+    key: 'GRIEVANCE_OFFICER',
+    group: 'Business details (legal pages)',
+    label: 'Grievance officer name',
+    type: 'text',
+    help: 'Named on the Privacy page, as Indian IT rules expect.',
+  },
+
   // Live orders
   {
     key: 'LIVE_TRADING_ENABLED',

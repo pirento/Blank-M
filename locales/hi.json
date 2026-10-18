@@ -270,5 +270,10 @@
   "Implied volatility %": "इम्प्लाइड वोलैटिलिटी %",
   "Risk-free rate %": "रिस्क-फ्री रेट %",
   "Payoff": "पेऑफ",
-  "Greeks": "ग्रीक्स"
+  "Greeks": "ग्रीक्स",
+  "8-digit setup code": "8 अंकों का सेटअप कोड",
+  "Setup code": "सेटअप कोड",
+  "Continue": "आगे बढ़ें",
+  "Email a new code": "नया कोड ईमेल करें",
+  "Email me a code": "मुझे कोड ईमेल करें"
 }

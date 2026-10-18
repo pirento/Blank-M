@@ -40,6 +40,11 @@ site "502 Bad Gateway" dikhati hai (`df -h /` se dekhiye).
 5. VPS ka IP (`curl https://api.ipify.org`) Kite developer profile mein whitelist kariye.
 6. `https://aapka-domain.com` kholiye aur login kariye.
 
+**Naya version daalna (update):** nayi file upload karke wahi step 2 dobara chalaiye. Script pehle
+database ka backup leti hai (`/srv/blank/backups`), backup fail ho to ruk jaati hai, `.env` nahi
+chhedti. Naye version purana bekaar data hata sakte hain (90 din purane triggered alerts, 180 din
+purane research runs, 30 din pehle expire hue share links), isliye ye backup hi wapas jaane ka raasta hai.
+
 ## Backup dusri jagah (Google Drive) — zaroor kariye
 
 Roz raat 3 baje (IST) database ka backup `/srv/blank/backups` mein banta hai. Server kharab hua to wo
@@ -116,10 +121,19 @@ Admin panel member workspace se bilkul alag hai: **https://aapka-domain.com/admi
 (sirf admin account se login hota hai). Pehle Settings → Authenticator mein authenticator lagaiye —
 API keys, plan aur Premium badalne ke liye ye zaroori hai.
 
+Admin ka **pehla** authenticator lagane ke liye ek 8 ankon ka setup code chahiye (taaki sirf password
+chura lene wala authenticator na jod sake). "Email me a code" dabaiye — code email par aata hai. Email
+(SMTP) set nahi hai to server par ye chalaiye aur dikha code daaliye (15 minute chalta hai):
+
+```bash
+cd /srv/blank && set -a && . ./.env && set +a && node scripts/admin-setup-code.js aap@example.com
+```
+
 - **Overview:** kitne members, kitne trial par, kitne paying, mahine ki kamai (MRR), pichhle 30 din
   ki payments, kaun si API set hai, disk aur database ka size, aakhri backup.
 - **Integrations:** saari API keys yahin se — OpenAI, Zerodha, Upstox, Fyers, Razorpay, Email,
-  Telegram, Google sign-in, push, live order limits. Yahan save ki value `.env` ki jagah le leti hai
+  Telegram, Google sign-in, push, live order limits, aur **Business details** (naam, support email,
+  phone, address, grievance officer) jo Terms/Privacy/Refund/Contact pages par dikhte hain. Yahan save ki value `.env` ki jagah le leti hai
   (1 minute mein lagu, restart nahi). Secret wapas kabhi nahi dikhta, sirf aakhri 4 akshar.
   "Use .env value" se wapas `.env` wali value. (Database, SESSION_SECRET, encryption key, CRON_SECRET
   aur APP_URL sirf `.env` mein.)
@@ -140,13 +154,32 @@ API keys, plan aur Premium badalne ke liye ye zaroori hai.
 6. Kisi ko bhi khud account banane dena ho to "Anyone can sign up" tick kariye (Email/SMTP set hona
    chahiye). Login page par "Create an account" aa jaayega.
 
+**Live karne se pehle Razorpay test mode mein khud check kariye:**
+
+1. `rzp_test_` wali keys daaliye → Plans & billing → **Check keys** (keys galat hon to yahin bata deta hai).
+2. Plans & billing mein billing on, trial `0` din rakhiye (taaki turant charge ho), ek test member
+   banaiye aur Settings → Plan & billing → Subscribe.
+3. Razorpay page par test card `4111 1111 1111 1111` (koi bhi future date, CVV `123`) ya UPI
+   `success@razorpay` se pay kariye.
+4. Kuch second mein member par "Premium active" aana chahiye aur admin Overview mein payment dikhni
+   chahiye. Na aaye to Razorpay Dashboard → Webhooks mein delivery error dekhiye (URL ya secret galat).
+5. Member se Cancel karke dekhiye, phir trial waapas set kariye aur `rzp_live_` keys + live webhook
+   secret daaliye.
+
 Member Settings → Plan & billing se Subscribe karta hai, payment Razorpay ke apne page par hoti hai
 (card/UPI detail hamare server par kabhi nahi aati). Trial chal raha ho to pehla charge trial khatam
 hone par. Cancel karne par mahine ke aakhir tak Premium rehta hai. Billing off ho to sab free (pehle
 jaisa).
 
-**Zaroori:** platform bechne se pehle Terms/Privacy page aur GST/invoice ki zaroorat apne CA se pooch
-lijiye. AI picks/research ko advice ki tarah bechne par SEBI Research Analyst registration lag sakta
+Ek insaan ko ek hi free trial milta hai: Gmail ke dots aur `+tag` wale email ek hi gine jaate hain,
+aur account delete karke dobara banane par bhi trial dobara nahi milta. Jo log 7 din tak email
+confirm nahi karte, unke sign-up roz apne aap hat jaate hain (`scripts/maintenance-signups.js`).
+
+**Legal pages:** `/terms`, `/privacy`, `/refunds`, `/contact` bane hue hain (landing page ke footer
+mein link). Razorpay KYC mein inke link maangta hai. Text ek achha shuruaati draft hai — Business
+details bharne ke baad bechne se pehle apne CA/lawyer se padhwa lijiye (`views/pages/legal.ejs`).
+
+**Zaroori:** GST/invoice ki zaroorat apne CA se pooch lijiye. AI picks/research ko advice ki tarah bechne par SEBI Research Analyst registration lag sakta
 hai — kisi expert se confirm kariye.
 
 ## Tarika 2: Hostinger "Node.js app" (managed hosting)

@@ -149,6 +149,35 @@ export async function signup(req, res) {
   res.render('pages/signup', { title: 'Create account', plan: publicPlan(plan) });
 }
 
+const LEGAL_PAGES = {
+  terms: 'Terms of service',
+  privacy: 'Privacy policy',
+  refunds: 'Cancellation and refund policy',
+  contact: 'Contact us',
+};
+
+/**
+ * GET /terms, /privacy, /refunds, /contact: public legal pages (Razorpay checks them before it
+ * activates payments). Business details come from the admin panel → Integrations.
+ */
+export async function legal(req, res) {
+  const page = req.path.slice(1);
+  const plan = await loadPlan();
+  res.render('pages/legal', {
+    title: LEGAL_PAGES[page],
+    page,
+    pages: LEGAL_PAGES,
+    plan: publicPlan(plan),
+    business: {
+      name: process.env.BUSINESS_NAME?.trim() || 'Pirento Blank',
+      email: process.env.SUPPORT_EMAIL?.trim() || '',
+      phone: process.env.SUPPORT_PHONE?.trim() || '',
+      address: process.env.BUSINESS_ADDRESS?.trim() || '',
+      grievanceOfficer: process.env.GRIEVANCE_OFFICER?.trim() || '',
+    },
+  });
+}
+
 /** GET /invite: the manual invitation acceptance page, sent with no referrer. */
 export function invite(_req, res) {
   res.setHeader('Referrer-Policy', 'no-referrer');
