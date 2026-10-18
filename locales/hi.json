@@ -241,5 +241,16 @@
   "The record matters.": "रिकॉर्ड मायने रखता है।",
   "Executed trades, estimated costs and planned outcomes remain clearly separated.": "किए गए ट्रेड, अनुमानित खर्च और प्लान किए नतीजे साफ़-साफ़ अलग रहते हैं।",
   "Your trading record": "आपका ट्रेडिंग रिकॉर्ड",
-  "Recent plans": "हाल के प्लान"
+  "Recent plans": "हाल के प्लान",
+  "Options payoff": "ऑप्शंस पेऑफ",
+  "Build an F&O strategy of up to six legs and see its payoff, breakevens and Greeks. Nothing is sent to the server.": "छह लेग तक की F&O स्ट्रैटेजी बनाइए और उसका पेऑफ, ब्रेकईवन और ग्रीक्स देखिए। सर्वर पर कुछ नहीं भेजा जाता।",
+  "Legs": "लेग्स",
+  "Leg": "लेग",
+  "Add leg": "लेग जोड़ें",
+  "Underlying price": "अंडरलाइंग प्राइस",
+  "Days to expiry": "एक्सपायरी तक दिन",
+  "Implied volatility %": "इम्प्लाइड वोलैटिलिटी %",
+  "Risk-free rate %": "रिस्क-फ्री रेट %",
+  "Payoff": "पेऑफ",
+  "Greeks": "ग्रीक्स"
 }

@@ -1,7 +1,8 @@
 /**
- * Insights page: the AI coach, P&L calendar, weekday results, mistake cost,
- * setups and emotions, R-multiples and per-strategy equity curves. All figures come from
- * shared/insights.js over the member's net P&L.
+ * Insights page: the AI coach, P&L calendar, the weekday × entry-time edge map
+ * with best/worst rankings, weekday results, mistake cost, setups and emotions,
+ * R-multiples and per-strategy equity curves. All figures come from
+ * shared/insights.js and shared/edge-map.js over the member's net P&L.
  */
 import { signedCurrency as signed, pnlTone as tone } from '../core/format.js';
 import {
@@ -28,6 +29,7 @@ import {
   weekdayStats,
 } from '../../../shared/insights.js';
 import { EMOTIONS } from '../../../shared/trade-tags.js';
+import { MIN_GROUP_TRADES, edgeGrid, edgeRankings } from '../../../shared/edge-map.js';
 import { pnlCalendar } from '../components/pnl-calendar.js';
 import { createCoachReview } from '../components/coach-review.js';
 import {
@@ -83,8 +85,11 @@ function canvasBox(height) {
   return { canvas, box: h('div', { class: 'w-full', style: { height: `${height}px` } }, canvas) };
 }
 
-/** A compact results table: label, trades, win rate, average and net P&L. */
-function statsTable(rows, labelHeading, labelOf) {
+/**
+ * A compact results table: label, trades, win rate, average (or average R with
+ * `{ averageR: true }`) and net P&L.
+ */
+function statsTable(rows, labelHeading, labelOf, { averageR = false } = {}) {
   return h(
     'div',
     { class: 'overflow-x-auto' },
@@ -100,7 +105,7 @@ function statsTable(rows, labelHeading, labelOf) {
           h('th', { class: 'py-2 pr-3' }, labelHeading),
           h('th', { class: 'py-2 pr-3 text-right' }, 'Trades'),
           h('th', { class: 'py-2 pr-3 text-right' }, 'Win rate'),
-          h('th', { class: 'py-2 pr-3 text-right' }, 'Average'),
+          h('th', { class: 'py-2 pr-3 text-right' }, averageR ? 'Avg R' : 'Average'),
           h('th', { class: 'py-2 text-right' }, 'Net P&L'),
         ),
       ),
@@ -114,11 +119,17 @@ function statsTable(rows, labelHeading, labelOf) {
             h('td', { class: 'py-2 pr-3 text-fg' }, labelOf(row)),
             h('td', { class: 'py-2 pr-3 text-right' }, String(row.count)),
             h('td', { class: 'py-2 pr-3 text-right' }, `${row.winRate}%`),
-            h(
-              'td',
-              { class: cn('py-2 pr-3 text-right', tone(row.averagePnl)) },
-              signed(row.averagePnl),
-            ),
+            averageR
+              ? h(
+                  'td',
+                  { class: cn('py-2 pr-3 text-right', tone(row.averageR ?? 0)) },
+                  row.averageR === null ? '—' : `${row.averageR}R`,
+                )
+              : h(
+                  'td',
+                  { class: cn('py-2 pr-3 text-right', tone(row.averagePnl)) },
+                  signed(row.averagePnl),
+                ),
             h(
               'td',
               { class: cn('py-2 text-right font-medium', tone(row.netPnl)) },
@@ -127,6 +138,147 @@ function statsTable(rows, labelHeading, labelOf) {
           ),
         ),
       ),
+    ),
+  );
+}
+
+/* ------------------------------- where you make money ------------------------------ */
+
+/**
+ * Weekday × entry-time table. Every cell prints its amount and trade count, so
+ * the colour (stronger for larger amounts) only repeats what the text says.
+ */
+function edgeHeatmap(grid) {
+  const cellView = (row, column, cell) => {
+    const strength = Math.round(12 + 48 * (Math.abs(cell.pnl) / (grid.largest || 1)));
+    const color = cell.pnl >= 0 ? 'var(--color-positive)' : 'var(--color-negative)';
+    return h(
+      'td',
+      {
+        class: cn(
+          'border border-line px-2 py-2 text-center align-middle',
+          cell.count ? 'text-fg' : 'text-subtle',
+        ),
+        style: cell.count
+          ? { backgroundColor: `color-mix(in srgb, ${color} ${strength}%, transparent)` }
+          : {},
+        title: `${row} ${column}`,
+      },
+      cell.count
+        ? [
+            h('span', { class: 'block font-medium' }, signed(cell.pnl)),
+            h(
+              'span',
+              { class: 'block text-[11px] text-muted' },
+              `${cell.count} ${cell.count === 1 ? 'trade' : 'trades'}`,
+            ),
+          ]
+        : [h('span', { 'aria-hidden': 'true' }, '·'), h('span', { class: 'sr-only' }, 'No trades')],
+    );
+  };
+  return h(
+    'div',
+    {
+      class: 'overflow-x-auto',
+      role: 'region',
+      tabindex: '0',
+      'aria-label': 'Net P&L by weekday and entry time',
+    },
+    h(
+      'table',
+      { class: 'w-full min-w-[640px] border-collapse tnum text-xs' },
+      h(
+        'caption',
+        { class: 'sr-only' },
+        'Net P&L and number of trades for each weekday (rows) and entry time in IST (columns).',
+      ),
+      h(
+        'thead',
+        {},
+        h(
+          'tr',
+          { class: 'text-muted' },
+          h('th', { scope: 'col', class: 'px-2 py-2 text-left font-normal' }, 'Day'),
+          grid.columns.map((column) =>
+            h('th', { scope: 'col', class: 'px-2 py-2 text-center font-normal' }, column),
+          ),
+        ),
+      ),
+      h(
+        'tbody',
+        {},
+        grid.rows.map((row) =>
+          h(
+            'tr',
+            {},
+            h(
+              'th',
+              { scope: 'row', class: 'px-2 py-2 text-left font-normal text-muted' },
+              row.label,
+            ),
+            row.cells.map((cell, index) => cellView(row.label, grid.columns[index], cell)),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+/** One dimension's best and worst groups, or a note when none has enough trades. */
+function rankingCard(title, ranking, labelOf) {
+  const table = (heading, rows, empty) =>
+    h(
+      'div',
+      { class: 'space-y-1' },
+      h('h5', { class: 'text-xs font-medium uppercase tracking-wide text-muted' }, heading),
+      rows.length
+        ? statsTable(rows, title, (row) => labelOf(row.name), { averageR: true })
+        : h('p', { class: 'text-sm text-muted' }, empty),
+    );
+  return h(
+    'div',
+    { class: 'space-y-3 rounded-card border border-line p-4' },
+    h(
+      'div',
+      { class: 'flex flex-wrap items-baseline justify-between gap-2' },
+      h('h4', { class: 'text-sm font-medium text-fg' }, `By ${title.toLowerCase()}`),
+      ranking.groups
+        ? h(
+            'span',
+            { class: 'text-xs text-muted' },
+            `${ranking.qualified} of ${ranking.groups} with ${MIN_GROUP_TRADES}+ trades`,
+          )
+        : null,
+    ),
+    ranking.qualified
+      ? [
+          table('Best', ranking.best, 'None in profit yet.'),
+          table('Worst', ranking.worst, 'None in loss.'),
+        ]
+      : h(
+          'p',
+          { class: 'text-sm text-muted' },
+          ranking.groups
+            ? `None has ${MIN_GROUP_TRADES} trades yet.`
+            : `Nothing recorded yet for ${title.toLowerCase()}.`,
+        ),
+  );
+}
+
+function edgeSection(trades) {
+  const grid = edgeGrid(trades);
+  const rankings = edgeRankings(trades);
+  return section(
+    'Where you make and lose money',
+    `Net P&L by weekday and entry time (IST). Rankings only include groups with at least ${MIN_GROUP_TRADES} trades; Avg R uses trades with a planned risk or stop.${grid.weekend ? ` ${grid.weekend} weekend ${grid.weekend === 1 ? 'trade is' : 'trades are'} left out of the grid.` : ''}`,
+    edgeHeatmap(grid),
+    h(
+      'div',
+      { class: 'grid gap-6 lg:grid-cols-2' },
+      rankingCard('Setup', rankings.setup, (name) => name),
+      rankingCard('Mistake', rankings.mistake, (name) => name),
+      rankingCard('Emotion', rankings.emotion, emotionLabel),
+      rankingCard('Symbol', rankings.symbol, (name) => name),
     ),
   );
 }
@@ -174,6 +326,7 @@ function paint() {
         'Net P&L per day for the last three months (colour strength shows size).',
         pnlCalendar(trades),
       ),
+      edgeSection(trades),
       h(
         'div',
         { class: 'grid gap-6 lg:grid-cols-2' },

@@ -60,6 +60,8 @@ Common browser helpers live in `public/js/core/` (`dom.js` element builder, card
 | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
 | How P&L or charges are calculated                    | `shared/pnl.js` (tests: `tests/shared/pnl.test.js`)                                               |
 | Position size / stop / target maths                  | `shared/risk-calculator.js`                                                                       |
+| Options payoff and Greeks                            | `shared/options.js`, `public/js/pages/options.js`                                                 |
+| Insights edge map (weekday × time, best/worst)       | `shared/edge-map.js`, `public/js/pages/insights.js`                                               |
 | CSV / Excel import parsing                           | `shared/csv.js`, `shared/spreadsheet-data.js`, `public/js/pages/import/`                          |
 | Broker tradebooks (Zerodha, Upstox, Angel One, Dhan) | `shared/tradebook.js` → `shared/broker-fills.js`, used by `public/js/pages/import/reading.js`     |
 | Sign-in, sessions, password reset                    | `services/auth/accounts.js`, `controllers/auth.controller.js`                                     |
@@ -234,6 +236,7 @@ Common browser helpers live in `public/js/core/` (`dom.js` element builder, card
 | `journal.js`                        | Journal page                                                          |
 | `login.js`                          | Login page                                                            |
 | `mfa-challenge.js`                  | Authenticator challenge after sign-in (verifies a 6-digit TOTP code). |
+| `options.js`                        | Options payoff page: F&O legs, payoff at expiry and today, Greeks.    |
 | `orders.js`                         | Order review page                                                     |
 | `orders/live-dialogs.js`            | Live order and stop/target GTT dialogs                                |
 | `reports.js`                        | Reports page                                                          |
@@ -452,12 +455,14 @@ Common browser helpers live in `public/js/core/` (`dom.js` element builder, card
 | `broker-portfolio.js`   | Zod schemas and size limits for the read-only broker portfolio response.                 |
 | `business-dates.js`     | The app's date-only format supports Gregorian years 0001 through 9999.                   |
 | `csv.js`                | Parsing and normalising broker trade exports.                                            |
+| `edge-map.js`           | Net P&L by weekday × entry time and best/worst setups, mistakes, emotions, symbols.      |
 | `risk-limits.js`        | Daily loss / trades-per-day limits and monthly goal; the status that pauses live orders. |
 | `trade-execution.js`    | Stop-loss, entry/exit times, partial exits and orders per side                           |
 | `strategy-stages.js`    | Strategy stages: draft → backtested → paper → live → retired                             |
 | `tradebook.js`          | Recognises fill-per-row broker tradebooks and pairs them into same-day round trips.      |
 | `manual-invitations.js` | Zod schemas for private invitation links, shared by server and browser.                  |
 | `market.js`             | NSE session helpers.                                                                     |
+| `options.js`            | Black-Scholes prices and Greeks, option leg/strategy payoff, breakevens, presets.        |
 | `order-plans.js`        | Order plans (frozen planning estimates)                                                  |
 | `pnl.js`                | The single source of truth for what a trade earned.                                      |
 | `risk-calculator.js`    | Position sizing and risk/reward maths with exact decimal arithmetic (paise).             |
