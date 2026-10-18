@@ -65,6 +65,17 @@ Drive par 30 din ke backup rehte hain, encrypted (Google bhi nahi padh sakta). W
 `rclone copy gdrive-secret:blank-YYYY-MM-DD.archive.gz .` phir
 `mongorestore --gzip --archive=blank-YYYY-MM-DD.archive.gz --drop`.
 
+## Server alert Telegram par
+
+Har 5 minute server khud check karta hai: app/database chal raha hai, disk mein 1 GB se zyada jagah hai,
+aur pichhle 26 ghante mein backup bana hai. Koi gadbad ho to Telegram par ek message aata hai, aur
+theek hone par "OK again". Chalu karne ke liye:
+
+1. `.env` mein `TELEGRAM_BOT_TOKEN` daaliye (@BotFather se) aur `node scripts/telegram-set-webhook.js`.
+2. Apne bot ko Telegram par `/chatid` bhejiye; jo number aaye wo `.env` mein
+   `ALERT_TELEGRAM_CHAT_ID="..."` likhiye, phir `pm2 reload pirento-blank`.
+3. Test: `pm2 stop pirento-blank`, 5 minute mein alert aayega; phir `pm2 start pirento-blank`.
+
 ## Tarika 2: Hostinger "Node.js app" (managed hosting)
 
 `pirento-blank-ready.tar.xz` mein production dependencies (`node_modules`) aur built CSS pehle se

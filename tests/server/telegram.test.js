@@ -99,6 +99,9 @@ describe('Telegram bot', () => {
   it('rejects unlinked chats and a wrong secret, and sends price alerts to the chat', async () => {
     await say('/today', 999);
     expect(lastReply()).toContain('not linked');
+    // Any chat can read its own ID (for server alerts), linked or not.
+    await say('/chatid', 999);
+    expect(lastReply()).toBe("This chat's ID: 999");
     const forged = await supertest(app)
       .post('/api/telegram/webhook')
       .set('X-Telegram-Bot-Api-Secret-Token', 'wrong')

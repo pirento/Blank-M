@@ -16,3 +16,5 @@ if [ -n "${BACKUP_REMOTE:-}" ]; then
   rclone delete --min-age 30d --include 'blank-*.archive.gz' "$BACKUP_REMOTE"
   echo "$(date -Is) uploaded $FILE to $BACKUP_REMOTE"
 fi
+# health-check.sh alerts when this is over a day old.
+touch backups/.last-ok

@@ -52,7 +52,10 @@ MongoDB 8 (bound to localhost), a firewall, the code in `/srv/blank`, a `.env` f
 HTTPS certificate, the scheduled jobs and a daily MongoDB backup (`deploy/backup-mongo.sh`, 14 days
 kept in `/srv/blank/backups`). Set `BACKUP_REMOTE` in `.env` to an rclone remote (an encrypted
 `crypt` remote over Google Drive or S3 is recommended) and each backup is also copied off the server,
-with 30 days kept there; `START-HERE.md` has the `rclone config` steps.
+with 30 days kept there; `START-HERE.md` has the `rclone config` steps. `deploy/health-check.sh`
+runs every 5 minutes and, with `TELEGRAM_BOT_TOKEN` and `ALERT_TELEGRAM_CHAT_ID` set (send `/chatid`
+to the bot), sends one Telegram message when the app or database is down, under 1 GB of disk is free
+or no backup has succeeded for 26 hours, and another when all is clear.
 
 ```bash
 # Point the domain's A record at the VPS first, then from the unpacked code folder:

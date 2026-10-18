@@ -206,7 +206,10 @@ export async function handleUpdate(update) {
   const [rawCommand, ...args] = text.split(/\s+/);
   const command = rawCommand.toLowerCase().replace(/@.*$/, '');
   let reply;
-  if (command === '/start' && args[0] && /^[A-Za-z0-9_-]{24}$/.test(args[0])) {
+  if (command === '/chatid') {
+    // For ALERT_TELEGRAM_CHAT_ID; a chat may always learn its own ID.
+    reply = `This chat's ID: ${chat.id}`;
+  } else if (command === '/start' && args[0] && /^[A-Za-z0-9_-]{24}$/.test(args[0])) {
     reply = await linkChat(chat, message.from, args[0]);
   } else {
     const link = await TelegramLink.findOne({ chatId: String(chat.id) }).lean();

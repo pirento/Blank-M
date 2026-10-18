@@ -92,6 +92,7 @@ CRON_FILE=$(mktemp)
 sudo -u "$APP_USER" crontab -l 2>/dev/null | grep -v '/srv/blank' > "$CRON_FILE" || true
 grep -v '^#' deploy/crontab.example | grep -v '^$' | sed 's#/var/log/blank-cron.log#/srv/blank/logs/cron.log#' >> "$CRON_FILE"
 echo "30 21 * * * bash /srv/blank/deploy/backup-mongo.sh >> /srv/blank/logs/backup.log 2>&1" >> "$CRON_FILE"
+echo "*/5 * * * * bash /srv/blank/deploy/health-check.sh >> /srv/blank/logs/health.log 2>&1" >> "$CRON_FILE"
 mkdir -p "$APP_DIR/logs" && chown "$APP_USER":"$APP_USER" "$APP_DIR/logs"
 # Fed on stdin: the temp file is root-only, and crontab reads it as $APP_USER.
 sudo -u "$APP_USER" crontab - < "$CRON_FILE"
