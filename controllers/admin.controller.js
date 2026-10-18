@@ -4,7 +4,7 @@
  */
 import { z } from 'zod';
 import { readJsonBody, requireMethod } from '../services/http.js';
-import { requireAdmin } from '../services/auth/request-auth.js';
+import { assertAdminStepUp, requireAdmin } from '../services/auth/request-auth.js';
 import { AdminContractError } from '../services/admin/contracts.js';
 import { AllowedUser, ManualInvitation, User } from '../models/index.js';
 import {
@@ -196,6 +196,7 @@ export async function handleInviteUser(req, res) {
   try {
     const admin = await requireAdmin(req);
     const body = inviteSchema.parse(readJsonBody(req));
+    if (body.role === 'admin') assertAdminStepUp(req);
     await requestInvitation(body.email, body.role, admin.user.id, false);
     res.status(201).json({ ok: true, invitationStatus: 'requested', deliveryConfirmed: false });
   } catch (error) {

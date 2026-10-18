@@ -6,7 +6,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { z } from 'zod';
 import { clientAddress, readJsonBody, requireMethod } from '../services/http.js';
-import { requireAdmin } from '../services/auth/request-auth.js';
+import { assertAdminStepUp, requireAdmin } from '../services/auth/request-auth.js';
 import { AllowedUser, User } from '../models/index.js';
 import { hashPassword } from '../services/auth/accounts.js';
 import {
@@ -144,6 +144,7 @@ export async function handleCreateManualInvitation(req, res) {
       .object({ email, role: z.enum(['member', 'admin']).default('member') })
       .strict()
       .parse(readJsonBody(req));
+    if (input.role === 'admin') assertAdminStepUp(req);
     const origin = invitationOrigin();
     const token = randomBytes(32).toString('base64url');
     const created = await run(() =>

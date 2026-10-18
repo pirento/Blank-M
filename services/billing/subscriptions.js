@@ -49,63 +49,117 @@ export async function startCheckout(user) {
     throw new HttpError('Payments are not set up yet. Ask the administrator.', 503);
   }
   const membership = await membershipFor(user);
-  const sub = await Subscription.findById(user._id).lean();
-  if (sub?.razorpaySubscriptionId && LIVE_STATUSES.includes(sub.razorpayStatus)) {
-    if (sub.razorpayStatus === 'created' && sub.checkoutUrl) return { url: sub.checkoutUrl };
+  // Claim the record so two quick clicks cannot create two Razorpay subscriptions.
+  // A claim left behind by a crash is taken over after two minutes.
+  const claimed = await Subscription.findOneAndUpdate(
+    {
+      _id: user._id,
+      $or: [
+        { razorpayStatus: { $nin: [...LIVE_STATUSES, 'creating'] } },
+        { razorpayStatus: 'creating', updatedAt: { $lt: new Date(Date.now() - 2 * 60_000) } },
+      ],
+    },
+    { $set: { razorpayStatus: 'creating' } },
+  ).lean();
+  if (!claimed) {
+    const sub = await Subscription.findById(user._id).lean();
+    if (sub?.razorpayStatus === 'created' && sub.checkoutUrl) return { url: sub.checkoutUrl };
+    if (sub?.razorpayStatus === 'creating') {
+      throw new HttpError('Your payment page is being prepared. Try again in a moment.', 409);
+    }
     throw new HttpError('You already have a subscription. It renews every month.', 409);
   }
-  const planId = await currentRazorpayPlan(plan);
-  // Do not charge during a running trial: the first charge is on the day it ends.
-  const trialEnd = membership.trialEndsAt ? new Date(membership.trialEndsAt) : null;
-  const startAt = trialEnd && trialEnd.getTime() > Date.now() + 10 * 60_000 ? trialEnd : null;
-  const created = await createSubscription({
-    planId,
-    userId: user._id,
-    email: user.email,
-    startAt,
-  });
-  await Subscription.updateOne(
-    { _id: user._id },
-    {
-      $set: {
-        razorpaySubscriptionId: created.id,
-        razorpayStatus: created.status ?? 'created',
-        checkoutUrl: created.shortUrl,
-        planPrice: plan.priceMonthly,
-        cancelAtPeriodEnd: false,
+  try {
+    // A halted subscription can come back to life when an old invoice is paid;
+    // end it before starting a new one so the member is never charged twice.
+    if (claimed.razorpaySubscriptionId && ['halted', 'paused'].includes(claimed.razorpayStatus)) {
+      await cancelSubscription(claimed.razorpaySubscriptionId, { immediately: true }).catch(
+        (error) => log.warn('old subscription not cancelled', { error: error.message }),
+      );
+    }
+    const planId = await currentRazorpayPlan(plan);
+    // Do not charge during a running trial: the first charge is on the day it ends.
+    const trialEnd = membership.trialEndsAt ? new Date(membership.trialEndsAt) : null;
+    const startAt = trialEnd && trialEnd.getTime() > Date.now() + 10 * 60_000 ? trialEnd : null;
+    const created = await createSubscription({
+      planId,
+      userId: user._id,
+      email: user.email,
+      startAt,
+    });
+    await Subscription.updateOne(
+      { _id: user._id },
+      {
+        $set: {
+          razorpaySubscriptionId: created.id,
+          razorpayStatus: created.status ?? 'created',
+          checkoutUrl: created.shortUrl,
+          planPrice: plan.priceMonthly,
+          cancelAtPeriodEnd: false,
+        },
       },
-    },
-    { upsert: true },
-  );
-  return { url: created.shortUrl };
+    );
+    return { url: created.shortUrl };
+  } catch (error) {
+    // Give the claim back so the member can try again.
+    await Subscription.updateOne(
+      { _id: user._id, razorpayStatus: 'creating' },
+      { $set: { razorpayStatus: claimed.razorpayStatus ?? null } },
+    );
+    throw error;
+  }
 }
 
-/** Applies a Razorpay subscription entity (from a webhook or a fetch) to our record. */
+/** Razorpay statuses after which a subscription never becomes live again. */
+const FINAL_STATUSES = ['cancelled', 'completed', 'expired'];
+/** Statuses whose current_end is a period that has really been paid for. */
+const PAID_STATUSES = ['active', 'cancelled', 'completed'];
+
+/**
+ * Applies a Razorpay subscription entity (from a webhook or a fetch) to our record.
+ * Webhooks can arrive late or out of order, so the paid period only ever moves
+ * forward ($max) and a finished subscription is never marked live again.
+ */
 async function applySubscriptionEntity(entity) {
   if (!entity?.id) return null;
+  const status = String(entity.status ?? '');
+  const paid =
+    PAID_STATUSES.includes(status) &&
+    Number.isFinite(entity.current_end) &&
+    entity.current_end > 0 &&
+    entity.paid_count > 0;
   const update = {
-    razorpayStatus: String(entity.status ?? ''),
-    // Razorpay sends seconds; current_end is the end of the month paid for.
-    ...(Number.isFinite(entity.current_end) && entity.current_end > 0 && entity.paid_count > 0
-      ? { paidUntil: new Date(entity.current_end * 1000) }
-      : {}),
-    ...(['cancelled', 'completed'].includes(entity.status) ? { cancelAtPeriodEnd: true } : {}),
-    ...(entity.status !== 'created' ? { checkoutUrl: null } : {}),
+    $set: {
+      ...(FINAL_STATUSES.includes(status) ? { cancelAtPeriodEnd: true } : {}),
+      ...(status !== 'created' ? { checkoutUrl: null } : {}),
+    },
+    // pending/halted carry the next, unpaid cycle; only a paid cycle extends Premium.
+    ...(paid ? { $max: { paidUntil: new Date(entity.current_end * 1000) } } : {}),
   };
-  const byId = await Subscription.findOneAndUpdate(
-    { razorpaySubscriptionId: entity.id },
-    { $set: update },
-    { new: true },
-  ).lean();
-  if (byId) return byId;
-  // A subscription created from the Razorpay dashboard: match the member from its notes.
+  const ours = await Subscription.findOne({ razorpaySubscriptionId: entity.id }).lean();
+  if (ours) {
+    if (!(FINAL_STATUSES.includes(ours.razorpayStatus) && !FINAL_STATUSES.includes(status))) {
+      update.$set.razorpayStatus = status;
+    }
+    return Subscription.findOneAndUpdate({ _id: ours._id }, update, { new: true }).lean();
+  }
+  // A subscription created from the Razorpay dashboard: match the member from its
+  // notes, but never replace a subscription we already track for them.
   const userId = entity.notes?.userId;
   if (!userId || !(await User.exists({ _id: userId }))) return null;
-  return Subscription.findOneAndUpdate(
-    { _id: userId },
-    { $set: { ...update, razorpaySubscriptionId: entity.id } },
-    { upsert: true, new: true },
-  ).lean();
+  update.$set.razorpayStatus = status;
+  update.$set.razorpaySubscriptionId = entity.id;
+  try {
+    return await Subscription.findOneAndUpdate(
+      { _id: userId, razorpaySubscriptionId: null },
+      update,
+      { upsert: true, new: true },
+    ).lean();
+  } catch (error) {
+    // The member already has another subscription on record: leave it alone.
+    if (error?.code === 11000) return null;
+    throw error;
+  }
 }
 
 /**
@@ -131,6 +185,16 @@ export async function handleWebhook(rawBody, headers) {
       throw error;
     }
   }
+  try {
+    return await applyWebhookEvent(event);
+  } catch (error) {
+    // Let Razorpay's retry apply it: forget that this event id was seen.
+    if (eventId) await BillingEvent.deleteOne({ _id: eventId }).catch(() => undefined);
+    throw error;
+  }
+}
+
+async function applyWebhookEvent(event) {
   const subscription = event.payload?.subscription?.entity;
   const record = await applySubscriptionEntity(subscription);
   const payment = event.payload?.payment?.entity;
@@ -170,7 +234,11 @@ export async function cancelMembership(user) {
   if (!sub?.razorpaySubscriptionId || !LIVE_STATUSES.includes(sub.razorpayStatus)) {
     throw new HttpError('There is no active subscription to cancel.', 409);
   }
-  const entity = await cancelSubscription(sub.razorpaySubscriptionId);
+  // Before the first charge (checkout not finished, or still in the trial) there is no
+  // paid month to run out, so the subscription is cancelled at once.
+  const entity = await cancelSubscription(sub.razorpaySubscriptionId, {
+    immediately: ['created', 'authenticated'].includes(sub.razorpayStatus),
+  });
   await applySubscriptionEntity(entity);
   await Subscription.updateOne({ _id: user._id }, { $set: { cancelAtPeriodEnd: true } });
   return membershipFor(user);

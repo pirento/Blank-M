@@ -262,6 +262,85 @@ describe('Premium', () => {
   });
 });
 
+describe('Premium webhooks and checkout edge cases', () => {
+  async function payingMember() {
+    const admin = await adminSession();
+    await admin.send('put', '/api/admin/settings', {
+      changes: {
+        RAZORPAY_KEY_ID: 'rzp_test_abcdefgh123',
+        RAZORPAY_KEY_SECRET: 'secret-value',
+        RAZORPAY_WEBHOOK_SECRET: WEBHOOK_SECRET,
+      },
+    });
+    await admin.send('put', '/api/admin/billing', { enabled: true, trialDays: 0 });
+    forgetPlanCache();
+    const member = await memberSession();
+    // Two quick clicks create one Razorpay subscription only.
+    const [first, second] = await Promise.all([
+      member.send('post', '/api/billing/checkout', {}),
+      member.send('post', '/api/billing/checkout', {}),
+    ]);
+    // The slower click either waits (409) or gets the same payment page back.
+    for (const response of [first, second]) {
+      if (response.status === 200) expect(response.body.url).toBe('https://rzp.io/i/pay');
+      else expect(response.status).toBe(409);
+    }
+    expect(razorpay.calls.filter((call) => call.path === '/subscriptions')).toHaveLength(1);
+    return { admin, member };
+  }
+  const entity = (status, endDays, paidCount = 1) => ({
+    event: `subscription.${status}`,
+    payload: {
+      subscription: {
+        entity: {
+          id: 'sub_test1',
+          status,
+          current_end: Math.floor(Date.now() / 1000) + endDays * 86400,
+          paid_count: paidCount,
+        },
+      },
+    },
+  });
+  const paidUntil = async (member) =>
+    Date.parse((await member.agent.get('/api/billing')).body.membership.paidUntil);
+
+  it('never extends Premium for an unpaid cycle or moves it backwards', async () => {
+    const { member } = await payingMember();
+    await signedWebhook(entity('active', 30), 'evt_a');
+    const paid = await paidUntil(member);
+    // A failed renewal carries the next cycle: no free month.
+    await signedWebhook(entity('pending', 60), 'evt_b');
+    expect(await paidUntil(member)).toBe(paid);
+    // A late retry of an older cycle does not shorten Premium.
+    await signedWebhook(entity('active', 5), 'evt_c');
+    expect(await paidUntil(member)).toBe(paid);
+    // Once cancelled, a late "active" does not bring renewal back.
+    await signedWebhook(entity('cancelled', 30), 'evt_d');
+    await signedWebhook(entity('active', 30), 'evt_e');
+    const after = (await member.agent.get('/api/billing')).body.membership;
+    expect(after).toMatchObject({ razorpayStatus: 'cancelled', cancelAtPeriodEnd: true });
+  });
+
+  it('needs the webhook secret to switch billing on and an authenticator to invite admins', async () => {
+    const admin = await adminSession();
+    await admin.send('put', '/api/admin/settings', {
+      changes: { RAZORPAY_KEY_ID: 'rzp_test_abcdefgh123', RAZORPAY_KEY_SECRET: 'secret-value' },
+    });
+    const refused = await admin.send('put', '/api/admin/billing', { enabled: true });
+    expect(refused.status).toBe(409);
+    expect(refused.body.error).toMatch(/webhook secret/);
+
+    await resetDatabase();
+    const plain = await adminSession({ mfa: false });
+    const invite = await plain.send('post', '/api/admin/users/invite', {
+      email: 'boss@example.com',
+      role: 'admin',
+    });
+    expect(invite.status).toBe(403);
+    expect(invite.body.error).toMatch(/authenticator/);
+  });
+});
+
 describe('sign-up', () => {
   it('is closed until the administrator opens it, then emails an activation link', async () => {
     const visitor = supertest.agent(app);

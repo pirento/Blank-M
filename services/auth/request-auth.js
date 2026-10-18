@@ -29,3 +29,17 @@ export async function requireAdmin(req) {
   }
   return auth;
 }
+
+/**
+ * Making someone an administrator needs the same proof as other admin-panel
+ * changes: an authenticator used in this session (aal2). Throws HttpError 403.
+ */
+export function assertAdminStepUp(req) {
+  const { user, session } = req.auth ?? {};
+  if (!user?.hasVerifiedFactor?.() || session?.aal !== 'aal2') {
+    throw new HttpError(
+      'Inviting an administrator needs your authenticator. Add one in Settings → Authenticator and sign in again.',
+      403,
+    );
+  }
+}

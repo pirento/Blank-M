@@ -136,10 +136,17 @@ export async function savePlan(actor, changes) {
   return next;
 }
 
-/** Remembers the Razorpay plan created for the current price. */
+/**
+ * Remembers the Razorpay plan created for the current price. Only these two fields
+ * are written, so a stale cached plan on another process cannot undo an admin change.
+ */
 export async function rememberRazorpayPlan(planId, price) {
-  const current = await loadPlan();
-  await writePlan({ ...current, razorpayPlanId: planId, razorpayPlanPrice: price }, null);
+  await PlatformSetting.updateOne(
+    { _id: PLAN_KEY },
+    { $set: { 'value.razorpayPlanId': planId, 'value.razorpayPlanPrice': price } },
+    { upsert: true },
+  );
+  forgetPlanCache();
 }
 
 /** What members may see about the plan (no Razorpay ids). */

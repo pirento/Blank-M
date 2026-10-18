@@ -348,14 +348,22 @@ export async function signUp(email, clientAddress) {
     return;
   }
   if (await User.exists({ email: address })) return;
-  const account = await User.create({ email: address, role: 'member', status: 'active' });
-  await AllowedUser.create({
-    _id: address,
-    role: 'member',
-    invitedBy: null,
-    invitedAt: new Date(),
-    authUserId: account._id,
-  });
+  let account;
+  try {
+    account = await User.create({ email: address, role: 'member', status: 'active' });
+    await AllowedUser.create({
+      _id: address,
+      role: 'member',
+      invitedBy: null,
+      invitedAt: new Date(),
+      authUserId: account._id,
+    });
+  } catch (error) {
+    // A parallel sign-up for the same address won; remove our half-made account.
+    if (error?.code !== 11000) throw error;
+    if (account) await User.deleteOne({ _id: account._id, emailConfirmedAt: null });
+    return;
+  }
   await sendActivationEmail(account, { selfSignup: true });
 }
 

@@ -101,10 +101,13 @@ export function fetchSubscription(id) {
   return razorpay('GET', `/subscriptions/${encodeURIComponent(id)}`);
 }
 
-/** Stops renewal at the end of the paid month (the member keeps Premium until then). */
-export function cancelSubscription(id) {
+/**
+ * Stops renewal at the end of the paid month (the member keeps Premium until then),
+ * or at once with `immediately` (nothing paid yet, or an old subscription being replaced).
+ */
+export function cancelSubscription(id, { immediately = false } = {}) {
   return razorpay('POST', `/subscriptions/${encodeURIComponent(id)}/cancel`, {
-    cancel_at_cycle_end: 1,
+    cancel_at_cycle_end: immediately ? 0 : 1,
   });
 }
 

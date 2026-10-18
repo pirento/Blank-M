@@ -197,9 +197,13 @@ const planSchema = z
 export async function saveBilling(req, res) {
   const parsed = planSchema.safeParse(req.body ?? {});
   if (!parsed.success) throw new HttpError('Send valid plan settings.', 400);
-  if (parsed.data.enabled && !isRazorpayConfigured()) {
+  // Without the webhook secret renewals never arrive and paying members drop to free.
+  if (
+    parsed.data.enabled &&
+    (!isRazorpayConfigured() || !process.env.RAZORPAY_WEBHOOK_SECRET?.trim())
+  ) {
     throw new HttpError(
-      'Add the Razorpay keys in Integrations before switching billing on, so members can pay.',
+      'Add the Razorpay key id, key secret and webhook secret in Integrations before switching billing on.',
       409,
     );
   }
