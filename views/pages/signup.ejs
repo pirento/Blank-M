@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <%- include('../partials/head') %>
+  </head>
+  <body>
+    <div class="login-layout blank-login">
+      <aside class="login-aside">
+        <a href="/" aria-label="Pirento Blank home" class="focus-ring login-brand inline-flex min-h-6 items-center"><%- include('../partials/brand') %></a>
+        <div>
+          <span class="section-index">START FREE</span>
+          <h1>A clear head. <br />A considered <br />trade.</h1>
+          <p><%= plan.trialDays > 0 ? `${plan.trialDays} days of ${plan.name} free,` : `${plan.name} for` %><br />then <%= formatCurrency(plan.priceMonthly) %> a month.</p>
+        </div>
+        <span class="fineprint">PIRENTO BLANK / NEW ACCOUNT</span>
+      </aside>
+      <main class="login" data-signup>
+        <a href="/login" class="focus-ring back-link inline-flex min-h-6 items-center"><%- icon('arrow-left', { size: 14 }) %> Back to sign in</a>
+        <span class="eyebrow">CREATE ACCOUNT</span>
+        <h2>Create your account</h2>
+        <p class="muted">We email you a link to confirm your address and choose a password.</p>
+        <form data-signup-form class="login-form mt-8 space-y-5" novalidate>
+          <div>
+            <label class="<%= LABEL_CLASS %>" for="signup-email">Email</label>
+            <input id="signup-email" name="email" type="email" autocomplete="email" autocapitalize="none" spellcheck="false" maxlength="320" class="<%= FIELD_CLASS %>" />
+          </div>
+          <label class="flex items-start gap-2 text-sm text-muted">
+            <input type="checkbox" class="mt-1" data-signup-agree />
+            <span>I understand Pirento Blank is a journal and planning tool, not investment advice.</span>
+          </label>
+          <p data-signup-error role="alert" class="border border-negative bg-negative-soft px-3 py-2 text-sm text-negative" hidden></p>
+          <p data-signup-success role="status" class="border border-positive bg-positive-soft px-3 py-2 text-sm text-positive" hidden></p>
+          <button type="submit" class="<%= buttonClass('default', 'lg', 'login-submit w-full') %>">
+            <span>Email me the link</span>
+            <%- icon('arrow-right', { size: 17 }) %>
+          </button>
+        </form>
+      </main>
+    </div>
+    <script type="module" src="/js/pages/signup.js" nonce="<%= cspNonce %>"></script>
+  </body>
+</html>

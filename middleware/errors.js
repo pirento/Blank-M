@@ -72,6 +72,7 @@ export function errorHandler(error, req, res, _next) {
       'outcome',
       'fieldErrors',
       'code',
+      'feature',
     ]) {
       if (error?.[key] !== undefined) body[key] = error[key];
     }

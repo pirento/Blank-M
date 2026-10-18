@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <%- include('../partials/head') %>
+  </head>
+  <body>
+    <div class="login-layout blank-login">
+      <aside class="login-aside">
+        <a href="/" aria-label="Pirento Blank home" class="focus-ring login-brand inline-flex min-h-6 items-center"><%- include('../partials/brand') %></a>
+        <div>
+          <span class="section-index">ADMIN PANEL</span>
+          <h1>Run the <br />platform.</h1>
+          <p>Members, plans, payments<br />and integrations.</p>
+        </div>
+        <span class="fineprint">PIRENTO BLANK / ADMINISTRATORS ONLY</span>
+      </aside>
+      <main class="login" data-admin-login>
+        <span class="eyebrow">ADMIN SIGN-IN</span>
+        <h2>Administrator sign-in</h2>
+        <p class="muted">Members sign in at <a class="text-accent underline" href="/login">the member login</a>.</p>
+        <form data-admin-login-form class="login-form mt-8 space-y-5" novalidate>
+          <div>
+            <label class="<%= LABEL_CLASS %>" for="admin-email">Email or username</label>
+            <input id="admin-email" name="identifier" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="320" class="<%= FIELD_CLASS %>" />
+          </div>
+          <div>
+            <label class="<%= LABEL_CLASS %>" for="admin-password">Password</label>
+            <input id="admin-password" name="password" type="password" autocomplete="current-password" class="<%= FIELD_CLASS %>" />
+          </div>
+          <p data-admin-login-error role="alert" class="border border-negative bg-negative-soft px-3 py-2 text-sm text-negative" hidden></p>
+          <button type="submit" class="<%= buttonClass('default', 'lg', 'login-submit w-full') %>">
+            <span>Sign in to the admin panel</span>
+            <%- icon('arrow-right', { size: 17 }) %>
+          </button>
+        </form>
+        <small>Only administrator accounts can sign in here. You will be asked for your authenticator code next if one is set up.</small>
+      </main>
+    </div>
+    <script type="module" src="/js/admin/login.js" nonce="<%= cspNonce %>"></script>
+  </body>
+</html>

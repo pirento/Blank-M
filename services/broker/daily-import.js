@@ -7,6 +7,7 @@
 import { AccountSettings, User } from '../../models/index.js';
 import { MARKET_CLOSE_MINUTE, getMarketStatus, toIst } from '../../shared/market.js';
 import { accessProblem } from '../auth/accounts.js';
+import { hasFeature } from '../billing/membership.js';
 import { HttpError } from '../errors.js';
 import { createLogger, errorName } from '../logger.js';
 import { activeConnection } from '../market/kite/connection.js';
@@ -72,7 +73,8 @@ export async function runDailyImports({ now = new Date(), limit = 200 } = {}) {
   let failed = 0;
   for (const settings of due) {
     const user = await User.findById(settings._id);
-    if (!user || (await accessProblem(user))) {
+    // Free members on a billed platform keep the setting but are not imported for.
+    if (!user || (await accessProblem(user)) || !(await hasFeature(user, 'brokers'))) {
       skipped += 1;
       continue;
     }

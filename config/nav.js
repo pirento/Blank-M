@@ -38,10 +38,21 @@ export const NAV_GROUPS = [
   ...SECONDARY_NAV_GROUPS,
 ];
 
+/** Shown to administrators only: a link out of the member workspace into the admin panel. */
 export const ADMIN_NAV_GROUP = {
   group: 'Administration',
-  items: [{ name: 'Admin', path: '/users', icon: 'users-round' }],
+  items: [{ name: 'Admin panel', path: '/admin', icon: 'shield-check' }],
 };
+
+/** The admin panel's own sidebar (views/layouts/admin.ejs). Separate from member navigation. */
+export const ADMIN_PANEL_NAV = [
+  { name: 'Overview', path: '/admin', icon: 'layout-dashboard' },
+  { name: 'Members', path: '/admin/members', icon: 'users-round' },
+  { name: 'Plans & billing', path: '/admin/billing', icon: 'credit-card' },
+  { name: 'Integrations', path: '/admin/integrations', icon: 'key-round' },
+  { name: 'AI models', path: '/admin/ai', icon: 'bot' },
+  { name: 'Audit log', path: '/admin/audit', icon: 'scroll-text' },
+];
 
 /** Member-safe list shared by the command palette and page labels. */
 export const NAV_LINKS = NAV_GROUPS.flatMap((group) => group.items);

@@ -7,6 +7,7 @@ import { catalogFor, languageOf, translator } from '../services/i18n.js';
 import { todayInIst } from '../shared/market.js';
 import {
   ADMIN_NAV_GROUP,
+  ADMIN_PANEL_NAV,
   NAV_LINKS,
   PRIMARY_NAV_LINKS,
   SECONDARY_NAV_GROUPS,
@@ -112,6 +113,14 @@ export function viewHelpers(req, res, next) {
     allNavLinks: translate([...NAV_LINKS, ...ADMIN_NAV_GROUP.items]),
     navLinks: translate(NAV_LINKS),
   });
+  /** Render an admin panel view inside the admin layout (views/layouts/admin.ejs). */
+  res.renderAdmin = (view, locals = {}) => {
+    const page = { ...res.locals, adminNav: ADMIN_PANEL_NAV, ...locals };
+    req.app.render(view, page, (error, body) => {
+      if (error) return next(error);
+      res.render('layouts/admin', { adminNav: ADMIN_PANEL_NAV, ...locals, body });
+    });
+  };
   /** Render a page view inside the workspace shell layout. */
   res.renderWorkspace = (view, locals = {}) => {
     const page = { ...res.locals, ...locals };

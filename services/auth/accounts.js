@@ -298,13 +298,65 @@ export async function createRecoveryLink(user) {
  * Emails a 24-hour, single-use activation link to an invited member; any earlier unused activation
  * link stops working.
  */
-export async function sendActivationEmail(user) {
+export async function sendActivationEmail(user, { selfSignup = false } = {}) {
   const token = await issueToken(user, 'activate', ACTIVATION_TTL_MS);
+  const link = `${appOrigin()}/auth/link/activate#token=${token}`;
   await sendMail({
     to: user.email,
-    subject: 'Your Pirento Blank invitation',
-    text: `You have been invited to a private Pirento Blank workspace.\n\nOpen this link within 24 hours to choose your password:\n${appOrigin()}/auth/link/activate#token=${token}\n\nThe workspace is invite-only; ignore this email if you were not expecting it.`,
+    subject: selfSignup ? 'Confirm your Pirento Blank account' : 'Your Pirento Blank invitation',
+    text: selfSignup
+      ? `Welcome to Pirento Blank.\n\nOpen this link within 24 hours to confirm your email and choose your password:\n${link}\n\nIf you did not sign up, ignore this email and no account will be created.`
+      : `You have been invited to a private Pirento Blank workspace.\n\nOpen this link within 24 hours to choose your password:\n${link}\n\nThe workspace is invite-only; ignore this email if you were not expecting it.`,
   });
+}
+
+/**
+ * Public sign-up (only while the administrator has opened it): creates the
+ * allowlist row and an unconfirmed account, then emails an activation link.
+ * Always answers the same way, so it cannot be used to find out who has an
+ * account; an existing unconfirmed sign-up simply gets a fresh link.
+ */
+export async function signUp(email, clientAddress) {
+  const parsed = z.string().trim().toLowerCase().email().max(320).safeParse(email);
+  if (!parsed.success) throw new HttpError('Enter a valid email address.', 400);
+  const address = parsed.data;
+  const quota = await reserveAttempts(
+    [
+      { key: 'signup:g', limit: 200 },
+      { key: `signup:c:${opaque('client', clientAddress || 'unidentified-client')}`, limit: 5 },
+      { key: `signup:i:${opaque('identifier', address)}`, limit: 3 },
+    ],
+    60 * 60_000,
+  );
+  if (!quota.allowed) {
+    throw new HttpError('Too many sign-up attempts. Try again in an hour.', 429, {
+      retryAfter: quota.retryAfterSeconds,
+    });
+  }
+  const invitation = await AllowedUser.findById(address).lean();
+  if (invitation) {
+    const account = invitation.authUserId ? await User.findById(invitation.authUserId) : null;
+    // Only a sign-up that was never confirmed gets a new link; everyone else nothing.
+    if (
+      account &&
+      !account.emailConfirmedAt &&
+      !invitation.revokedAt &&
+      account.status === 'active'
+    ) {
+      await sendActivationEmail(account, { selfSignup: true });
+    }
+    return;
+  }
+  if (await User.exists({ email: address })) return;
+  const account = await User.create({ email: address, role: 'member', status: 'active' });
+  await AllowedUser.create({
+    _id: address,
+    role: 'member',
+    invitedBy: null,
+    invitedAt: new Date(),
+    authUserId: account._id,
+  });
+  await sendActivationEmail(account, { selfSignup: true });
 }
 
 /** Consume a single-use emailed link and return its account. */

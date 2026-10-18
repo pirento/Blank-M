@@ -124,7 +124,11 @@ const changesPassword = mode === 'activate' || mode === 'recover';
           <span>Here to look around?</span>
           <a href="/prototype/index.html" class="focus-ring text-button inline-flex min-h-6 items-center">Explore without credentials</a>
         </div>
+        <% if (locals.signupOpen) { %>
+        <a href="/signup" class="<%= buttonClass('outline', 'lg', 'mt-6 w-full') %>">Create an account</a>
+        <% } else { %>
         <small>Your account requires an active membership. Ask your workspace administrator for an invitation.</small>
+        <% } %>
         <% } %>
       </main>
     </div>

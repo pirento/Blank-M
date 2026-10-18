@@ -1,0 +1,17 @@
+<%# Shown instead of a Premium page to a member without Premium (billing switched on). %>
+<div class="mx-auto max-w-xl py-10">
+  <div class="rounded-card border border-line bg-surface p-6 sm:p-8">
+    <span class="text-xs font-semibold uppercase tracking-wider text-accent"><%= plan.name %></span>
+    <h1 class="mt-2 text-2xl font-semibold text-fg"><%= featureLabel %> is part of <%= plan.name %></h1>
+    <p class="mt-3 text-sm text-muted">
+      <% if (membership.state === 'free') { %>Your free trial has ended.<% } else { %>Your plan does not include this yet.<% } %>
+      <%= plan.name %> is <strong class="text-fg"><%= formatCurrency(plan.priceMonthly) %> a month</strong>, cancel any time.
+    </p>
+    <ul class="mt-5 space-y-2 text-sm text-fg">
+      <% for (const feature of plan.features) { %>
+      <li class="flex items-start gap-2"><%- icon('check', { size: 16, className: 'mt-0.5 text-positive' }) %><span><%= feature.label %></span></li>
+      <% } %>
+    </ul>
+    <a href="/settings#billing" class="<%= buttonClass('default', 'lg', 'mt-6 w-full') %>">See plan & subscribe</a>
+  </div>
+</div>

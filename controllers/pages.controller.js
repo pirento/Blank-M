@@ -12,6 +12,8 @@ import { NAV_LINKS, ADMIN_NAV_GROUP } from '../config/nav.js';
 import { createHash } from 'node:crypto';
 import { openShareLink } from '../services/journal/share-links.js';
 import { reserveAttempts } from '../services/rate-window.js';
+import { hasFeature, membershipFor } from '../services/billing/membership.js';
+import { featureLabel, loadPlan, publicPlan } from '../services/billing/plan.js';
 
 const TITLES = Object.fromEntries(
   [...NAV_LINKS, ...ADMIN_NAV_GROUP.items].map((link) => [link.path, link.name]),
@@ -34,7 +36,12 @@ function integrations() {
  */
 export function workspacePage(
   view,
-  { script = view, vendor = [], data: parts = [...WORKSPACE_PARTS, 'portfolioBalance'] } = {},
+  {
+    script = view,
+    vendor = [],
+    data: parts = [...WORKSPACE_PARTS, 'portfolioBalance'],
+    feature = null,
+  } = {},
 ) {
   // The dock shows the watchlist count on every page.
   const wanted = new Set([...parts, 'watchlist']);
@@ -43,6 +50,17 @@ export function workspacePage(
   if (withBalance) load.add('trades').add('settings');
   return async (req, res) => {
     const userId = req.member.userId;
+    const membership = await membershipFor(req.member.user);
+    // A Premium page for a free member shows the upgrade page instead (billing on only).
+    if (feature && !(await hasFeature(req.member.user, feature))) {
+      const plan = await loadPlan();
+      return res.status(402).renderWorkspace('pages/upgrade', {
+        title: res.locals.t(TITLES[req.path] ?? 'Premium'),
+        featureLabel: featureLabel(feature),
+        plan: publicPlan(plan),
+        membership,
+      });
+    }
     const snapshot = await loadWorkspace(userId, [...load]);
     const data = Object.fromEntries([...wanted].map((part) => [part, snapshot[part]]));
     if (withBalance) {
@@ -68,6 +86,7 @@ export function workspacePage(
         health: { ...health, aiAvailable: health.openai },
         workspace: data,
         query: req.query,
+        membership,
       },
     });
   };
@@ -92,7 +111,7 @@ export function landing(req, res) {
  * GET /login: the sign-in page in signin, activate, recover or reset mode (from ?mode= and the
  * session). A signed-in member asking to sign in is sent to /dashboard.
  */
-export function login(req, res) {
+export async function login(req, res) {
   const { user, mfaRequired, passwordRecovery, session } = req.auth;
   if (mfaRequired) return res.render('pages/mfa-challenge', { title: 'Verify' });
   const requested = req.query.mode;
@@ -118,7 +137,16 @@ export function login(req, res) {
     mailConfigured: isMailConfigured(),
     passwordUser: (mode === 'activate' || mode === 'recover') && user ? user.email : null,
     initialError: errors[req.query.error] ?? null,
+    signupOpen: (await loadPlan()).signupOpen,
   });
+}
+
+/** GET /signup: the public sign-up page while sign-up is open; otherwise the login page. */
+export async function signup(req, res) {
+  const plan = await loadPlan();
+  if (!plan.signupOpen) return res.redirect('/login');
+  if (req.auth.user && !req.auth.accessError) return res.redirect('/dashboard');
+  res.render('pages/signup', { title: 'Create account', plan: publicPlan(plan) });
 }
 
 /** GET /invite: the manual invitation acceptance page, sent with no referrer. */

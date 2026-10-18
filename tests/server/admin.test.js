@@ -36,9 +36,12 @@ describe('administration', () => {
       password: created.password,
     });
     expect((await agent.get('/api/admin/users')).status).toBe(403);
-    const page = await agent.get('/users');
-    expect(page.status).toBe(302);
-    expect(page.headers.location).toBe('/dashboard');
+    // The old address points at the admin panel, which members cannot see at all.
+    const old = await agent.get('/users');
+    expect(old.status).toBe(301);
+    expect(old.headers.location).toBe('/admin/members');
+    expect((await agent.get('/admin/members')).status).toBe(404);
+    expect((await agent.get('/api/admin/overview')).status).toBe(403);
   });
 
   it('creates a one-use private invitation that activates a membership', async () => {

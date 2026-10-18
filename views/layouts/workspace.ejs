@@ -20,7 +20,7 @@
       <%- include('../partials/dock') %>
     </div>
     <%- include('../partials/menu-template') %>
-    <script type="application/json" id="nav-data"><%- safeJson(allNavLinks.filter((link) => isAdmin || link.path !== '/users')) %></script>
+    <script type="application/json" id="nav-data"><%- safeJson(allNavLinks.filter((link) => isAdmin || link.path !== '/admin')) %></script>
     <% if (locals.lang && locals.lang !== 'en') { %>
     <script type="application/json" id="i18n"><%- safeJson(i18nCatalog) %></script>
     <% } %>

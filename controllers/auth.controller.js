@@ -12,12 +12,15 @@ import {
   recordSignIn,
   requestPasswordRecovery,
   revokeUserSessions,
+  signUp,
   updatePassword,
   verifyPasswordSignIn,
 } from '../services/auth/accounts.js';
 import { HttpError } from '../services/errors.js';
 import { env } from '../config/env.js';
 import { clientAddress } from '../services/http.js';
+import { loadPlan } from '../services/billing/plan.js';
+import { isMailConfigured } from '../services/mailer.js';
 
 /** Password sign-in with an invited email or a claimed username. */
 export async function login(req, res) {
@@ -32,6 +35,25 @@ export async function login(req, res) {
 }
 
 /**
+ * POST /auth/admin/login: the admin panel's sign-in. Same checks and rate limits as
+ * member sign-in, but only administrator accounts get a session; anyone else sees the
+ * same "not recognised" answer, so the page does not reveal who is an administrator.
+ */
+export async function adminLogin(req, res) {
+  res.setHeader('Cache-Control', 'private, no-store');
+  const user = await verifyPasswordSignIn(
+    { identifier: req.body?.identifier, password: req.body?.password },
+    clientAddress(req),
+  );
+  if (user.role !== 'admin') {
+    throw new HttpError('That username or email and password are not recognised.', 401);
+  }
+  await establishSession(req, user, { method: 'password' });
+  await recordSignIn(user);
+  res.json({ ok: true, mfaRequired: user.hasVerifiedFactor(), csrfToken: req.session.csrfToken });
+}
+
+/**
  * POST /auth/logout: ends the session and clears its cookie; JSON callers get { ok }, others a
  * redirect to /login.
  */
@@ -40,6 +62,23 @@ export async function logout(req, res) {
   res.clearCookie('blank.sid');
   if ((req.get('accept') || '').includes('application/json')) res.json({ ok: true });
   else res.redirect('/login');
+}
+
+/**
+ * POST /auth/signup { email }: public sign-up while the administrator has opened
+ * it (admin panel → Plans & billing). Same answer whether or not the address
+ * already has an account.
+ */
+export async function signup(req, res) {
+  res.setHeader('Cache-Control', 'private, no-store');
+  if (!(await loadPlan()).signupOpen) {
+    throw new HttpError('Sign-up is closed. Ask the administrator for an invitation.', 403);
+  }
+  if (!isMailConfigured() || !env.appUrl) {
+    throw new HttpError('Sign-up is not available right now. Try again later.', 503);
+  }
+  await signUp(req.body?.email, clientAddress(req));
+  res.json({ ok: true });
 }
 
 /** Same response whether or not the address is eligible. */

@@ -27,3 +27,8 @@ export { PriceAlert } from './PriceAlert.js';
 export { ShareLink } from './ShareLink.js';
 export { CoachReview } from './CoachReview.js';
 export { TelegramLink, TelegramLinkCode } from './TelegramLink.js';
+export { PlatformSetting } from './PlatformSetting.js';
+export { AdminAuditLog } from './AdminAuditLog.js';
+export { Subscription } from './Subscription.js';
+export { Payment } from './Payment.js';
+export { BillingEvent } from './BillingEvent.js';

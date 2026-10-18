@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <%- include('../partials/head') %>
+  </head>
+  <body class="admin-panel">
+    <a href="#admin-main" class="focus-ring sr-only fixed left-4 top-4 z-[70] rounded-control bg-surface px-4 py-2 focus:not-sr-only">Skip to content</a>
+    <div class="flex min-h-dvh flex-col lg:flex-row">
+      <aside class="border-b border-line bg-surface lg:sticky lg:top-0 lg:h-dvh lg:w-60 lg:shrink-0 lg:border-b-0 lg:border-r">
+        <div class="flex items-center justify-between gap-3 px-4 py-4">
+          <a href="/admin" class="focus-ring inline-flex min-h-6 items-center gap-2" aria-label="Admin panel home">
+            <%- include('../partials/brand') %>
+            <span class="rounded-full border border-line px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted">Admin</span>
+          </a>
+        </div>
+        <nav aria-label="Admin panel" class="px-2 pb-3">
+          <ul class="flex flex-wrap gap-1 lg:flex-col">
+            <% for (const link of adminNav) { %>
+            <% const active = link.path === '/admin' ? currentPath === '/admin' : currentPath.startsWith(link.path); %>
+            <li>
+              <a href="<%= link.path %>" class="<%= cn('focus-ring flex min-h-10 items-center gap-2 rounded-control px-3 text-sm', active ? 'bg-elevated font-semibold text-fg' : 'text-muted hover:bg-elevated hover:text-fg') %>" <%- active ? 'aria-current="page"' : '' %>>
+                <%- icon(link.icon, { size: 16 }) %><span><%= link.name %></span>
+              </a>
+            </li>
+            <% } %>
+          </ul>
+        </nav>
+      </aside>
+      <div class="flex min-w-0 flex-1 flex-col">
+        <header class="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3 sm:px-6">
+          <p class="min-w-0 truncate text-sm text-muted">Signed in as <strong class="text-fg"><%= memberEmail %></strong></p>
+          <div class="flex items-center gap-2">
+            <a href="/dashboard" class="<%= buttonClass('ghost', 'sm') %>"><%- icon('external-link', { size: 14, className: 'mr-1.5' }) %>Member workspace</a>
+            <button type="button" class="<%= buttonClass('outline', 'sm') %>" data-admin-sign-out><%- icon('log-out', { size: 14, className: 'mr-1.5' }) %>Sign out</button>
+          </div>
+        </header>
+        <main id="admin-main" tabindex="-1" class="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6">
+          <div class="mb-6">
+            <h1 class="text-2xl font-semibold text-fg"><%= title %></h1>
+            <% if (locals.subtitle) { %><p class="mt-1 text-sm text-muted"><%= subtitle %></p><% } %>
+          </div>
+          <%- body %>
+        </main>
+      </div>
+    </div>
+    <% if (locals.pageData) { %>
+    <script type="application/json" id="page-data"><%- safeJson(pageData) %></script>
+    <% } %>
+    <script type="module" src="/js/admin/shell.js" nonce="<%= cspNonce %>"></script>
+    <% if (locals.script) { %>
+    <script type="module" src="/js/admin/<%= script %>.js" nonce="<%= cspNonce %>"></script>
+    <% } %>
+  </body>
+</html>

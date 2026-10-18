@@ -103,8 +103,59 @@ export function requirePageAuth(req, res, next) {
   next();
 }
 
-/** Page guard after requirePageAuth: non-administrators are redirected to /dashboard. */
-export function requirePageAdmin(req, res, next) {
-  if (req.member?.user.role !== 'admin') return res.redirect('/dashboard');
+/* ---------------------------------- admin panel ---------------------------------- */
+
+/**
+ * Page guard for /admin/*: signed-out visitors go to the admin sign-in page, a
+ * pending authenticator check shows the challenge, and anyone who is not an
+ * active administrator gets a plain 404 (the panel does not announce itself).
+ */
+export function requireAdminPage(req, res, next) {
+  const { user, accessError, mfaRequired, passwordRecovery } = req.auth;
+  if (!user || accessError) return res.redirect('/admin/login');
+  if (mfaRequired) return res.status(403).render('pages/mfa-challenge', { title: 'Verify' });
+  if (passwordRecovery) return res.redirect('/login?mode=recover');
+  if (user.role !== 'admin') {
+    return res.status(404).render('pages/error', {
+      title: 'Not found',
+      status: 404,
+      message: 'This page does not exist.',
+    });
+  }
+  req.member = { user, userId: user._id, session: req.auth.session, profile: req.auth.profile };
+  next();
+}
+
+/** API guard for /api/admin/*: a fully signed-in, active administrator (sets `req.member`). */
+export function requireApiAdmin(req, _res, next) {
+  try {
+    req.member = authenticatedApi(req);
+    if (req.member.user.role !== 'admin') {
+      throw new HttpError('Administrator access is required.', 403);
+    }
+    next();
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * For admin actions that change secrets, money or access: the administrator must
+ * have an authenticator and have used it in this session (aal2), so a stolen
+ * password alone cannot change payment keys.
+ */
+export function requireAdminMfa(req, _res, next) {
+  const { user, session } = req.member ?? {};
+  if (!user?.hasVerifiedFactor?.()) {
+    return next(
+      new HttpError(
+        'Add an authenticator first (Settings → Authenticator) — admin changes require it.',
+        403,
+      ),
+    );
+  }
+  if (session?.aal !== 'aal2') {
+    return next(new HttpError('Verify your authenticator again to make admin changes.', 403));
+  }
   next();
 }

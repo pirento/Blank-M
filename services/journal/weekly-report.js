@@ -12,6 +12,7 @@ import {
 } from '../../shared/business-dates.js';
 import { todayInIst } from '../../shared/market.js';
 import { accessProblem } from '../auth/accounts.js';
+import { hasFeature } from '../billing/membership.js';
 import { isMailConfigured, sendMail } from '../mailer.js';
 import { toTrade } from './workspace.js';
 import { hasOpenAiKey } from '../ai/openai-key.js';
@@ -135,7 +136,7 @@ export async function sendWeeklyReports({ today = todayInIst(), limit = 200 } = 
   let failed = 0;
   for (const settings of due) {
     const user = await User.findById(settings._id);
-    if (!user || (await accessProblem(user))) {
+    if (!user || (await accessProblem(user)) || !(await hasFeature(user, 'reports'))) {
       skipped += 1;
       continue;
     }

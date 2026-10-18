@@ -26,6 +26,7 @@
     <div data-broker></div>
     <div data-dhan></div>
   </div>
+  <div id="billing" data-billing></div>
   <div data-capital></div>
   <div data-risk-limits></div>
   <div data-mfa></div>
@@ -41,7 +42,6 @@
   <div data-backup></div>
   <div class="grid gap-6 xl:grid-cols-2">
     <div data-ai></div>
-    <div class="xl:col-span-2" data-model-routing <%= member.role === 'admin' ? '' : 'hidden' %>></div>
     <div class="xl:col-span-2" data-charges></div>
     <div data-fo-charges-futures></div>
     <div data-fo-charges-options></div>

@@ -11,6 +11,12 @@ export function isMailConfigured() {
   return Boolean(process.env.SMTP_HOST?.trim() && process.env.SMTP_FROM?.trim());
 }
 
+/** Forgets the SMTP transport so the next email uses the current SMTP_* settings. */
+export function resetMailer() {
+  transport?.close?.();
+  transport = null;
+}
+
 function mailer() {
   if (!isMailConfigured()) {
     throw new HttpError(

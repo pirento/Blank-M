@@ -1,0 +1,123 @@
+/**
+ * Does this member have Premium right now? Worked out on each request from the
+ * Subscription dates (trial end, paid-until, admin grant), so expiry needs no
+ * scheduled job. Also the Express guard that puts a feature behind Premium.
+ *
+ *   billing off            → everyone has everything (state "billing-off")
+ *   administrator          → always Premium (state "admin")
+ *   admin grant running    → Premium ("granted")
+ *   paid period running    → Premium ("active", or "cancelled" when it will not renew)
+ *   trial running          → Premium ("trial")
+ *   otherwise              → free features only ("free")
+ */
+import { Subscription } from '../../models/index.js';
+import { HttpError } from '../errors.js';
+import { featureLabel, loadPlan } from './plan.js';
+
+const DAY_MS = 24 * 60 * 60_000;
+const iso = (date) => (date ? new Date(date).toISOString() : null);
+const later = (date, now) => Boolean(date && new Date(date).getTime() > now);
+
+/**
+ * The member's Subscription row, created on first sight with the trial starting
+ * now (so members who existed before billing was switched on get a full trial).
+ */
+async function subscriptionFor(user, plan, now) {
+  const existing = await Subscription.findById(user._id).lean();
+  if (existing) return existing;
+  const trialEndsAt = plan.trialDays > 0 ? new Date(now + plan.trialDays * DAY_MS) : null;
+  try {
+    await Subscription.create({ _id: user._id, trialEndsAt });
+  } catch (error) {
+    // Created by a parallel request: read theirs.
+    if (error?.code !== 11000) throw error;
+  }
+  return Subscription.findById(user._id).lean();
+}
+
+/**
+ * Premium status from a plan and a Subscription row (pure; `sub` may be null when
+ * the member has not been seen since billing was switched on).
+ */
+export function computeMembership(plan, user, sub, now = Date.now()) {
+  const base = { billingEnabled: plan.enabled, premiumFeatures: plan.features };
+  if (!plan.enabled) return { ...base, premium: true, state: 'billing-off', daysLeft: null };
+  if (user.role === 'admin') return { ...base, premium: true, state: 'admin', daysLeft: null };
+  const dates = {
+    trialEndsAt: iso(sub?.trialEndsAt),
+    paidUntil: iso(sub?.paidUntil),
+    grantUntil: iso(sub?.grantUntil),
+    razorpayStatus: sub?.razorpayStatus ?? null,
+    cancelAtPeriodEnd: Boolean(sub?.cancelAtPeriodEnd),
+  };
+  // The latest of the three dates is when Premium ends.
+  const ends = [sub?.grantUntil, sub?.paidUntil, sub?.trialEndsAt]
+    .filter((date) => later(date, now))
+    .map((date) => new Date(date).getTime());
+  const endsAt = ends.length ? Math.max(...ends) : null;
+  const state = later(sub?.grantUntil, now)
+    ? 'granted'
+    : later(sub?.paidUntil, now)
+      ? sub.cancelAtPeriodEnd
+        ? 'cancelled'
+        : 'active'
+      : later(sub?.trialEndsAt, now)
+        ? 'trial'
+        : sub
+          ? 'free'
+          : 'not-started';
+  return {
+    ...base,
+    ...dates,
+    premium: endsAt !== null,
+    state,
+    premiumEndsAt: endsAt ? new Date(endsAt).toISOString() : null,
+    daysLeft: endsAt ? Math.ceil((endsAt - now) / DAY_MS) : 0,
+  };
+}
+
+/**
+ * The member's Premium status for the UI and for guards:
+ * `{ billingEnabled, premium, state, trialEndsAt, paidUntil, grantUntil, daysLeft, premiumFeatures }`.
+ * The first time a member is seen with billing on, their free trial starts.
+ */
+export async function membershipFor(user, now = Date.now()) {
+  const plan = await loadPlan();
+  if (!plan.enabled || user.role === 'admin') return computeMembership(plan, user, null, now);
+  return computeMembership(plan, user, await subscriptionFor(user, plan, now), now);
+}
+
+/** Whether the member may use a feature now (free features and billing-off always may). */
+export async function hasFeature(user, feature) {
+  const plan = await loadPlan();
+  if (!plan.enabled || !plan.features.includes(feature)) return true;
+  return (await membershipFor(user)).premium;
+}
+
+/** The 402 error shown when a free member opens a Premium feature. */
+export function premiumRequired(feature) {
+  return new HttpError(
+    `${featureLabel(feature)} is part of Premium. Start or renew it in Settings → Plan & billing.`,
+    402,
+    { code: 'premium_required', feature },
+  );
+}
+
+/**
+ * Express guard for API routes: lets the request through when the signed-in member
+ * may use `feature`; answers 402 otherwise. Signed-out requests pass through so the
+ * route's own sign-in check answers them as before.
+ */
+export function requirePremium(feature) {
+  return async (req, _res, next) => {
+    try {
+      const user = req.member?.user ?? req.auth?.user;
+      if (user && !req.auth?.accessError && !(await hasFeature(user, feature))) {
+        throw premiumRequired(feature);
+      }
+      next();
+    } catch (error) {
+      next(error);
+    }
+  };
+}

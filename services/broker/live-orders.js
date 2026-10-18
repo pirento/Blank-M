@@ -9,6 +9,7 @@ import { getQuote, isKiteConfigured } from '../market/index.js';
 import { placeKiteGtt, placeKiteLimitOrder, readKiteOrder } from '../market/kite.js';
 import { HttpError } from '../errors.js';
 import { accessProblem } from '../auth/accounts.js';
+import { hasFeature } from '../billing/membership.js';
 import { sendToMember } from '../telegram/bot.js';
 
 const positiveNumber = (value, fallback) => {
@@ -461,6 +462,7 @@ export async function placePendingAutoGtts({ limit = 100 } = {}) {
     let problem = null;
     if (!user || (await accessProblem(user))) problem = 'Blank access is not active.';
     else if (!settings?.liveTradingEnabled) problem = 'Live orders were turned off in Settings.';
+    else if (!(await hasFeature(user, 'liveOrders'))) problem = 'Premium has ended.';
     let result = null;
     if (!problem) {
       try {

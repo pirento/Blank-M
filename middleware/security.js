@@ -52,6 +52,7 @@ const CSRF_EXEMPT = new Set([
   '/api/maintenance/weekly-reports',
   '/api/maintenance/price-checks',
   '/api/maintenance/daily-import',
+  '/api/billing/razorpay/webhook',
   '/api/telegram/webhook',
   '/api/invitations/accept',
 ]);

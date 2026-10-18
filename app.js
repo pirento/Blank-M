@@ -16,6 +16,7 @@ import { iconSprite } from './services/icons.js';
 import apiRoutes from './routes/api.js';
 import authRoutes from './routes/auth.js';
 import webRoutes from './routes/web.js';
+import adminRoutes from './routes/admin.js';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 /** Direct dependencies only; pnpm links each one under node_modules/<name>. */
@@ -70,7 +71,15 @@ export function createApp({ sessionStore } = {}) {
   app.use(requestLog);
   app.use('/api', privateApiResponse);
   // The Kite callback and Google OAuth return use GET with query strings only.
-  app.use(express.json({ limit: '2mb' }));
+  app.use(
+    express.json({
+      limit: '2mb',
+      // Payment webhooks are verified against the exact bytes Razorpay signed.
+      verify: (req, _res, buffer) => {
+        if (req.originalUrl === '/api/billing/razorpay/webhook') req.rawBody = Buffer.from(buffer);
+      },
+    }),
+  );
   app.use(express.urlencoded({ extended: false, limit: '256kb' }));
   app.use(sessionMiddleware({ store: sessionStore }));
   app.use(csrfProtection);
@@ -80,6 +89,7 @@ export function createApp({ sessionStore } = {}) {
   app.use('/api', apiRoutes);
   app.use('/api', notFoundApi);
   app.use('/auth', authRoutes);
+  app.use('/admin', adminRoutes);
   app.use('/', webRoutes);
   app.use(errorHandler);
   return app;
