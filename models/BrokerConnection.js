@@ -4,7 +4,7 @@ import mongoose from 'mongoose';
 const brokerConnectionSchema = new mongoose.Schema(
   {
     userId: { type: String, required: true },
-    provider: { type: String, enum: ['kite', 'dhan'], default: 'kite' },
+    provider: { type: String, enum: ['kite', 'dhan', 'upstox', 'fyers', 'angel'], default: 'kite' },
     accessTokenCiphertext: { type: String, default: '' },
     accessTokenIv: { type: String, default: '' },
     accessTokenTag: { type: String, default: '' },

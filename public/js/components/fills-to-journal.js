@@ -1,5 +1,6 @@
 /**
- * "Add today's fills to journal": previews today's Zerodha or Dhan fills paired into
+ * "Add today's fills to journal": previews today's broker fills (Zerodha, Dhan,
+ * Upstox, Fyers or Angel One) paired into
  * round trips and adds the chosen ones as journal trades. The server re-reads
  * the fills itself; this dialog only sends which round trips to add.
  */
@@ -13,9 +14,12 @@ import { notify } from '../core/toast.js';
 const BROKERS = {
   kite: { label: 'Zerodha', path: '/api/kite/fills' },
   dhan: { label: 'Dhan', path: '/api/dhan/fills' },
+  upstox: { label: 'Upstox', path: '/api/upstox/fills' },
+  fyers: { label: 'Fyers', path: '/api/fyers/fills' },
+  angel: { label: 'Angel One', path: '/api/angel/fills' },
 };
 
-/** @param {{ onAdded: (trades: object[]) => void, broker?: 'kite' | 'dhan' }} options */
+/** @param {{ onAdded: (trades: object[]) => void, broker?: 'kite' | 'dhan' | 'upstox' | 'fyers' | 'angel' }} options */
 export function openFillsToJournal({ onAdded, broker = 'kite' }) {
   const source = BROKERS[broker];
   openModal({

@@ -8,13 +8,12 @@ import { BrokerConnection } from '../../models/index.js';
 import { decryptSecret, encryptSecret } from '../crypto.js';
 import { HttpError } from '../errors.js';
 import { createLogger, errorName } from '../logger.js';
+import { MAX_ROWS, brokerRequest } from './broker-api.js';
 import { brokerTradingDate } from './portfolio.js';
 
 const log = createLogger('dhan');
 const API_BASE = 'https://api.dhan.co/v2';
-const TIMEOUT_MS = 15_000;
-const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
-const MAX_TRADES = 5000;
+const MAX_TRADES = MAX_ROWS;
 const DEFAULT_VALIDITY_MS = 24 * 60 * 60_000;
 
 /** Dhan exchange segments → exchanges the journal understands (others are skipped later). */
@@ -39,42 +38,11 @@ export function dhanTokenClaims(token) {
   }
 }
 
-async function dhanGet(path, token) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-  let response;
-  let text;
-  try {
-    response = await fetch(`${API_BASE}${path}`, {
-      method: 'GET',
-      redirect: 'error',
-      signal: controller.signal,
-      headers: { 'access-token': token, Accept: 'application/json' },
-    });
-    text = await response.text();
-  } catch (error) {
-    log.warn('dhan request failed', { path, error: errorName(error) });
-    throw new HttpError('Dhan could not be reached. Try again shortly.', 504);
-  } finally {
-    clearTimeout(timer);
-  }
-  if (response.status === 401 || response.status === 403) {
-    const error = new HttpError(
-      'Dhan rejected the access token. Create a new one and reconnect.',
-      401,
-    );
-    error.tokenRejected = true;
-    throw error;
-  }
-  if (response.status === 429)
-    throw new HttpError('Dhan is rate limiting requests. Try again in a minute.', 429);
-  if (!response.ok) throw new HttpError(`Dhan returned ${response.status}.`, 502);
-  if (text.length > MAX_RESPONSE_BYTES) throw new HttpError('Dhan returned too much data.', 502);
-  try {
-    return JSON.parse(text);
-  } catch {
-    throw new HttpError('Dhan returned an invalid response.', 502);
-  }
+function dhanGet(path, token) {
+  return brokerRequest('Dhan', `${API_BASE}${path}`, {
+    headers: { 'access-token': token },
+    rejected: 'Dhan rejected the access token. Create a new one and reconnect.',
+  });
 }
 
 async function loadToken(userId) {

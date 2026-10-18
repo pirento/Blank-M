@@ -7,6 +7,7 @@ import { requireApiAuth } from '../middleware/auth.js';
 import * as market from '../controllers/market.controller.js';
 import * as kite from '../controllers/kite.controller.js';
 import * as dhan from '../controllers/dhan.controller.js';
+import { brokerHandlers } from '../controllers/brokers.controller.js';
 import * as ai from '../controllers/ai.controller.js';
 import * as adminAi from '../controllers/admin-ai.controller.js';
 import * as admin from '../controllers/admin.controller.js';
@@ -24,6 +25,9 @@ import * as alerts from '../controllers/alerts.controller.js';
 import * as telegram from '../controllers/telegram.controller.js';
 
 const router = Router();
+const upstox = brokerHandlers('upstox');
+const fyers = brokerHandlers('fyers');
+const angel = brokerHandlers('angel');
 
 /* --------------------------- integrations & market -------------------------- */
 router.get('/health', wrap(market.health));
@@ -67,6 +71,25 @@ router.post('/dhan/connect', requireApiAuth, wrap(dhan.connect));
 router.post('/dhan/disconnect', requireApiAuth, wrap(dhan.disconnect));
 router.get('/dhan/fills', requireApiAuth, wrap(dhan.fills));
 router.post('/dhan/fills/import', requireApiAuth, wrap(dhan.importToJournal));
+// Upstox and Fyers log in over OAuth. Their callbacks are GET (CSRF-safe) and check the
+// member and login state themselves, so a failure can redirect back to Settings.
+router.get('/upstox', requireApiAuth, wrap(upstox.status));
+router.post('/upstox/authorize', requireApiAuth, wrap(upstox.authorize));
+router.get('/upstox/callback', wrap(upstox.callback));
+router.post('/upstox/disconnect', requireApiAuth, wrap(upstox.disconnect));
+router.get('/upstox/fills', requireApiAuth, wrap(upstox.fills));
+router.post('/upstox/fills/import', requireApiAuth, wrap(upstox.importToJournal));
+router.get('/fyers', requireApiAuth, wrap(fyers.status));
+router.post('/fyers/authorize', requireApiAuth, wrap(fyers.authorize));
+router.get('/fyers/callback', wrap(fyers.callback));
+router.post('/fyers/disconnect', requireApiAuth, wrap(fyers.disconnect));
+router.get('/fyers/fills', requireApiAuth, wrap(fyers.fills));
+router.post('/fyers/fills/import', requireApiAuth, wrap(fyers.importToJournal));
+router.get('/angel', requireApiAuth, wrap(angel.status));
+router.post('/angel/connect', requireApiAuth, wrap(angel.connect));
+router.post('/angel/disconnect', requireApiAuth, wrap(angel.disconnect));
+router.get('/angel/fills', requireApiAuth, wrap(angel.fills));
+router.post('/angel/fills/import', requireApiAuth, wrap(angel.importToJournal));
 
 /* ------------------------------- administration ------------------------------ */
 router.get('/admin/users', wrap(admin.handleListUsers));

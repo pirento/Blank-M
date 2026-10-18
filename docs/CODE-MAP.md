@@ -56,29 +56,30 @@ Common browser helpers live in `public/js/core/` (`dom.js` element builder, card
 
 ## Where to change…
 
-| I want to change…                                    | Start here                                                                                        |
-| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| How P&L or charges are calculated                    | `shared/pnl.js` (tests: `tests/shared/pnl.test.js`)                                               |
-| Position size / stop / target maths                  | `shared/risk-calculator.js`                                                                       |
-| CSV / Excel import parsing                           | `shared/csv.js`, `shared/spreadsheet-data.js`, `public/js/pages/import/`                          |
-| Broker tradebooks (Zerodha, Upstox, Angel One, Dhan) | `shared/tradebook.js` → `shared/broker-fills.js`, used by `public/js/pages/import/reading.js`     |
-| Sign-in, sessions, password reset                    | `services/auth/accounts.js`, `controllers/auth.controller.js`                                     |
-| Authenticator (MFA)                                  | `services/auth/totp.js`, `controllers/mfa.controller.js`                                          |
-| Invitations and member access                        | `controllers/admin.controller.js`, `services/admin/`                                              |
-| Trades, strategies, rules, watchlist storage         | `services/journal/workspace.js`, `controllers/workspace.controller.js`                            |
-| Backup / restore                                     | `services/journal/backup.js`                                                                      |
-| Weekly report email                                  | `services/journal/weekly-report.js`, `scripts/send-weekly-reports.js`                             |
-| Quotes and price history                             | `services/market/` (Kite first, Yahoo fallback)                                                   |
-| Zerodha login, balance, portfolio                    | `services/market/kite/`, `services/broker/`, `controllers/kite.controller.js`                     |
-| Dhan fills → journal                                 | `services/broker/dhan.js`, `services/broker/fills-journal.js`, `public/js/pages/settings/dhan.js` |
-| Live orders                                          | `services/broker/live-orders.js`, `public/js/pages/orders.js`                                     |
-| AI prompts and endpoints                             | `controllers/ai/`, `services/ai/openai.js`                                                        |
-| AI models and limits                                 | `services/ai/config.js`, `services/ai/usage-limits.js`                                            |
-| Saved research history                               | `services/ai/research-archive.js`, `controllers/research.controller.js`                           |
-| Security headers, CSRF, CSP                          | `middleware/security.js`                                                                          |
-| Navigation menu                                      | `config/nav.js`                                                                                   |
-| Page layout, top bar, dock                           | `views/layouts/workspace.ejs`, `views/partials/`                                                  |
-| Styles                                               | `assets/css/` (Tailwind; `pnpm run build`)                                                        |
+| I want to change…                                    | Start here                                                                                                                 |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| How P&L or charges are calculated                    | `shared/pnl.js` (tests: `tests/shared/pnl.test.js`)                                                                        |
+| Position size / stop / target maths                  | `shared/risk-calculator.js`                                                                                                |
+| CSV / Excel import parsing                           | `shared/csv.js`, `shared/spreadsheet-data.js`, `public/js/pages/import/`                                                   |
+| Broker tradebooks (Zerodha, Upstox, Angel One, Dhan) | `shared/tradebook.js` → `shared/broker-fills.js`, used by `public/js/pages/import/reading.js`                              |
+| Sign-in, sessions, password reset                    | `services/auth/accounts.js`, `controllers/auth.controller.js`                                                              |
+| Authenticator (MFA)                                  | `services/auth/totp.js`, `controllers/mfa.controller.js`                                                                   |
+| Invitations and member access                        | `controllers/admin.controller.js`, `services/admin/`                                                                       |
+| Trades, strategies, rules, watchlist storage         | `services/journal/workspace.js`, `controllers/workspace.controller.js`                                                     |
+| Backup / restore                                     | `services/journal/backup.js`                                                                                               |
+| Weekly report email                                  | `services/journal/weekly-report.js`, `scripts/send-weekly-reports.js`                                                      |
+| Quotes and price history                             | `services/market/` (Kite first, Yahoo fallback)                                                                            |
+| Zerodha login, balance, portfolio                    | `services/market/kite/`, `services/broker/`, `controllers/kite.controller.js`                                              |
+| Dhan fills → journal                                 | `services/broker/dhan.js`, `services/broker/fills-journal.js`, `public/js/pages/settings/dhan.js`                          |
+| Upstox / Fyers / Angel One fills → journal           | `services/broker/{upstox,fyers,angel}.js`, `controllers/brokers.controller.js`, `public/js/pages/settings/broker-links.js` |
+| Live orders                                          | `services/broker/live-orders.js`, `public/js/pages/orders.js`                                                              |
+| AI prompts and endpoints                             | `controllers/ai/`, `services/ai/openai.js`                                                                                 |
+| AI models and limits                                 | `services/ai/config.js`, `services/ai/usage-limits.js`                                                                     |
+| Saved research history                               | `services/ai/research-archive.js`, `controllers/research.controller.js`                                                    |
+| Security headers, CSRF, CSP                          | `middleware/security.js`                                                                                                   |
+| Navigation menu                                      | `config/nav.js`                                                                                                            |
+| Page layout, top bar, dock                           | `views/layouts/workspace.ejs`, `views/partials/`                                                                           |
+| Styles                                               | `assets/css/` (Tailwind; `pnpm run build`)                                                                                 |
 
 ## Tests
 
@@ -115,6 +116,7 @@ Common browser helpers live in `public/js/core/` (`dom.js` element builder, card
 | `auth.controller.js`               | Sign-in endpoints                                                                     |
 | `kite.controller.js`               | Zerodha Kite endpoints                                                                |
 | `dhan.controller.js`               | Dhan token connection and today's fills → journal                                     |
+| `brokers.controller.js`            | Upstox, Fyers (OAuth) and Angel One connections and today's fills → journal           |
 | `manual-invitations.controller.js` | HTTP handlers for private invitation links.                                           |
 | `market.controller.js`             | Market endpoints                                                                      |
 | `mfa.controller.js`                | Authenticator (TOTP) management                                                       |
@@ -305,6 +307,7 @@ Common browser helpers live in `public/js/core/` (`dom.js` element builder, card
 | `ai.js`            | Settings page — Blank AI.                                                  |
 | `backup.js`        | Settings page — data backup.                                               |
 | `broker.js`        | Settings page — broker connection.                                         |
+| `broker-links.js`  | Settings page — Upstox, Fyers and Angel One connections (today's fills).   |
 | `capital.js`       | Settings page — capital preferences.                                       |
 | `charges.js`       | Settings page — charges.                                                   |
 | `daily-journal.js` | Settings page — daily automatic journal (broker fills after the close).    |
@@ -398,12 +401,18 @@ Common browser helpers live in `public/js/core/` (`dom.js` element builder, card
 
 ### `services/broker/`
 
-| File              | What it does                                                                                                           |
-| ----------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `flow.js`         | Zerodha login flow security                                                                                            |
-| `daily-import.js` | After the close: today's Zerodha/Dhan fills into the journal for opted-in members, with a Telegram summary.            |
-| `live-orders.js`  | Live orders through Zerodha                                                                                            |
-| `portfolio.js`    | Reads the member's Zerodha holdings, positions, orders and trades into the shape shared/broker-portfolio.js validates. |
+| File              | What it does                                                                                                                       |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `flow.js`         | Zerodha login flow security                                                                                                        |
+| `broker-api.js`   | Shared broker JSON requests (timeout, size limit, error mapping) and the encrypted token row per broker                            |
+| `fill-mapping.js` | Broker rows → journal fills and carried-in map; NSE/BSE symbols and Kite-style F&O names                                           |
+| `oauth.js`        | Single-use OAuth state for the Upstox and Fyers logins                                                                             |
+| `upstox.js`       | Upstox (API v2) OAuth connection and today's fills, read-only                                                                      |
+| `fyers.js`        | Fyers (API v3) OAuth connection and today's fills, read-only                                                                       |
+| `angel.js`        | Angel One (SmartAPI) login with the member's own API key and today's fills, read-only; PIN/TOTP never stored                       |
+| `daily-import.js` | After the close: today's Zerodha/Dhan/Upstox/Fyers/Angel One fills into the journal for opted-in members, with a Telegram summary. |
+| `live-orders.js`  | Live orders through Zerodha                                                                                                        |
+| `portfolio.js`    | Reads the member's Zerodha holdings, positions, orders and trades into the shape shared/broker-portfolio.js validates.             |
 
 ### `services/journal/`
 

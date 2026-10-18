@@ -60,7 +60,7 @@ export function mountDailyJournal() {
             {},
             cardTitle(t('Daily automatic journal')),
             cardDescription(
-              'Every trading day at about 4:15 pm IST, today’s Zerodha and Dhan round trips are added to your journal and the day’s summary is sent to your linked Telegram chat.',
+              'Every trading day at about 4:15 pm IST, today’s Zerodha, Dhan, Upstox, Fyers and Angel One round trips are added to your journal and the day’s summary is sent to your linked Telegram chat.',
             ),
           ),
         ),
