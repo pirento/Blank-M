@@ -40,6 +40,31 @@ site "502 Bad Gateway" dikhati hai (`df -h /` se dekhiye).
 5. VPS ka IP (`curl https://api.ipify.org`) Kite developer profile mein whitelist kariye.
 6. `https://aapka-domain.com` kholiye aur login kariye.
 
+## Backup dusri jagah (Google Drive) — zaroor kariye
+
+Roz raat 3 baje (IST) database ka backup `/srv/blank/backups` mein banta hai. Server kharab hua to wo
+bhi jaayega, isliye har backup Google Drive par bhi bhejiye. Ek baar, usi user se jisne setup chalaya
+(`sudo` ke bina):
+
+```bash
+rclone config
+#  n → naam: gdrive → type: drive → client_id/secret khaali → scope: 1 (full)
+#  "Use auto config?" → n. Jo command dikhe (rclone authorize "drive" ...) wo apne
+#  computer par chalaiye (rclone wahan bhi install kariye), mila token yahan paste kariye.
+#  Phir dobara n → naam: gdrive-secret → type: crypt → remote: gdrive:pirento-backups
+#  → ek lamba password do baar (ye password kahin likh kar rakhiye, iske bina backup nahi khulega).
+```
+
+`/srv/blank/.env` mein `BACKUP_REMOTE="gdrive-secret:"` likhiye aur test kariye:
+
+```bash
+bash /srv/blank/deploy/backup-mongo.sh && rclone ls gdrive-secret:
+```
+
+Drive par 30 din ke backup rehte hain, encrypted (Google bhi nahi padh sakta). Wapas laane ke liye:
+`rclone copy gdrive-secret:blank-YYYY-MM-DD.archive.gz .` phir
+`mongorestore --gzip --archive=blank-YYYY-MM-DD.archive.gz --drop`.
+
 ## Tarika 2: Hostinger "Node.js app" (managed hosting)
 
 `pirento-blank-ready.tar.xz` mein production dependencies (`node_modules`) aur built CSS pehle se

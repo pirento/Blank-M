@@ -15,7 +15,7 @@ SOURCE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
 echo "==> System packages"
 apt-get update -y
-apt-get install -y curl git nginx ufw gnupg ca-certificates rsync cron xz-utils certbot python3-certbot-nginx
+apt-get install -y curl git nginx ufw gnupg ca-certificates rsync cron xz-utils rclone certbot python3-certbot-nginx
 systemctl enable --now cron
 
 echo "==> Node.js 22, pnpm and PM2"
