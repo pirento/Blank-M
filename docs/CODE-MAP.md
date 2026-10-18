@@ -60,12 +60,14 @@ Common browser helpers live in `public/js/core/` (`dom.js` element builder, card
 | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
 | How P&L or charges are calculated                    | `shared/pnl.js` (tests: `tests/shared/pnl.test.js`)                                                                        |
 | Position size / stop / target maths                  | `shared/risk-calculator.js`                                                                                                |
-| Options payoff and Greeks                            | `shared/options.js`, `public/js/pages/options.js`                                                 |
-| Insights edge map (weekday × time, best/worst)       | `shared/edge-map.js`, `public/js/pages/insights.js`                                               |
+| Options payoff and Greeks                            | `shared/options.js`, `public/js/pages/options.js`                                                                          |
+| Insights edge map (weekday × time, best/worst)       | `shared/edge-map.js`, `public/js/pages/insights.js`                                                                        |
 | CSV / Excel import parsing                           | `shared/csv.js`, `shared/spreadsheet-data.js`, `public/js/pages/import/`                                                   |
 | Broker tradebooks (Zerodha, Upstox, Angel One, Dhan) | `shared/tradebook.js` → `shared/broker-fills.js`, used by `public/js/pages/import/reading.js`                              |
 | Sign-in, sessions, password reset                    | `services/auth/accounts.js`, `controllers/auth.controller.js`                                                              |
 | Authenticator (MFA)                                  | `services/auth/totp.js`, `controllers/mfa.controller.js`                                                                   |
+| Admin panel pages and API keys                       | `routes/admin.js`, `controllers/admin-panel.controller.js`, `services/platform/`, `public/js/admin/`                       |
+| Premium plan, trial, payments, feature gates         | `services/billing/`, `controllers/billing.controller.js`, `routes/api.js` (`premium.*`)                                    |
 | Invitations and member access                        | `controllers/admin.controller.js`, `services/admin/`                                                                       |
 | Trades, strategies, rules, watchlist storage         | `services/journal/workspace.js`, `controllers/workspace.controller.js`                                                     |
 | Backup / restore                                     | `services/journal/backup.js`                                                                                               |
@@ -112,6 +114,8 @@ Common browser helpers live in `public/js/core/` (`dom.js` element builder, card
 | File                               | What it does                                                                          |
 | ---------------------------------- | ------------------------------------------------------------------------------------- |
 | `account.controller.js`            | Account endpoints                                                                     |
+| `admin-panel.controller.js`        | Admin panel pages and their API (overview, integrations, plan, payments, audit).      |
+| `billing.controller.js`            | Member billing (status, checkout, cancel) and the Razorpay webhook.                   |
 | `admin-ai.controller.js`           | Administrator AI settings                                                             |
 | `admin.controller.js`              | Administrator member management                                                       |
 | `ai.controller.js`                 | Blank AI HTTP handlers.                                                               |
@@ -159,6 +163,11 @@ Common browser helpers live in `public/js/core/` (`dom.js` element builder, card
 | File                  | What it does                                                                                       |
 | --------------------- | -------------------------------------------------------------------------------------------------- |
 | `AccountSettings.js`  | Per-user account settings.                                                                         |
+| `AdminAuditLog.js`    | Who changed what in the admin panel (2-year retention).                                            |
+| `BillingEvent.js`     | Razorpay webhook events already applied (90 days).                                                 |
+| `Payment.js`          | Razorpay payments.                                                                                 |
+| `PlatformSetting.js`  | Admin panel settings: API keys (encrypted) and the Premium plan.                                   |
+| `Subscription.js`     | A member's trial, paid period and admin grant.                                                     |
 | `Ai.js`               | AI models                                                                                          |
 | `AllowedUser.js`      | The invite-only allowlist.                                                                         |
 | `AuthToken.js`        | Single-use emailed links                                                                           |
@@ -332,22 +341,56 @@ Common browser helpers live in `public/js/core/` (`dom.js` element builder, card
 | `shared.js`    | Today page data, state and small formatting helpers.     |
 | `shortlist.js` | Analysis status and today's shortlist of research picks. |
 
-### `public/js/pages/users/`
+### `public/js/admin/`
 
-| File               | What it does                                                  |
-| ------------------ | ------------------------------------------------------------- |
-| `email-members.js` | Members invited by email                                      |
-| `paint.js`         | Renders the whole administration page from the current state. |
-| `private-links.js` | Private invitation links                                      |
-| `shared.js`        | Users page state and small formatting helpers.                |
+The admin panel's browser modules (one per page in `views/admin/`, plus `shell.js` and `shared.js`).
+
+| File              | What it does                                                          |
+| ----------------- | --------------------------------------------------------------------- |
+| `login.js`        | Admin sign-in page (administrators only).                             |
+| `shell.js`        | Admin panel sign-out button, loaded on every admin page.              |
+| `shared.js`       | Page data, the authenticator notice and formatters for admin pages.   |
+| `dashboard.js`    | Overview: members, Premium and revenue, integrations, server health.  |
+| `members.js`      | Members: invitations, access, and each member's Premium (`members/`). |
+| `billing.js`      | Plans & billing: price, trial, Premium features, sign-up, payments.   |
+| `integrations.js` | API keys and switches (services/platform/settings-registry.js).       |
+| `ai.js`           | Which OpenAI models the platform uses.                                |
+| `audit.js`        | Every change made in the admin panel.                                 |
+
+### `public/js/admin/members/`
+
+| File               | What it does                                     |
+| ------------------ | ------------------------------------------------ |
+| `email-members.js` | Members invited by email                         |
+| `paint.js`         | Renders the members page from the current state. |
+| `premium.js`       | Each member's Premium status and "Give Premium". |
+| `private-links.js` | Private invitation links                         |
+| `shared.js`        | Members page state and small formatting helpers. |
+
+### `services/billing/`
+
+| File               | What it does                                                                       |
+| ------------------ | ---------------------------------------------------------------------------------- |
+| `plan.js`          | The Premium plan the administrator sets (price, trial, Premium features, sign-up). |
+| `membership.js`    | Whether a member has Premium now; `requirePremium(feature)` guard (402).           |
+| `razorpay.js`      | Razorpay Subscriptions API and webhook signature check.                            |
+| `subscriptions.js` | Checkout, webhooks, cancel, admin grants, revenue numbers.                         |
+
+### `services/platform/`
+
+| File                   | What it does                                                                           |
+| ---------------------- | -------------------------------------------------------------------------------------- |
+| `settings-registry.js` | Which settings the admin panel may change (env names, types, help).                    |
+| `settings.js`          | Stores them (secrets encrypted), applies them to process.env, keeps processes in step. |
 
 ### `routes/`
 
-| File      | What it does                                                             |
-| --------- | ------------------------------------------------------------------------ |
-| `api.js`  | JSON API routes under /api.                                              |
-| `auth.js` | Authentication routes under /auth (sign-in, recovery, Google, sign-out). |
-| `web.js`  | Server-rendered page routes.                                             |
+| File       | What it does                                                             |
+| ---------- | ------------------------------------------------------------------------ |
+| `admin.js` | The admin panel's pages under /admin (own sign-in and layout).           |
+| `api.js`   | JSON API routes under /api.                                              |
+| `auth.js`  | Authentication routes under /auth (sign-in, recovery, Google, sign-out). |
+| `web.js`   | Server-rendered page routes.                                             |
 
 ### `scripts/`
 

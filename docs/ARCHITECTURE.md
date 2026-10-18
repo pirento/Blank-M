@@ -22,7 +22,9 @@ browser fetch ──► routes/api.js ──► middleware ──► controllers
   TOTP), `journal/` (workspace CRUD with server-side trade economics, backup, weekly report),
   `market/` (Kite with Yahoo fallback, instrument master), `broker/` (Zerodha login flow, portfolio,
   live orders), `ai/` (OpenAI helpers, model configuration, usage limits, research archive),
-  `admin/` (private invitations) and `maintenance/`. GridFS storage, mail and encryption helpers sit
+  `admin/` (private invitations), `billing/` (Premium plan, membership, Razorpay), `platform/`
+  (admin-managed API keys copied into `process.env`) and `maintenance/`. GridFS storage, mail and
+  encryption helpers sit
   at the top level. See [CODE-MAP.md](CODE-MAP.md) for every file.
 - **Views** (`views/`) are EJS templates. Every workspace page uses one layout
   (`layouts/workspace.ejs`) with the top bar, dock and command palette partials. The page's data is
@@ -52,6 +54,24 @@ P&L and charges (`pnl.js`), risk calculator, CSV/XLSX import parsing, business d
 periods, backtest engine and indicators, order-plan records, strategy evidence validation, AI
 response schemas and the trade CSV export. Both sides import the same files, so a value the browser
 previews is the value the server stores.
+
+## Admin panel and Premium
+
+The admin panel (`/admin`, `routes/admin.js`) is a separate area with its own sign-in page, layout
+(`views/layouts/admin.ejs`, rendered with `res.renderAdmin`) and browser modules
+(`public/js/admin/`). Its API lives under `/api/admin` behind `requireApiAdmin`; changes to keys,
+money or access also need `requireAdminMfa` (an authenticator used in this session) and are written
+to `AdminAuditLog`.
+
+API keys saved in Integrations are stored in `PlatformSetting` (secrets encrypted) and copied into
+`process.env` at start-up and every minute (`services/platform/settings.js`), so services keep
+reading `process.env` and need no changes. A panel value overrides `.env`.
+
+Premium (`services/billing/`) is off until the administrator switches billing on. Then
+`requirePremium(feature)` answers 402 on Premium API routes, Premium pages render
+`pages/upgrade.ejs`, and the scheduled jobs skip free members. Whether a member has Premium is
+computed from `Subscription` dates on each request (trial end, paid-until from Razorpay webhooks,
+admin grant), so nothing has to expire it.
 
 ## Data storage
 

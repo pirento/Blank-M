@@ -35,7 +35,6 @@ export const WORKSPACE_PAGES = [
   '/reports',
   '/analytics',
   '/settings',
-  '/users',
 ];
 
 /** A short unique suffix so repeated runs never collide in the shared database. */

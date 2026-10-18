@@ -39,7 +39,7 @@ test('invite a member with a private link, then reset their password and suspend
 }) => {
   const email = `member-${unique()}@example.com`;
   await signIn(page);
-  await page.goto('/users');
+  await page.goto('/admin/members');
   await page.fill('#manual-invite-email', email);
   await page.getByRole('button', { name: 'Create private invitation' }).click();
   const link = await page.inputValue('#manual-invite-link');

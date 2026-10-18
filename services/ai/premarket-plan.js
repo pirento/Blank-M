@@ -18,6 +18,7 @@ import { MARKET_OPEN_MINUTE, getMarketStatus, toIst } from '../../shared/market.
 import { summarisePerformance } from '../../shared/pnl.js';
 import { riskStatus, toRiskLimits } from '../../shared/risk-limits.js';
 import { accessProblem } from '../auth/accounts.js';
+import { hasFeature } from '../billing/membership.js';
 import { toTrade } from '../journal/workspace.js';
 import { createLogger, errorName } from '../logger.js';
 import { isTelegramConfigured } from '../telegram/api.js';
@@ -203,6 +204,8 @@ export async function runPremarketPlans({ now = new Date(), limit = 200 } = {}) 
       if (
         !user ||
         (await accessProblem(user)) ||
+        // A Premium feature when the administrator bills for AI.
+        !(await hasFeature(user, 'ai')) ||
         !(await TelegramLink.exists({ userId: user._id }))
       ) {
         skipped += 1;

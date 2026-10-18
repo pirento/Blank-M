@@ -110,6 +110,45 @@ theek hone par "OK again". Chalu karne ke liye:
   profit/loss ("Unlimited" bhi) aur Greeks (delta, gamma, theta/din, vega/1% IV) dikhte hain. Sab
   kuch browser mein hi hota hai; server par kuch nahi jaata, koi order nahi lagta.
 
+## Admin panel — platform chalana aur bechna
+
+Admin panel member workspace se bilkul alag hai: **https://aapka-domain.com/admin/login**
+(sirf admin account se login hota hai). Pehle Settings → Authenticator mein authenticator lagaiye —
+API keys, plan aur Premium badalne ke liye ye zaroori hai.
+
+- **Overview:** kitne members, kitne trial par, kitne paying, mahine ki kamai (MRR), pichhle 30 din
+  ki payments, kaun si API set hai, disk aur database ka size, aakhri backup.
+- **Integrations:** saari API keys yahin se — OpenAI, Zerodha, Upstox, Fyers, Razorpay, Email,
+  Telegram, Google sign-in, push, live order limits. Yahan save ki value `.env` ki jagah le leti hai
+  (1 minute mein lagu, restart nahi). Secret wapas kabhi nahi dikhta, sirf aakhri 4 akshar.
+  "Use .env value" se wapas `.env` wali value. (Database, SESSION_SECRET, encryption key, CRON_SECRET
+  aur APP_URL sirf `.env` mein.)
+- **Members:** invite, access band karna, reset link, aur kisi ko free Premium din dena.
+- **AI models:** kaun sa OpenAI model.
+- **Audit log:** admin panel mein kisne kya badla.
+
+### Monthly Premium chalu karna (Razorpay)
+
+1. razorpay.com par business account banaiye, KYC poora kariye (live payment ke liye zaroori).
+2. Dashboard → Account & Settings → API keys: Key ID + Key secret banaiye (pehle `rzp_test_` se
+   test kariye).
+3. Dashboard → Webhooks → Add: URL `https://aapka-domain.com/api/billing/razorpay/webhook`, ek lamba
+   secret, events `subscription.*` aur `payment.failed`.
+4. Admin panel → Integrations → Razorpay mein teeno (Key ID, Key secret, Webhook secret) daaliye.
+5. Admin panel → Plans & billing: price (₹/mahina), free trial ke din, kaun se features Premium hain,
+   "Billing is on" tick → Save.
+6. Kisi ko bhi khud account banane dena ho to "Anyone can sign up" tick kariye (Email/SMTP set hona
+   chahiye). Login page par "Create an account" aa jaayega.
+
+Member Settings → Plan & billing se Subscribe karta hai, payment Razorpay ke apne page par hoti hai
+(card/UPI detail hamare server par kabhi nahi aati). Trial chal raha ho to pehla charge trial khatam
+hone par. Cancel karne par mahine ke aakhir tak Premium rehta hai. Billing off ho to sab free (pehle
+jaisa).
+
+**Zaroori:** platform bechne se pehle Terms/Privacy page aur GST/invoice ki zaroorat apne CA se pooch
+lijiye. AI picks/research ko advice ki tarah bechne par SEBI Research Analyst registration lag sakta
+hai — kisi expert se confirm kariye.
+
 ## Tarika 2: Hostinger "Node.js app" (managed hosting)
 
 `pirento-blank-ready.tar.xz` mein production dependencies (`node_modules`) aur built CSS pehle se

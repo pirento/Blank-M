@@ -60,11 +60,14 @@ Sizes are rough figures for an active member, to plan disk and RAM, not limits.
 | GridFS `voiceNotes`       | Temporary voice notes                                         | GridFS `filename+uploadDate`                                                                                  | **24 hours** (`scripts/maintenance-voice-notes.js`) | tiny                                |
 | GridFS `tradeScreenshots` | One chart screenshot per trade (≤ 5 MB)                       | GridFS `filename+uploadDate`                                                                                  | Deleted with the trade or screenshot                | ≤ 5 MB per trade                    |
 
+| `platformsettings` | Admin panel API keys/switches (secrets encrypted) and the Premium plan | `_id` = setting key | Kept | platform-wide, a few KB |
+| `adminauditlogs` | Who changed what in the admin panel (never secret values) | `createdAt` TTL | **2 years** | admin only |
+| `subscriptions` | Premium per member: trial end, paid-until, admin grant, Razorpay id/status | `_id` = user id, `razorpaySubscriptionId` unique (partial), `razorpayStatus` | Kept | ~0.3 KB |
+| `payments` | Razorpay payments (financial record) | `_id` = payment id, `userId+paidAt`, `paidAt` | Kept | ~0.2 KB per month paid |
+| `billingevents` | Razorpay webhook event ids already applied (idempotency) | `_id` = event id, `receivedAt` TTL | **90 days** | tiny |
+
 A typical member needs **1–5 MB** of documents plus up to ~18 MB of search vectors and whatever
-files they upload; 5,000 members fit comfortably in tens of gigabytes. The admin and billing work
-adds its own models (`PlatformSetting`, `AdminAuditLog`, `Subscription`, `Payment`,
-`BillingEvent`) with their own indexes and TTLs; add each new collection to this table with its
-indexes and retention.
+files they upload; 5,000 members fit comfortably in tens of gigabytes.
 
 ## Sensitive data
 
