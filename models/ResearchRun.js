@@ -21,6 +21,9 @@ const researchRunSchema = new mongoose.Schema(
 );
 researchRunSchema.index({ userId: 1, requestId: 1 }, { unique: true });
 researchRunSchema.index({ userId: 1, sequence: -1 });
+// Retention: each run keeps a full NIFTY 500 universe snapshot (~60 KB), so runs are deleted 180
+// days after they started. Nothing replays a request ID that old.
+researchRunSchema.index({ startedAt: 1 }, { expireAfterSeconds: 180 * 24 * 60 * 60 });
 
 export const ResearchRun =
   mongoose.models.ResearchRun || mongoose.model('ResearchRun', researchRunSchema);

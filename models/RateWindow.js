@@ -10,6 +10,7 @@ const rateWindowSchema = new mongoose.Schema({
   attempts: { type: Number, required: true, min: 0 },
   expiresAt: { type: Date, required: true },
 });
+// Retention: deleted as soon as the window ends.
 rateWindowSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 export const RateWindow =

@@ -40,7 +40,7 @@ const WORKSPACE_PAGES = [
   ['/reports', 'reports', ['trades', 'strategies', 'rules', 'chatMessages'], PDF],
   ['/strategy', 'strategy', ['trades', 'strategies', 'rules']],
   ['/analytics', 'analytics', ['trades', 'strategies', 'rules', 'chatMessages']],
-  ['/settings', 'settings', ['trades', 'strategies', 'rules', 'chatMessages', 'settings']],
+  ['/settings', 'settings', ['settings']],
   ['/journal', 'journal', ['trades', 'strategies', 'rules', 'settings']],
   ['/import', 'import', ['trades', 'settings']],
   ['/backtest', 'backtest', ['trades', 'strategies', 'rules', 'settings'], CHARTS],

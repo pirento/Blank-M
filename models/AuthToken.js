@@ -15,6 +15,7 @@ const authTokenSchema = new mongoose.Schema({
   expiresAt: { type: Date, required: true },
   usedAt: { type: Date, default: null },
 });
+// Retention: kept 7 days past expiry, then deleted (used tokens are worthless after that).
 authTokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 7 * 86400 });
 authTokenSchema.index({ userId: 1, purpose: 1 });
 

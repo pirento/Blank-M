@@ -55,6 +55,9 @@ previews is the value the server stores.
 
 ## Data storage
 
+Every collection with its indexes, retention, size per member and sensitive fields, plus backups
+and scaling: [DATABASE.md](DATABASE.md).
+
 | Collection(s)                                          | Purpose                                              |
 | ------------------------------------------------------ | ---------------------------------------------------- |
 | `users`, `allowedusers`, `loginusernames`              | Members, invitations allow-list, optional usernames  |

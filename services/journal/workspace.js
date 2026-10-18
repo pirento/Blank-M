@@ -30,8 +30,10 @@ import { iso } from '../../models/helpers.js';
 // Settings live in account-settings.js; re-exported for existing importers.
 export { loadAccountSettings, saveAccountSettings, toAccountSettings } from './account-settings.js';
 
-/** Chat history grows without bound; only the recent window is loaded. */
+/** Only the recent window of the chat history is loaded. */
 export const CHAT_HISTORY_LIMIT = 200;
+/** Messages kept per member; older ones are deleted as new ones arrive (the UI shows 200). */
+export const CHAT_KEEP = 1000;
 
 /** Stored numbers can arrive as strings in some paths; normalise. */
 function num(value, fallback = 0) {
@@ -776,6 +778,13 @@ export async function addChatMessage(userId, message) {
     text: parsed.data.text,
     createdAt: parsed.data.timestamp ? new Date(parsed.data.timestamp) : new Date(),
   });
+  // Keep one member's conversation bounded; at most 100 per call so a restored backup trims gently.
+  const old = await ChatMessage.find({ userId }, { _id: 1 })
+    .sort({ createdAt: -1, _id: -1 })
+    .skip(CHAT_KEEP)
+    .limit(100)
+    .lean();
+  if (old.length) await ChatMessage.deleteMany({ userId, _id: { $in: old.map((row) => row._id) } });
   return toChatMessage(saved.toObject());
 }
 

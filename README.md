@@ -69,7 +69,8 @@ tests/                 shared/ (domain + client modules), server/ (HTTP integrat
 New to the code? Read [docs/DEVELOPER-GUIDE.md](docs/DEVELOPER-GUIDE.md) first (reading order, where
 code goes, one request end to end, common tasks), then [docs/CODE-MAP.md](docs/CODE-MAP.md) (where
 everything lives). See also
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) and
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/DATABASE.md](docs/DATABASE.md) (collections,
+indexes, retention, backups), [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) and
 [docs/MIGRATION.md](docs/MIGRATION.md).
 
 ## Security model (summary)

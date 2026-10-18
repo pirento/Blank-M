@@ -29,5 +29,20 @@ const accountSettingsSchema = new mongoose.Schema(
   { timestamps: { createdAt: false, updatedAt: 'updatedAt' }, minimize: false },
 );
 
+// The scheduled jobs look for opted-in members only; partial indexes keep each lookup to that small
+// set instead of reading every member's settings.
+accountSettingsSchema.index(
+  { weeklyReportSentFor: 1 },
+  { partialFilterExpression: { weeklyReportEmail: true } },
+);
+accountSettingsSchema.index(
+  { dailyAutoImportFor: 1 },
+  { partialFilterExpression: { dailyAutoImport: true } },
+);
+accountSettingsSchema.index(
+  { premarketPlanFor: 1 },
+  { partialFilterExpression: { premarketPlan: true } },
+);
+
 export const AccountSettings =
   mongoose.models.AccountSettings || mongoose.model('AccountSettings', accountSettingsSchema);

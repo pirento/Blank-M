@@ -33,6 +33,8 @@ const paperTradeSchema = new mongoose.Schema(
 );
 paperTradeSchema.index({ userId: 1, status: 1, openedAt: -1 });
 paperTradeSchema.index({ status: 1 });
+// Closed paper trades, most recently closed first (the paper page lists up to 500).
+paperTradeSchema.index({ userId: 1, status: 1, closedAt: -1 });
 
 export const PaperTrade =
   mongoose.models.PaperTrade || mongoose.model('PaperTrade', paperTradeSchema);

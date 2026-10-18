@@ -27,6 +27,7 @@ const brokerOAuthStateSchema = new mongoose.Schema({
   usedAt: { type: Date, default: null },
   createdAt: { type: Date, default: Date.now },
 });
+// Retention: login markers are deleted one day after they expire.
 brokerOAuthStateSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 86400 });
 
 export const BrokerOAuthState =

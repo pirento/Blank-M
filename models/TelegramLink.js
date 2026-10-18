@@ -20,6 +20,7 @@ const telegramLinkCodeSchema = new mongoose.Schema({
   userId: { type: String, required: true },
   expiresAt: { type: Date, required: true },
 });
+// Retention: a code is deleted as soon as it expires (10 minutes).
 telegramLinkCodeSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 export const TelegramLink =
