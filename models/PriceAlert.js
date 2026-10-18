@@ -23,6 +23,9 @@ const priceAlertSchema = new mongoose.Schema(
 );
 priceAlertSchema.index({ userId: 1, status: 1, createdAt: -1 });
 priceAlertSchema.index({ status: 1 });
+// Retention: a triggered alert is deleted 90 days after it fired (active alerts have no
+// triggeredAt, and re-arming clears it, so they are never removed).
+priceAlertSchema.index({ triggeredAt: 1 }, { expireAfterSeconds: 90 * 24 * 60 * 60 });
 
 export const PriceAlert =
   mongoose.models.PriceAlert || mongoose.model('PriceAlert', priceAlertSchema);

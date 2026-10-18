@@ -51,6 +51,7 @@ router.all('/maintenance/voice-notes', wrap(handleVoiceNoteCleanup));
 router.all('/maintenance/weekly-reports', wrap(account.runWeeklyReports));
 router.all('/maintenance/price-checks', wrap(paper.runPriceChecks));
 router.all('/maintenance/daily-import', wrap(account.runDailyImports));
+router.all('/maintenance/premarket-plan', wrap(account.runPremarketPlans));
 
 /* ------------------------------------- AI ------------------------------------ */
 router.post('/ai/chat', premium.ai, wrap(ai.handleChat));

@@ -8,7 +8,7 @@ import { timestamps, uuidId } from './helpers.js';
 const strategySchema = new mongoose.Schema(
   {
     _id: uuidId,
-    userId: { type: String, required: true, index: true },
+    userId: { type: String, required: true },
     name: { type: String, required: true, minlength: 1, maxlength: 120 },
     rules: { type: String, default: '' },
     improvements: { type: String, default: '' },

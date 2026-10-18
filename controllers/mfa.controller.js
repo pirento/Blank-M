@@ -12,6 +12,7 @@ import { accessProblem, revokeUserSessions } from '../services/auth/accounts.js'
 
 const CODE_FAILED =
   'The code could not be verified. Use the latest code from your authenticator and try again.';
+const MAX_FACTORS = 10;
 
 /** Signed-in (aal1 is enough) account whose membership is still active. */
 async function signedInUser(req) {
@@ -89,6 +90,10 @@ export async function enroll(req, res) {
   }
   if (user.factors.filter((factor) => factor.status === 'unverified').length >= 3) {
     throw new HttpError('Finish or remove unfinished authenticator setup first.', 409);
+  }
+  // Factors live inside the user document, so their number is capped.
+  if (user.factors.length >= MAX_FACTORS) {
+    throw new HttpError(`You can have at most ${MAX_FACTORS} authenticators.`, 409);
   }
   const secret = generateTotpSecret();
   const id = randomUUID();

@@ -40,5 +40,13 @@ liveOrderSchema.index(
   },
 );
 liveOrderSchema.index({ userId: 1, tradingDate: 1 });
+// The member's order log, newest first.
+liveOrderSchema.index({ userId: 1, createdAt: -1 });
+// The every-5-minutes automatic stop/target job scans recent auto-GTT orders of all members.
+liveOrderSchema.index(
+  { status: 1, gttStatus: 1, createdAt: 1 },
+  { partialFilterExpression: { autoGtt: true } },
+);
+// No TTL: live orders are the member's financial audit record and are kept.
 
 export const LiveOrder = mongoose.models.LiveOrder || mongoose.model('LiveOrder', liveOrderSchema);

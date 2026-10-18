@@ -21,5 +21,8 @@ const shareLinkSchema = new mongoose.Schema(
   timestamps,
 );
 shareLinkSchema.index({ userId: 1, createdAt: -1 });
+// Retention: a link is deleted 30 days after it expired (links last at most 90 days); the token
+// stops working at expiresAt either way.
+shareLinkSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 60 });
 
 export const ShareLink = mongoose.models.ShareLink || mongoose.model('ShareLink', shareLinkSchema);

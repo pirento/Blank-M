@@ -62,7 +62,11 @@ export async function buildWeeklyReport(userId, period) {
     tradeDate: { $gte: period.start, $lte: period.end },
   }).lean();
   const trades = rows.map(toTrade).filter((trade) => inReportPeriod(trade.date, period));
-  const plans = await OrderPlanRecord.find({ userId, recordKind: 'plan' }, { record: 1 }).lean();
+  // Only the creation time is needed; a member's plan history can be long.
+  const plans = await OrderPlanRecord.find(
+    { userId, recordKind: 'plan' },
+    { 'record.createdAt': 1 },
+  ).lean();
   const plansInWeek = plans.filter((row) =>
     inReportPeriod(instantBusinessDate(new Date(row.record?.createdAt ?? 0)), period),
   ).length;
