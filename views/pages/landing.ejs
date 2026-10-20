@@ -14,7 +14,7 @@ const QUESTIONS = [
   { question: 'Can this preview place real trades?', answer: 'No. The public preview uses fictional prices and is disconnected from trading. Blank is a journal and research workspace; it does not place, edit or cancel orders.' },
   { question: 'How will Zerodha connect?', answer: 'Broker access needs a configured integration and a separate authorization. The existing Zerodha Kite integration is for read-only market research. Signing in to Blank does not connect a broker, and this preview connects to no provider.' },
   { question: 'Does AI control the account?', answer: 'No. AI features support research and review when configured. They cannot execute trades. Their output can be incomplete or incorrect, and you remain responsible for your trading decisions.' },
-  { question: 'Who can access the platform?', answer: 'The public preview is open to everyone. The member workspace requires an active invitation and sign-in with the invited email. Viewing this page does not create an account or grant member access.' },
+  { question: 'Who can access the platform?', answer: 'The public preview is open to everyone. The member workspace is by approval: send a request with the form below, and once an administrator approves it you get an email with your sign-in details. You can then sign in with the Google account for that email, or choose a password.' },
 ];
 const SAMPLE_WATCHLIST = [
   { symbol: 'RELIANCE', name: 'Reliance Industries', price: '1420.50', change: '+1.28%', up: true },
@@ -47,6 +47,7 @@ const pitch = 700 / SAMPLE_CANDLES.length;
           <a href="#about">Platform</a>
           <a href="#process">How it works</a>
           <a href="#features">Features</a>
+          <a href="#request-access">Request access</a>
           <a href="/login" class="landing-button">Get started <%- icon('arrow-right', { size: 17 }) %></a>
         </nav>
       </header>
@@ -193,13 +194,52 @@ const pitch = 700 / SAMPLE_CANDLES.length;
           </div>
         </section>
 
+        <section id="request-access" class="landing-section landing-faq-section" aria-labelledby="request-heading">
+          <div>
+            <p class="landing-section-index">04 / REQUEST ACCESS</p>
+            <h2 id="request-heading">Ask to join<br />the workspace.</h2>
+            <p class="landing-request-note">An administrator reviews every request. When yours is approved, we email your sign-in details to the address you give here.</p>
+          </div>
+          <form data-access-request class="landing-request-form" novalidate>
+            <div class="landing-request-grid">
+              <div>
+                <label class="<%= LABEL_CLASS %>" for="access-name">Full name</label>
+                <input id="access-name" name="name" autocomplete="name" maxlength="120" required class="<%= FIELD_CLASS %>" />
+              </div>
+              <div>
+                <label class="<%= LABEL_CLASS %>" for="access-email">Email (your Google account works best)</label>
+                <input id="access-email" name="email" type="email" autocomplete="email" autocapitalize="none" spellcheck="false" maxlength="320" required class="<%= FIELD_CLASS %>" />
+              </div>
+              <div>
+                <label class="<%= LABEL_CLASS %>" for="access-phone">Phone (optional)</label>
+                <input id="access-phone" name="phone" type="tel" autocomplete="tel" maxlength="20" class="<%= FIELD_CLASS %>" />
+              </div>
+            </div>
+            <div>
+              <label class="<%= LABEL_CLASS %>" for="access-message">How do you trade? (optional)</label>
+              <textarea id="access-message" name="message" rows="3" maxlength="1000" class="<%= FIELD_CLASS %> h-auto py-2"></textarea>
+            </div>
+            <div class="landing-request-trap" aria-hidden="true">
+              <label for="access-website">Leave this empty</label>
+              <input id="access-website" name="website" tabindex="-1" autocomplete="off" />
+            </div>
+            <label class="flex items-start gap-2 text-sm text-muted">
+              <input type="checkbox" class="mt-1" name="agree" />
+              <span>I agree to the <a href="/terms" class="underline">terms</a> and the <a href="/privacy" class="underline">privacy policy</a>, and understand Pirento Blank is a journal and planning tool, not investment advice.</span>
+            </label>
+            <p data-access-error role="alert" class="border border-negative bg-negative-soft px-3 py-2 text-sm text-negative" hidden></p>
+            <p data-access-success role="status" class="border border-positive bg-positive-soft px-3 py-2 text-sm text-positive" hidden></p>
+            <button type="submit" class="landing-button">Send request <%- icon('arrow-right', { size: 17 }) %></button>
+          </form>
+        </section>
+
         <section class="landing-closing" aria-labelledby="closing-heading">
           <div>
             <p class="landing-section-index">YOUR NEXT TRADING DAY</p>
             <h2 id="closing-heading">Start with a plan.</h2>
           </div>
           <div class="landing-closing-action">
-            <a href="/prototype/index.html" class="landing-button">Explore the workspace <%- icon('arrow-right', { size: 17 }) %></a>
+            <a href="#request-access" class="landing-button">Request access <%- icon('arrow-right', { size: 17 }) %></a>
           </div>
         </section>
       </main>
@@ -210,5 +250,6 @@ const pitch = 700 / SAMPLE_CANDLES.length;
         <a href="#about" class="landing-footer-link">Back to the platform ↑</a>
       </footer>
     </div>
+    <script type="module" src="/js/pages/landing.js" nonce="<%= cspNonce %>"></script>
   </body>
 </html>

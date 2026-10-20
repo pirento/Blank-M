@@ -1051,3 +1051,32 @@
 .workspace-dock svg {
   stroke-width: 1.5;
 }
+
+/* Request access form */
+.blank-landing .landing-request-note {
+  margin: 20px 0 0;
+  max-width: 340px;
+  color: var(--color-muted);
+  font-size: 15px;
+  line-height: 1.6;
+}
+.blank-landing .landing-request-form {
+  display: grid;
+  gap: 18px;
+  align-content: start;
+}
+.blank-landing .landing-request-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px;
+}
+.blank-landing .landing-request-form .landing-button {
+  justify-self: start;
+}
+.blank-landing .landing-request-trap {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}

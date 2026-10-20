@@ -547,6 +547,77 @@ describe('sign-up', () => {
   });
 });
 
+describe('access requests', () => {
+  it('records a home page request, tells the admins, and approval emails sign-in details', async () => {
+    const admin = await adminSession();
+    const visitor = supertest.agent(app);
+    const csrf = (await visitor.get('/')).text.match(/name="csrf-token" content="([^"]+)"/)[1];
+    const send = (body) =>
+      visitor.post('/auth/request-access').set('X-CSRF-Token', csrf).send(body);
+    const before = mails.length;
+
+    expect((await send({ name: 'A', email: 'x@example.com' })).status).toBe(400);
+    const ok = await send({ name: 'Asha Rao', email: 'Asha@Example.com', message: 'Swing trader' });
+    expect(ok.body).toEqual({ ok: true });
+    const sent = mails.slice(before);
+    expect(sent.map((mail) => mail.to)).toEqual(['asha@example.com', 'admin@example.com']);
+    expect(sent[0].html).toContain('Pirento');
+    // A repeat, a bot and an existing member get the same answer and no email.
+    expect((await send({ name: 'Asha Rao', email: 'asha@example.com' })).body).toEqual({
+      ok: true,
+    });
+    await send({ name: 'Bot', email: 'bot@example.com', website: 'spam.example' });
+    await send({ name: 'Admin', email: 'admin@example.com' });
+    expect(mails).toHaveLength(before + 2);
+
+    const list = await admin.agent.get('/api/admin/access-requests');
+    expect(list.body.requests).toHaveLength(1);
+    const [request] = list.body.requests;
+    expect(request).toMatchObject({ email: 'asha@example.com', status: 'pending' });
+
+    const approved = await admin.send('post', `/api/admin/access-requests/${request.id}`, {
+      decision: 'approve',
+    });
+    expect(approved.status).toBe(200);
+    expect(approved.body.request.status).toBe('approved');
+    expect(await AllowedUser.exists({ _id: 'asha@example.com' })).toBeTruthy();
+    expect(mails.at(-1)).toMatchObject({
+      to: 'asha@example.com',
+      subject: 'Your Pirento Blank access is approved',
+    });
+    expect(mails.at(-1).text).toContain('/auth/link/activate#token=');
+    expect(mails.at(-1).html).toContain('Set my password');
+    // Already decided: a second click does nothing.
+    const again = await admin.send('post', `/api/admin/access-requests/${request.id}`, {
+      decision: 'reject',
+    });
+    expect(again.status).toBe(404);
+    expect(await AdminAuditLog.exists({ action: 'access-request.approve' })).toBeTruthy();
+  });
+
+  it('rejects politely and keeps members out of the list', async () => {
+    const admin = await adminSession();
+    const visitor = supertest.agent(app);
+    const csrf = (await visitor.get('/')).text.match(/name="csrf-token" content="([^"]+)"/)[1];
+    await visitor
+      .post('/auth/request-access')
+      .set('X-CSRF-Token', csrf)
+      .send({ name: 'Ravi Kumar', email: 'ravi@example.com' });
+    const member = await memberSession();
+    expect((await member.agent.get('/api/admin/access-requests')).status).toBe(403);
+    const [request] = (await admin.agent.get('/api/admin/access-requests')).body.requests;
+    const rejected = await admin.send('post', `/api/admin/access-requests/${request.id}`, {
+      decision: 'reject',
+    });
+    expect(rejected.body.request.status).toBe('rejected');
+    expect(mails.at(-1)).toMatchObject({
+      to: 'ravi@example.com',
+      subject: 'About your request to join Pirento Blank',
+    });
+    expect(await AllowedUser.exists({ _id: 'ravi@example.com' })).toBeNull();
+  });
+});
+
 describe('Google sign-in', () => {
   /** Runs the Google redirect round trip for `profile`; returns the final redirect. */
   async function googleRoundTrip(agent, profile, start = '/auth/google') {

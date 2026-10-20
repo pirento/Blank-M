@@ -38,7 +38,7 @@ export async function notifyMember(userId, message, channels = { push: true }) {
         await sendMail({
           to: user.email,
           subject: message.title,
-          text: `${message.body}${origin && message.url ? `\n\n${origin}${message.url}` : ''}`,
+          text: `${message.body}${origin && message.url ? `\n\nOpen Pirento Blank: ${origin}${message.url}` : ''}`,
         });
         result.email = true;
       }

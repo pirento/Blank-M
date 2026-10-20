@@ -143,6 +143,8 @@ router.post('/admin/users/invite', wrap(admin.handleInviteUser));
 router.post('/admin/users/resend', wrap(admin.handleResendInvite));
 router.post('/admin/users/revoke', wrap(admin.handleRevokeUser));
 router.post('/admin/users/reset-link', wrap(admin.handleCreateResetLink));
+router.get('/admin/access-requests', wrap(admin.handleListAccessRequests));
+router.post('/admin/access-requests/:id', wrap(admin.handleDecideAccessRequest));
 router.all('/admin/manual-invitations', wrap(manualInvitations.handleManualInvitations));
 router.all(
   '/admin/manual-invitations/revoke',

@@ -24,6 +24,7 @@ import { clientAddress } from '../services/http.js';
 import { loadPlan } from '../services/billing/plan.js';
 import { isMailConfigured } from '../services/mailer.js';
 import { welcomeMember } from '../services/notifications/emails.js';
+import { submitAccessRequest } from '../services/admin/access-requests.js';
 
 /** Password sign-in with an invited email or a claimed username. */
 export async function login(req, res) {
@@ -66,6 +67,17 @@ export async function signup(req, res) {
     throw new HttpError('Sign-up is not available right now. Try again later.', 503);
   }
   await signUp(req.body?.email, clientAddress(req));
+  res.json({ ok: true });
+}
+
+/**
+ * POST /auth/request-access { name, email, phone?, message? }: the home page's "Request access"
+ * form. An administrator approves or rejects it in the admin panel → Members. Same answer for
+ * every address.
+ */
+export async function requestAccess(req, res) {
+  res.setHeader('Cache-Control', 'private, no-store');
+  await submitAccessRequest(req.body, clientAddress(req));
   res.json({ ok: true });
 }
 
