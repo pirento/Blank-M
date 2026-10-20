@@ -8,7 +8,7 @@
  */
 import '../config/env.js';
 
-const MAX_BATCHES = 50;
+const MAX_BATCHES = 1000;
 const base = String(process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`).replace(
   /\/$/,
   '',

@@ -401,9 +401,10 @@ The admin panel's browser modules (one per page in `views/admin/`, plus `shell.j
 | `create-admin.js`            | Bootstrap the first administrator.                   |
 | `admin-setup-code.js`        | Code for an admin's first authenticator (no email).  |
 | `maintenance-signups.js`     | Daily: delete sign-ups unconfirmed after 7 days.     |
+| `delete-member.js`           | Delete a member and all their data (on request).     |
 | `dev-memory.js`              | Local preview without installing MongoDB             |
 | `daily-import.js`            | Scheduled daily automatic journal (after the close). |
-| `premarket-plan.js`          | Scheduled pre-market plan on Telegram (08:45 IST).   |
+| `premarket-plan.js`          | Scheduled pre-market plan on Telegram (08:00 IST).   |
 | `maintenance-voice-notes.js` | Scheduled voice-note cleanup (run daily from cron).  |
 | `send-weekly-reports.js`     | Scheduled weekly report emails.                      |
 

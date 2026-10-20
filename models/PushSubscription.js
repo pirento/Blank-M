@@ -11,7 +11,6 @@ const pushSubscriptionSchema = new mongoose.Schema(
       p256dh: { type: String, required: true },
       auth: { type: String, required: true },
     },
-    userAgent: { type: String, default: '' },
   },
   timestamps,
 );

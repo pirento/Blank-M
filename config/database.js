@@ -12,7 +12,14 @@ let connecting = null;
 export async function connectDatabase(uri = env.mongoUri) {
   if (mongoose.connection.readyState === 1) return mongoose.connection;
   connecting ??= mongoose
-    .connect(uri, { serverSelectionTimeoutMS: 10_000, autoIndex: true })
+    .connect(uri, {
+      serverSelectionTimeoutMS: 10_000,
+      autoIndex: true,
+      // If MongoDB is slow, fail a request after a while instead of letting every request pile up.
+      maxPoolSize: 50,
+      waitQueueTimeoutMS: 5_000,
+      socketTimeoutMS: 30_000,
+    })
     .finally(() => {
       connecting = null;
     });

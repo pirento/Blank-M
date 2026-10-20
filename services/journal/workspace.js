@@ -34,6 +34,7 @@ export { loadAccountSettings, saveAccountSettings, toAccountSettings } from './a
 export const CHAT_HISTORY_LIMIT = 200;
 /** Messages kept per member; older ones are deleted as new ones arrive (the UI shows 200). */
 export const CHAT_KEEP = 1000;
+const CHAT_TEXT_MAX = 20_000;
 
 /** Stored numbers can arrive as strings in some paths; normalise. */
 function num(value, fallback = 0) {
@@ -781,17 +782,25 @@ export async function addChatMessage(userId, message) {
   const saved = await ChatMessage.create({
     userId,
     role: parsed.data.role,
-    text: parsed.data.text,
+    // Long enough for any real answer; keeps one message from holding 100 KB.
+    text: parsed.data.text.slice(0, CHAT_TEXT_MAX),
     createdAt: parsed.data.timestamp ? new Date(parsed.data.timestamp) : new Date(),
   });
-  // Keep one member's conversation bounded; at most 100 per call so a restored backup trims gently.
-  const old = await ChatMessage.find({ userId }, { _id: 1 })
+  await trimChat(userId);
+  return toChatMessage(saved.toObject());
+}
+
+/** Deletes a member's chat messages beyond the newest CHAT_KEEP (also after a restore). */
+export async function trimChat(userId) {
+  const cutoff = await ChatMessage.findOne({ userId }, { createdAt: 1 })
     .sort({ createdAt: -1, _id: -1 })
     .skip(CHAT_KEEP)
-    .limit(100)
     .lean();
-  if (old.length) await ChatMessage.deleteMany({ userId, _id: { $in: old.map((row) => row._id) } });
-  return toChatMessage(saved.toObject());
+  if (!cutoff) return;
+  const old = await ChatMessage.find({ userId, createdAt: { $lte: cutoff.createdAt } }, { _id: 1 })
+    .sort({ createdAt: -1, _id: -1 })
+    .lean();
+  await ChatMessage.deleteMany({ userId, _id: { $in: old.map((row) => row._id) } });
 }
 
 /** Delete the full owner's conversation, including rows outside the recent UI window. */

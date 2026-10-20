@@ -5,6 +5,7 @@
 import { api, sessionIdentity } from '../core/api.js';
 
 import {
+  MAX_PLAN_RECORDS,
   exportOrderPlanRecords,
   mergeOrderPlanRecords,
   samePlanRecord,
@@ -13,7 +14,7 @@ import {
 } from '../../../shared/order-plans.js';
 
 const PAGE_SIZE = 50;
-const MAX_RECORDS = 10000;
+const MAX_RECORDS = MAX_PLAN_RECORDS;
 const MAX_SNAPSHOT_BYTES = 20 * 1024 * 1024;
 const STOPPED = 'The account session changed before plan sync finished.';
 const INCOMPLETE = 'Could not verify the complete cloud plan history. Retry sync before exporting.';
@@ -50,6 +51,15 @@ export const orderPlanTransport = {
       throw new Error('Cloud plans could not be read. Check your connection and workspace access.');
     }
   },
+  /** Only the records after `revision` (plus the total count), for a sync after the first. */
+  async pageAfter(ownerId, revision, limit) {
+    try {
+      const result = await api(`/api/order-plans?after=${revision}&limit=${limit}`);
+      return { rows: result?.rows ?? [], count: result?.count ?? null };
+    } catch {
+      throw new Error('Cloud plans could not be read. Check your connection and workspace access.');
+    }
+  },
   async insert(row) {
     try {
       await api('/api/order-plans', {
@@ -67,15 +77,101 @@ export const orderPlanTransport = {
       );
     }
   },
-  /** Periodic refresh replaces database push notifications. */
-  subscribe(_ownerId, changed) {
-    const timer = window.setInterval(changed, 15_000);
-    return () => window.clearInterval(timer);
+  /** No separate timer: the sync worker below already refreshes every minute and on focus. */
+  subscribe() {
+    return () => {};
   },
 };
 
-/** Every page is counted; lower project row caps cannot silently truncate history. */
+/**
+ * Cloud history already read and verified in this tab, per owner, so later syncs only download
+ * new records instead of the whole history every minute.
+ */
+const cloudCache = new Map();
+
+/** Checks one page against what was read so far; throws INCOMPLETE on any inconsistency. */
+function acceptPage(ownerId, state, page, total) {
+  if (
+    !Number.isSafeInteger(page.count) ||
+    page.count < 0 ||
+    page.count > MAX_RECORDS ||
+    (total !== null && total !== page.count) ||
+    !Array.isArray(page.rows) ||
+    page.rows.length > PAGE_SIZE ||
+    state.rows.length + page.rows.length > page.count ||
+    (!page.rows.length && state.rows.length < page.count)
+  )
+    throw new Error(INCOMPLETE);
+  for (const row of page.rows) {
+    validateOrderPlanRecord(ownerId, row);
+    if (
+      !Number.isSafeInteger(row.server_revision) ||
+      row.server_revision <= state.revision ||
+      state.keys.has(row.record_key)
+    ) {
+      throw new Error(INCOMPLETE);
+    }
+    state.bytes += new TextEncoder().encode(JSON.stringify(row)).length;
+    if (state.bytes > MAX_SNAPSHOT_BYTES)
+      throw new Error(
+        'Cloud plan history exceeds the safe download limit. Contact the workspace administrator; no records were discarded.',
+      );
+    state.revision = row.server_revision;
+    state.keys.add(row.record_key);
+    state.rows.push(row);
+  }
+  return page.count;
+}
+
+/**
+ * Downloads only records newer than the cached ones. Records are append-only, so the cache plus
+ * the new rows must add up to the server's count; if not (e.g. a slower insert committed an older
+ * revision), the caller falls back to a full read.
+ */
+async function readNewRecords(ownerId, transport, current, cached) {
+  const state = { ...cached, rows: [...cached.rows], keys: new Set(cached.keys) };
+  let total = null;
+  do {
+    if (!current()) throw new Error(STOPPED);
+    const page = await transport.pageAfter(ownerId, state.revision, PAGE_SIZE);
+    if (!current()) throw new Error(STOPPED);
+    total = acceptPage(ownerId, state, page, total);
+  } while (state.rows.length < total);
+  return state;
+}
+
+/**
+ * Every page is counted; lower project row caps cannot silently truncate history. After the first
+ * complete read, only new records are downloaded (when the transport supports it).
+ */
 export async function readCloudOrderPlanRecords(ownerId, transport, current) {
+  const cached = cloudCache.get(ownerId);
+  if (cached && transport.pageAfter) {
+    try {
+      const state = await readNewRecords(ownerId, transport, current, cached);
+      cloudCache.set(ownerId, state);
+      return [...state.rows];
+    } catch (error) {
+      if (error?.message === STOPPED) throw error;
+      cloudCache.delete(ownerId);
+    }
+  }
+  const rows = await readAllRecords(ownerId, transport, current);
+  if (transport.pageAfter) {
+    cloudCache.set(ownerId, {
+      rows: [...rows],
+      keys: new Set(rows.map((row) => row.record_key)),
+      bytes: rows.reduce(
+        (sum, row) => sum + new TextEncoder().encode(JSON.stringify(row)).length,
+        0,
+      ),
+      revision: rows.at(-1)?.server_revision ?? 0,
+    });
+  }
+  return rows;
+}
+
+async function readAllRecords(ownerId, transport, current) {
   const rows = [];
   const keys = new Set();
   let total = null;
@@ -244,7 +340,10 @@ export function subscribeOrderPlanSync(ownerId, listener, transport = orderPlanT
         queueMicrotask(() => created.dispose());
       },
     );
-    const interval = window.setInterval(retry, 60000);
+    // Hidden tabs do not poll; they sync again when shown (see `visible` below).
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === 'visible') retry();
+    }, 60000);
     const visible = () => {
       if (document.visibilityState === 'visible') retry();
     };

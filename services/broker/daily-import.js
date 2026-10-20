@@ -70,7 +70,8 @@ async function importForMember(user) {
  * Runs the daily import for every opted-in member not yet done today. Does
  * nothing before the close or on weekends and NSE holidays.
  */
-export async function runDailyImports({ now = new Date(), limit = 200 } = {}) {
+// A batch per call stays well inside the proxy's 180 s timeout (a broker read per member).
+export async function runDailyImports({ now = new Date(), limit = 25 } = {}) {
   const status = getMarketStatus(now);
   const ist = toIst(now);
   if (status === 'closed-weekend' || status === 'closed-holiday') {

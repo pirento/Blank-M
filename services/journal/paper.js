@@ -12,6 +12,7 @@ import { HttpError } from '../errors.js';
 import { getQuote } from '../market/index.js';
 import { createLogger } from '../logger.js';
 import { loadAccountSettings } from './workspace.js';
+import { inBatches } from '../batches.js';
 
 const log = createLogger('paper');
 export const MAX_OPEN_PAPER_TRADES = 50;
@@ -188,12 +189,13 @@ async function checkTrades(rows) {
     if (!bySymbol.has(row.symbol)) bySymbol.set(row.symbol, []);
     bySymbol.get(row.symbol).push(row);
   }
-  for (const [symbol, group] of bySymbol) {
+  // A few symbols at a time; every open trade on a symbol (any member) shares one price.
+  await inBatches([...bySymbol], 8, async ([symbol, group]) => {
     let price;
     try {
       price = await livePrice(symbol, group[0].userId);
     } catch {
-      continue; // Leave the trade open; the next check retries.
+      return; // Leave the trade open; the next check retries.
     }
     for (const row of group) {
       const reason = exitTriggered(row, price);
@@ -206,7 +208,7 @@ async function checkTrades(rows) {
         );
       }
     }
-  }
+  });
   return closedCount;
 }
 
@@ -217,16 +219,10 @@ export async function refreshPaperTrades(userId) {
   return { ...(await listPaperTrades(userId)), closedNow };
 }
 
-/** Scheduled check of every member's open paper trades (per member, for their broker quotes). */
+/** Scheduled check of every member's open paper trades (one price per symbol for all of them). */
 export async function checkAllPaperTrades() {
   const open = await PaperTrade.find({ status: 'open' }).lean();
-  const byUser = new Map();
-  for (const row of open) {
-    if (!byUser.has(row.userId)) byUser.set(row.userId, []);
-    byUser.get(row.userId).push(row);
-  }
-  let closed = 0;
-  for (const rows of byUser.values()) closed += await checkTrades(rows);
+  const closed = await checkTrades(open);
   if (closed) log.info('paper trades closed by price check', { closed });
   return { checked: open.length, closed };
 }

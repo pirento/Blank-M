@@ -38,7 +38,7 @@ function vapid() {
 const base64url = /^[A-Za-z0-9_-]+={0,2}$/;
 
 /** Saves (or refreshes) one browser subscription for the member. */
-export async function subscribe(userId, subscription, userAgent = '') {
+export async function subscribe(userId, subscription) {
   if (!isPushConfigured()) throw new HttpError('Push notifications are not configured.', 503);
   const endpoint = String(subscription?.endpoint ?? '');
   const keys = subscription?.keys ?? {};
@@ -68,7 +68,6 @@ export async function subscribe(userId, subscription, userAgent = '') {
       $set: {
         userId,
         keys: { p256dh: keys.p256dh, auth: keys.auth },
-        userAgent: String(userAgent).slice(0, 300),
       },
     },
     { upsert: true },

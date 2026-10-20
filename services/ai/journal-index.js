@@ -5,7 +5,7 @@
  */
 import { createHash } from 'node:crypto';
 import { ChatMessage, JournalEmbedding, Strategy, Trade, TradingRule } from '../../models/index.js';
-import { EMBEDDING_MODEL } from './config.js';
+import { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL } from './config.js';
 import { openAiClient, providerRequest } from './openai.js';
 
 function journalDocument(sourceType, sourceId, title, text) {
@@ -99,8 +99,11 @@ export async function syncJournalEmbeddings(userId, documents) {
   if (orphans.length) {
     await JournalEmbedding.deleteMany({ userId, _id: { $in: orphans.map((row) => row._id) } });
   }
+  // The hash names the vector size, so vectors of an older size are embedded again.
+  const stamped = (hash) => `${EMBEDDING_DIMENSIONS}:${hash}`;
   const changed = documents.filter(
-    (document) => existing.get(`${document.sourceType}:${document.sourceId}`) !== document.hash,
+    (document) =>
+      existing.get(`${document.sourceType}:${document.sourceId}`) !== stamped(document.hash),
   );
   for (let offset = 0; offset < changed.length; offset += 100) {
     const batch = changed.slice(offset, offset + 100);
@@ -108,6 +111,7 @@ export async function syncJournalEmbeddings(userId, documents) {
     const result = await providerRequest(() =>
       provider.embeddings.create({
         model: EMBEDDING_MODEL,
+        dimensions: EMBEDDING_DIMENSIONS,
         input: batch.map((document) => document.text.slice(0, 12000)),
         encoding_format: 'float',
       }),
@@ -118,7 +122,7 @@ export async function syncJournalEmbeddings(userId, documents) {
         if (!embedding) throw new Error('OpenAI did not return a journal embedding.');
         await JournalEmbedding.updateOne(
           { userId, sourceType: document.sourceType, sourceId: document.sourceId },
-          { $set: { contentHash: document.hash, embedding: embedding.map(Number) } },
+          { $set: { contentHash: stamped(document.hash), embedding: embedding.map(Number) } },
           { upsert: true },
         );
       }),
