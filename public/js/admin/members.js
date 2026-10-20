@@ -17,7 +17,7 @@ $('[data-refresh-all]').addEventListener('click', () => {
   void refresh();
   if (!state.private.busy) void reloadPrivate();
   void loadMemberships();
-void loadAccessRequests();
+  void loadAccessRequests();
   void loadAccessRequests();
 });
 

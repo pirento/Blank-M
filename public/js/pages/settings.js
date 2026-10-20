@@ -19,6 +19,7 @@ import { mountBrokerLinks } from './settings/broker-links.js';
 import { mountLanguage } from './settings/language.js';
 import { mountAi } from './settings/ai.js';
 import { mountCharges } from './settings/charges.js';
+import { mountReportProblem } from './settings/report-problem.js';
 
 mountBroker();
 mountCapital();
@@ -38,3 +39,4 @@ mountShareLinks();
 mountBackup();
 mountAi();
 mountCharges();
+mountReportProblem();

@@ -618,6 +618,44 @@ describe('access requests', () => {
   });
 });
 
+describe('problem reports and the overview report', () => {
+  it('lets a member report a problem that an admin marks fixed, and shows it on the overview', async () => {
+    const admin = await adminSession();
+    const member = await memberSession();
+    expect(
+      (await member.send('post', '/api/account/problem-report', { category: 'bug', message: 'x' }))
+        .status,
+    ).toBe(400);
+    const sent = await member.send('post', '/api/account/problem-report', {
+      category: 'data',
+      message: 'The weekly P&L does not match my contract note.',
+      page: '/reports',
+    });
+    expect(sent.status).toBe(201);
+    expect(mails.at(-1)).toMatchObject({ to: 'admin@example.com' });
+    expect((await member.agent.get('/api/admin/reports')).status).toBe(403);
+
+    const overview = (await admin.agent.get('/api/admin/overview')).body;
+    expect(overview.openReports).toBe(1);
+    expect(overview.series).toHaveLength(30);
+    expect(overview.series.at(-1).signups).toBeGreaterThanOrEqual(2);
+    expect(overview.activity.some((event) => event.kind === 'report')).toBe(true);
+
+    const [report] = (await admin.agent.get('/api/admin/reports')).body.reports;
+    expect(report).toMatchObject({ status: 'open', page: '/reports' });
+    const fixed = await admin.send('post', `/api/admin/reports/${report.id}/fix`, {
+      note: 'Brokerage on F&O was off; fixed.',
+    });
+    expect(fixed.body.report.status).toBe('fixed');
+    expect(mails.at(-1)).toMatchObject({
+      to: 'member@example.com',
+      subject: 'Your problem report has been resolved',
+    });
+    expect(mails.at(-1).text).toContain('Brokerage on F&O was off');
+    expect((await admin.send('post', `/api/admin/reports/${report.id}/fix`, {})).status).toBe(404);
+  });
+});
+
 describe('Google sign-in', () => {
   /** Runs the Google redirect round trip for `profile`; returns the final redirect. */
   async function googleRoundTrip(agent, profile, start = '/auth/google') {

@@ -129,6 +129,8 @@ router.post(
   wrap(adminPanel.grantMemberPremium),
 );
 router.get('/admin/audit', requireApiAdmin, wrap(adminPanel.listAudit));
+router.get('/admin/reports', requireApiAdmin, wrap(adminPanel.listReports));
+router.post('/admin/reports/:id/fix', requireApiAdmin, wrap(adminPanel.fixReport));
 router.get('/admin/announcements', requireApiAdmin, wrap(adminPanel.listAnnouncementsHandler));
 router.post(
   '/admin/announcements',
@@ -217,6 +219,7 @@ router.get('/account/export', requireApiAuth, wrap(account.exportBackup));
 router.post('/account/restore', requireApiAuth, account.backupFile, wrap(account.importBackup));
 router.get('/account/notifications', requireApiAuth, wrap(account.getNotifications));
 router.put('/account/notifications', requireApiAuth, wrap(account.saveNotifications));
+router.post('/account/problem-report', requireApiAuth, wrap(account.reportProblem));
 router.post(
   '/account/weekly-report/send',
   requireApiAuth,

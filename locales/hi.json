@@ -291,5 +291,6 @@
   "Session expired: connect again": "सत्र समाप्त: फिर से जोड़ें",
   "Not available yet": "अभी उपलब्ध नहीं",
   "Status unavailable": "स्थिति उपलब्ध नहीं",
-  "Connections are read-only unless you turn on live orders in Settings. Your funds stay with your broker.": "जब तक आप सेटिंग्स में लाइव ऑर्डर चालू नहीं करते, कनेक्शन केवल पढ़ने के लिए हैं। आपका पैसा आपके ब्रोकर के पास ही रहता है।"
+  "Connections are read-only unless you turn on live orders in Settings. Your funds stay with your broker.": "जब तक आप सेटिंग्स में लाइव ऑर्डर चालू नहीं करते, कनेक्शन केवल पढ़ने के लिए हैं। आपका पैसा आपके ब्रोकर के पास ही रहता है।",
+  "Report a problem": "समस्या बताएँ"
 }

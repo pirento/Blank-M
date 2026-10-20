@@ -10,7 +10,7 @@
  */
 import fs from 'node:fs/promises';
 import { z } from 'zod';
-import { AdminAuditLog, Trade, User } from '../models/index.js';
+import { AccessRequest, AdminAuditLog, ProblemReport, Trade, User } from '../models/index.js';
 import { isDatabaseConnected, nativeDb } from '../config/database.js';
 import { HttpError } from '../services/errors.js';
 import { hasOpenAiKey } from '../services/ai/openai-key.js';
@@ -29,6 +29,8 @@ import {
 import { describePlatformSettings, savePlatformSettings } from '../services/platform/settings.js';
 import { env } from '../config/env.js';
 import { listAnnouncements, startAnnouncement } from '../services/admin/announcements.js';
+import { dailySeries, recentActivity } from '../services/admin/overview-report.js';
+import { listProblemReports, resolveProblemReport } from '../services/admin/problem-reports.js';
 
 const DAY_MS = 24 * 60 * 60_000;
 const actorOf = (req) => ({ id: req.member.userId, email: req.member.user.email });
@@ -121,19 +123,37 @@ async function lastBackupAt() {
 export async function overview(_req, res) {
   const now = Date.now();
   const since = (days) => new Date(now - days * DAY_MS);
-  const [members, active, pending, new7, new30, trades, billing, plan, disk, backup] =
-    await Promise.all([
-      User.countDocuments(),
-      User.countDocuments({ status: 'active', emailConfirmedAt: { $ne: null } }),
-      User.countDocuments({ emailConfirmedAt: null }),
-      User.countDocuments({ createdAt: { $gt: since(7) } }),
-      User.countDocuments({ createdAt: { $gt: since(30) } }),
-      Trade.estimatedDocumentCount(),
-      billingMetrics(now),
-      loadPlan(),
-      diskFree(),
-      lastBackupAt(),
-    ]);
+  const [
+    members,
+    active,
+    pending,
+    new7,
+    new30,
+    trades,
+    billing,
+    plan,
+    disk,
+    backup,
+    pendingRequests,
+    openReports,
+    series,
+    activity,
+  ] = await Promise.all([
+    User.countDocuments(),
+    User.countDocuments({ status: 'active', emailConfirmedAt: { $ne: null } }),
+    User.countDocuments({ emailConfirmedAt: null }),
+    User.countDocuments({ createdAt: { $gt: since(7) } }),
+    User.countDocuments({ createdAt: { $gt: since(30) } }),
+    Trade.estimatedDocumentCount(),
+    billingMetrics(now),
+    loadPlan(),
+    diskFree(),
+    lastBackupAt(),
+    AccessRequest.countDocuments({ status: 'pending' }),
+    ProblemReport.countDocuments({ status: 'open' }),
+    dailySeries(now),
+    recentActivity(),
+  ]);
   let database = null;
   if (isDatabaseConnected()) {
     const stats = await nativeDb().stats();
@@ -148,6 +168,10 @@ export async function overview(_req, res) {
     members: { total: members, active, pendingActivation: pending, new7d: new7, new30d: new30 },
     trades,
     billing: { ...billing, plan: publicPlan(plan) },
+    pendingRequests,
+    openReports,
+    series,
+    activity,
     integrations: {
       openai: hasOpenAiKey(),
       zerodha: isKiteConfigured(),
@@ -167,6 +191,16 @@ export async function overview(_req, res) {
       node: process.version,
     },
   });
+}
+
+/** GET /api/admin/reports: member problem reports, open ones first. */
+export async function listReports(_req, res) {
+  res.json({ reports: await listProblemReports() });
+}
+
+/** POST /api/admin/reports/:id/fix { note? }: marks a report fixed and emails the member. */
+export async function fixReport(req, res) {
+  res.json({ report: await resolveProblemReport(req.params.id, req.body, actorOf(req)) });
 }
 
 /* ---------------------------------- integrations ---------------------------------- */

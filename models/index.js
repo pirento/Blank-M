@@ -37,3 +37,4 @@ export { UsageCounter } from './UsageCounter.js';
 export { Announcement } from './Announcement.js';
 export { LiveQuote, LiveSubscription } from './LiveQuote.js';
 export { AccessRequest } from './AccessRequest.js';
+export { ProblemReport } from './ProblemReport.js';
