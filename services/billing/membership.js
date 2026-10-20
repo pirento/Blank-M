@@ -14,6 +14,7 @@ import { Subscription, TrialClaim } from '../../models/index.js';
 import { sha256Hex } from '../crypto.js';
 import { HttpError } from '../errors.js';
 import { featureLabel, loadPlan } from './plan.js';
+import { takeFreeUse, usedThisMonth } from './usage.js';
 
 const DAY_MS = 24 * 60 * 60_000;
 // Razorpay charges a renewal (and sends its webhook) some time after the paid month ends.
@@ -132,18 +133,30 @@ export async function hasFeature(user, feature) {
   return (await membershipFor(user)).premium;
 }
 
-/** The 402 error shown when a free member opens a Premium feature. */
-export function premiumRequired(feature) {
-  return new HttpError(
-    `${featureLabel(feature)} is part of Premium. Start or renew it in Settings → Plan & billing.`,
-    402,
-    { code: 'premium_required', feature },
-  );
+/**
+ * Whether a free member may still open a Premium feature's page: Premium, a free feature, or
+ * free uses left this month (opening the page does not use one; its requests do).
+ */
+export async function canUseFeature(user, feature) {
+  if (await hasFeature(user, feature)) return true;
+  const limit = (await loadPlan()).freeQuota[feature] ?? 0;
+  return limit > 0 && (await usedThisMonth(user._id, feature)) < limit;
+}
+
+/** The 402 error shown when a free member opens a Premium feature (`limit`: free uses used up). */
+export function premiumRequired(feature, limit = 0) {
+  const why = limit
+    ? `You have used this month's ${limit} free uses of ${featureLabel(feature)}.`
+    : `${featureLabel(feature)} is part of Premium.`;
+  return new HttpError(`${why} Start or renew Premium in Billing.`, 402, {
+    code: 'premium_required',
+    feature,
+  });
 }
 
 /**
  * Express guard for API routes: lets the request through when the signed-in member
- * may use `feature`; answers 402 otherwise. Signed-out requests pass through so the
+ * may use `feature` (Premium, or one of this month's free uses); answers 402 otherwise. Signed-out requests pass through so the
  * route's own sign-in check answers them as before.
  */
 export function requirePremium(feature) {
@@ -151,7 +164,9 @@ export function requirePremium(feature) {
     try {
       const user = req.member?.user ?? req.auth?.user;
       if (user && !req.auth?.accessError && !(await hasFeature(user, feature))) {
-        throw premiumRequired(feature);
+        // A free member may use the feature a few times a month before Premium is needed.
+        const limit = (await loadPlan()).freeQuota[feature] ?? 0;
+        if (!(await takeFreeUse(user._id, feature, limit))) throw premiumRequired(feature, limit);
       }
       next();
     } catch (error) {

@@ -3,7 +3,6 @@
  */
 import { mountBroker } from './settings/broker.js';
 import { mountCapital } from './settings/capital.js';
-import { mountBilling } from './settings/billing.js';
 import { mountRiskLimits } from './settings/risk-limits.js';
 import { mountMfa } from './settings/mfa.js';
 import { mountUsername } from './settings/username.js';
@@ -22,7 +21,6 @@ import { mountAi } from './settings/ai.js';
 import { mountCharges } from './settings/charges.js';
 
 mountBroker();
-mountBilling();
 mountCapital();
 mountRiskLimits();
 mountMfa();

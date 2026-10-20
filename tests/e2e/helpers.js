@@ -42,6 +42,8 @@ export const WORKSPACE_PAGES = [
   '/reports',
   '/analytics',
   '/settings',
+  '/billing',
+  '/chart',
 ];
 
 /** A short unique suffix so repeated runs never collide in the shared database. */

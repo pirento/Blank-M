@@ -60,8 +60,8 @@
                   <div class="reference-watch-actions">
                     <button type="button" data-refresh class="<%= buttonClass('outline', 'sm') %>" aria-label="Refresh <%= item.symbol %> quote"><%- icon('refresh-cw', { size: 14 }) %></button>
                     <button type="button" data-alert class="<%= buttonClass('outline', 'sm') %>" aria-label="Set a price alert for <%= item.symbol %>"><%- icon('bell', { size: 14 }) %></button>
-                    <a class="<%= buttonClass('outline', 'sm') %>" href="https://www.tradingview.com/chart/?symbol=NSE:<%= encodeURIComponent(item.symbol) %>" target="_blank" rel="noopener noreferrer" aria-label="Open <%= item.symbol %> chart on TradingView (new tab)">
-                      Chart <%- icon('arrow-up-right', { size: 14, className: 'ml-2' }) %>
+                    <a class="<%= buttonClass('outline', 'sm') %>" href="/chart?symbol=<%= encodeURIComponent(item.symbol) %>" aria-label="Open the live <%= item.symbol %> chart">
+                      Chart <%- icon('chart-candlestick', { size: 14, className: 'ml-2' }) %>
                     </a>
                     <button type="button" data-remove class="<%= buttonClass('ghost', 'sm', 'text-negative hover:bg-negative-soft') %>" aria-label="Remove <%= item.symbol %> from watchlist">
                       <%- icon('trash-2', { size: 16 }) %><span>Remove</span>

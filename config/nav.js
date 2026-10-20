@@ -9,6 +9,7 @@ export const PRIMARY_NAV_LINKS = [
   { name: 'Reports', path: '/reports', icon: 'file-bar-chart' },
   { name: 'Strategy', path: '/strategy', icon: 'lightbulb' },
   { name: 'AI chat', path: '/analytics', icon: 'bot' },
+  { name: 'Billing', path: '/billing', icon: 'credit-card' },
   { name: 'Settings', path: '/settings', icon: 'settings' },
 ];
 
@@ -19,6 +20,7 @@ export const SECONDARY_NAV_GROUPS = [
     items: [
       { name: 'Journal', path: '/journal', icon: 'book-open' },
       { name: 'Import', path: '/import', icon: 'upload' },
+      { name: 'Live chart', path: '/chart', icon: 'chart-candlestick' },
       { name: 'Paper trading', path: '/paper', icon: 'beaker' },
       { name: 'Options payoff', path: '/options', icon: 'chart-spline' },
     ],
@@ -52,6 +54,7 @@ export const ADMIN_PANEL_NAV = [
   { name: 'Plans & billing', path: '/admin/billing', icon: 'credit-card' },
   { name: 'Integrations', path: '/admin/integrations', icon: 'key-round' },
   { name: 'AI models', path: '/admin/ai', icon: 'bot' },
+  { name: 'Announcements', path: '/admin/announcements', icon: 'megaphone' },
   { name: 'Audit log', path: '/admin/audit', icon: 'scroll-text' },
 ];
 

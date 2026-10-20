@@ -12,7 +12,7 @@ import { NAV_LINKS, ADMIN_NAV_GROUP } from '../config/nav.js';
 import { createHash } from 'node:crypto';
 import { openShareLink } from '../services/journal/share-links.js';
 import { reserveAttempts } from '../services/rate-window.js';
-import { membershipFor } from '../services/billing/membership.js';
+import { canUseFeature, membershipFor } from '../services/billing/membership.js';
 import { featureLabel, loadPlan, publicPlan } from '../services/billing/plan.js';
 
 const TITLES = Object.fromEntries(
@@ -52,8 +52,13 @@ export function workspacePage(
     const userId = req.member.userId;
     const membership = await membershipFor(req.member.user);
     // A Premium page for a free member shows the upgrade page instead (billing on only).
-    // Same rule as hasFeature, from the membership already read (one Subscription read per page).
-    if (feature && !membership.premium && membership.premiumFeatures.includes(feature)) {
+    // A free member keeps the page while free uses of the feature are left this month.
+    const locked =
+      feature &&
+      !membership.premium &&
+      membership.premiumFeatures.includes(feature) &&
+      !(await canUseFeature(req.member.user, feature));
+    if (locked) {
       const plan = await loadPlan();
       return res.status(402).renderWorkspace('pages/upgrade', {
         title: res.locals.t(TITLES[req.path] ?? 'Premium'),
@@ -149,7 +154,11 @@ export async function signup(req, res) {
   const plan = await loadPlan();
   if (!plan.signupOpen) return res.redirect('/login');
   if (req.auth.user && !req.auth.accessError) return res.redirect('/dashboard');
-  res.render('pages/signup', { title: 'Create account', plan: publicPlan(plan) });
+  res.render('pages/signup', {
+    title: 'Create account',
+    plan: publicPlan(plan),
+    googleEnabled: env.googleAuthEnabled,
+  });
 }
 
 const LEGAL_PAGES = {

@@ -18,6 +18,7 @@ import { HttpError } from '../errors.js';
 import { reserveAttempts } from '../rate-window.js';
 import { sha256Hex } from '../crypto.js';
 import { isMailConfigured, sendMail } from '../mailer.js';
+import { loadPlan } from '../billing/plan.js';
 
 export { USERNAME_PATTERN };
 export const MIN_PASSWORD_LENGTH = 8;
@@ -455,6 +456,46 @@ export async function consumeAdminSetupCode(user, code) {
     { $set: { usedAt: now } },
   );
   return Boolean(record);
+}
+
+/**
+ * A new member signing up with Google while public sign-up is open: Google has verified the
+ * address, so the account is confirmed at once. Returns true when an account was created (false
+ * when sign-up is closed, rate-limited, or another request created it first).
+ */
+export async function signUpWithGoogle(email, clientAddress) {
+  if (!(await loadPlan()).signupOpen) return false;
+  const quota = await reserveAttempts(
+    [
+      { key: 'signup:g', limit: 200 },
+      { key: `signup:c:${opaque('client', clientAddress || 'unidentified-client')}`, limit: 5 },
+    ],
+    60 * 60_000,
+  );
+  if (!quota.allowed) return false;
+  let account;
+  try {
+    account = await User.create({
+      email,
+      role: 'member',
+      status: 'active',
+      emailConfirmedAt: new Date(),
+    });
+    await AllowedUser.create({
+      _id: email,
+      role: 'member',
+      invitedBy: null,
+      invitedAt: new Date(),
+      acceptedAt: new Date(),
+      authUserId: account._id,
+    });
+    return true;
+  } catch (error) {
+    // A parallel sign-up for the same address won; remove our half-made account.
+    if (error?.code !== 11000) throw error;
+    if (account) await User.deleteOne({ _id: account._id, passwordHash: null });
+    return false;
+  }
 }
 
 /** Consume a single-use emailed link and return its account. */

@@ -12,6 +12,8 @@ const subscriptionSchema = new mongoose.Schema(
     _id: String, // user id
     /** End of the free trial (set once, when the member is first seen with billing on). */
     trialEndsAt: { type: Date, default: null },
+    /** When the "your trial ends soon" email was sent (once per trial). */
+    trialReminderSentAt: { type: Date, default: null },
     /** End of the period already paid for (Razorpay current_end). */
     paidUntil: { type: Date, default: null },
     /** Premium given by an administrator until this date (offers, support, testers). */

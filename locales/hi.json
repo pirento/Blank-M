@@ -275,5 +275,11 @@
   "Setup code": "सेटअप कोड",
   "Continue": "आगे बढ़ें",
   "Email a new code": "नया कोड ईमेल करें",
-  "Email me a code": "मुझे कोड ईमेल करें"
+  "Email me a code": "मुझे कोड ईमेल करें",
+  "Billing": "बिलिंग",
+  "Your plan, this month’s free uses and your payments.": "आपका प्लान, इस महीने के फ्री उपयोग और आपके भुगतान।",
+  "Live chart": "लाइव चार्ट",
+  "Candles for any NSE symbol, moving with live prices. No need to open another site.": "किसी भी NSE सिंबल की कैंडल, लाइव प्राइस के साथ चलती हुई। किसी दूसरी साइट पर जाने की ज़रूरत नहीं।",
+  "Show chart": "चार्ट दिखाएं",
+  "Every feature is free right now. Nothing to pay.": "अभी हर फ़ीचर फ्री है। कुछ भी भुगतान नहीं करना है।"
 }

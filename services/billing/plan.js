@@ -22,7 +22,7 @@ export const PREMIUM_FEATURES = [
       'Broker connections (Zerodha, Dhan, Upstox, Fyers, Angel One) and the daily automatic journal',
   },
   { key: 'liveOrders', label: 'Live orders with automatic stop-loss and target' },
-  { key: 'livePrices', label: 'Live Zerodha prices' },
+  { key: 'livePrices', label: 'Live prices and live charts' },
   { key: 'telegram', label: 'Telegram bot and alerts' },
   { key: 'backtest', label: 'Backtesting' },
   { key: 'paper', label: 'Paper trading' },
@@ -40,6 +40,11 @@ export const DEFAULT_PLAN = Object.freeze({
   trialDays: 14,
   features: FEATURE_KEYS,
   signupOpen: false,
+  /**
+   * Free uses per month of each Premium feature for free members, e.g. { ai: 20 }. Each API request
+   * to the feature counts as one (services/billing/usage.js). Missing or 0 means none.
+   */
+  freeQuota: {},
   /** Razorpay plan created for the current price (Razorpay plans cannot change price). */
   razorpayPlanId: null,
   razorpayPlanPrice: null,
@@ -58,6 +63,7 @@ export async function loadPlan() {
     features: Array.isArray(stored.features)
       ? stored.features.filter((key) => FEATURE_KEYS.includes(key))
       : DEFAULT_PLAN.features,
+    freeQuota: stored.freeQuota && typeof stored.freeQuota === 'object' ? stored.freeQuota : {},
   };
   cache = { at: Date.now(), plan };
   return plan;
@@ -119,6 +125,20 @@ export async function savePlan(actor, changes) {
     }
     next.features = [...new Set(changes.features)];
   }
+  if (changes.freeQuota !== undefined) {
+    const quota = changes.freeQuota;
+    if (!quota || typeof quota !== 'object' || Array.isArray(quota)) {
+      throw new HttpError('Free uses must be a number per feature.', 400);
+    }
+    next.freeQuota = {};
+    for (const [key, value] of Object.entries(quota)) {
+      const uses = Number(value);
+      if (!FEATURE_KEYS.includes(key) || !Number.isInteger(uses) || uses < 0 || uses > 100_000) {
+        throw new HttpError('Free uses per month must be a whole number from 0 to 1,00,000.', 400);
+      }
+      if (uses > 0) next.freeQuota[key] = uses;
+    }
+  }
   await writePlan(next, actor.id);
   await AdminAuditLog.create({
     actorId: actor.id,
@@ -130,6 +150,7 @@ export async function savePlan(actor, changes) {
       priceMonthly: next.priceMonthly,
       trialDays: next.trialDays,
       features: next.features,
+      freeQuota: next.freeQuota,
       signupOpen: next.signupOpen,
     },
   });
@@ -157,6 +178,7 @@ export function publicPlan(plan) {
     priceMonthly: plan.priceMonthly,
     trialDays: plan.trialDays,
     features: plan.features.map((key) => ({ key, label: featureLabel(key) })),
+    freeQuota: plan.freeQuota,
     signupOpen: plan.signupOpen,
   };
 }

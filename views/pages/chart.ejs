@@ -1,0 +1,19 @@
+<div class="mx-auto max-w-6xl space-y-6 py-6">
+  <div class="workspace-pagehead">
+    <div>
+      <h1><%= t('Live chart') %></h1>
+      <p><%= t('Candles for any NSE symbol, moving with live prices. No need to open another site.') %></p>
+    </div>
+  </div>
+  <form data-chart-form class="flex flex-wrap items-end gap-3">
+    <div class="space-y-2">
+      <label class="<%= LABEL_CLASS %>" for="chart-symbol"><%= t('Symbol') %></label>
+      <input id="chart-symbol" name="symbol" list="chart-symbols" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="30" class="<%= FIELD_CLASS %> w-48 uppercase" />
+      <datalist id="chart-symbols">
+        <% for (const item of workspace.watchlist ?? []) { %><option value="<%= item.symbol %>"></option><% } %>
+      </datalist>
+    </div>
+    <button type="submit" class="<%= buttonClass() %>"><%= t('Show chart') %></button>
+  </form>
+  <div data-chart></div>
+</div>

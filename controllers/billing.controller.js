@@ -1,11 +1,12 @@
 /**
- * Member billing endpoints (Settings → Plan & billing) and the Razorpay webhook.
+ * Member billing endpoints (the Billing page) and the Razorpay webhook.
  * The member never sends prices or dates: the server decides them from the plan
  * and from what Razorpay reports.
  */
 import { loadPlan, publicPlan } from '../services/billing/plan.js';
 import { membershipFor } from '../services/billing/membership.js';
 import { isRazorpayConfigured } from '../services/billing/razorpay.js';
+import { freeUsage } from '../services/billing/usage.js';
 import {
   cancelMembership,
   handleWebhook,
@@ -15,17 +16,22 @@ import {
 } from '../services/billing/subscriptions.js';
 import { HttpError } from '../services/errors.js';
 
-/** GET /api/billing: the plan, the member's Premium status and their payments. */
+/**
+ * GET /api/billing: the plan, the member's Premium status, their payments and this month's use of
+ * the free allowances (`freeUsage: { feature: { used, limit } }`).
+ */
 export async function status(req, res) {
-  const [plan, membership, payments] = await Promise.all([
-    loadPlan(),
+  const plan = await loadPlan();
+  const [membership, payments, usage] = await Promise.all([
     membershipFor(req.member.user),
     paymentHistory(req.member.userId),
+    freeUsage(req.member.userId, plan.freeQuota),
   ]);
   res.json({
     plan: publicPlan(plan),
     membership,
     payments,
+    freeUsage: usage,
     paymentsAvailable: isRazorpayConfigured(),
   });
 }

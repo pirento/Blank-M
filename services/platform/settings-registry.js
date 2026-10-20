@@ -140,6 +140,29 @@ export const PLATFORM_SETTINGS = [
   },
   { key: 'VAPID_SUBJECT', group: 'Push notifications', label: 'Contact (mailto:…)', type: 'text' },
 
+  // Live market data for every member (TrueData). Needs TrueData's redistribution permission.
+  {
+    key: 'TRUEDATA_USER',
+    group: 'Live market data (TrueData)',
+    label: 'TrueData login',
+    type: 'text',
+    help: 'Live prices and charts for all members. Showing the data to members needs TrueData’s and the exchange’s written permission. Also start the feed: pm2 start ecosystem.config.cjs.',
+  },
+  {
+    key: 'TRUEDATA_PASSWORD',
+    group: 'Live market data (TrueData)',
+    label: 'TrueData password',
+    type: 'secret',
+  },
+  {
+    key: 'TRUEDATA_PORT',
+    group: 'Live market data (TrueData)',
+    label: 'Real-time port (usually 8082)',
+    type: 'number',
+    min: 1,
+    max: 65535,
+  },
+
   // Business details shown on the public Terms, Privacy, Refund and Contact pages
   // (Razorpay checks these pages before it activates live payments).
   {

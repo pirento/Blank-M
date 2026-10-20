@@ -14,6 +14,7 @@ import { AdminAuditLog, BillingEvent, Payment, Subscription, User } from '../../
 import { HttpError } from '../errors.js';
 import { createLogger } from '../logger.js';
 import { computeMembership, membershipFor } from './membership.js';
+import { billingEventEmail } from '../notifications/emails.js';
 import { loadPlan, rememberRazorpayPlan } from './plan.js';
 import {
   cancelSubscription,
@@ -224,6 +225,11 @@ async function applyWebhookEvent(event) {
     );
   }
   log.info('razorpay webhook', { event: event.event, matched: Boolean(record) });
+  // Each event id is applied once (handleWebhook), so the member gets one email per event. Not
+  // awaited: Razorpay must get its answer quickly even when the mail server is slow.
+  void billingEventEmail(event, record).catch((error) =>
+    log.warn('billing email failed', { error: error?.name }),
+  );
   return { ok: true };
 }
 

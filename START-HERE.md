@@ -187,6 +187,43 @@ details bharne ke baad bechne se pehle apne CA/lawyer se padhwa lijiye (`views/p
 **Zaroori:** GST/invoice ki zaroorat apne CA se pooch lijiye. AI picks/research ko advice ki tarah bechne par SEBI Research Analyst registration lag sakta
 hai — kisi expert se confirm kariye.
 
+### Free limit, Billing page aur emails
+
+- **Free limit:** admin panel → Plans & billing mein har Premium feature ke saamne "Free / month"
+  likhiye (jaise AI 20). Free member us feature ko mahine mein utni baar use kar sakta hai, phir
+  Premium lena padta hai. 0 = bilkul nahi.
+- **Billing page:** member ke menu mein "Billing" hai: plan, is mahine ke free uses, Subscribe/Cancel
+  aur payments.
+- **Emails apne aap:** account activate hone par welcome; payment hua / fail hua / renewal band;
+  trial khatam hone se 3 din pehle yaad (`scripts/billing-reminders.js`, roz cron se). Weekly report
+  naye members ke liye ON rehta hai (Settings se band kar sakte hain).
+- **Announcement:** admin panel → Announcements se sab members (ya sirf Premium / free) ko ek email.
+  Jo member Settings mein "Emails from the team" band kare, use nahi jaata. Email (SMTP) set hona
+  chahiye.
+
+### Google se login
+
+1. console.cloud.google.com → APIs & Services → Credentials → Create OAuth client ID → Web
+   application.
+2. Authorized redirect URI: `https://aapka-domain.com/auth/google/callback`.
+3. Client ID + secret admin panel → Integrations → Google sign-in mein daaliye, "Enabled" tick.
+
+Member login page, sign-up page aur admin login page teeno par "Continue with Google" aa jaata hai.
+Sign-up khula ho to naya member Google se seedha account bana sakta hai. Admin login par sirf admin
+account andar jaata hai, aur authenticator ho to uska code bhi maanga jaata hai.
+
+### Live price aur live chart (TrueData)
+
+Menu → **Live chart**: kisi bhi NSE symbol ka chart, jiski aakhri candle live price ke saath chalti
+hai (TradingView par jaane ki zaroorat nahi). Watchlist ka "Chart" button bhi yahin khulta hai.
+
+- TrueData (truedata.in) ka market data plan lijiye. Admin panel → Integrations → Live market data
+  mein login aur password daaliye. Feed ek alag process (`pirento-feed`) mein chalta hai, jo
+  `deploy/setup-vps.sh` / `pm2 start ecosystem.config.cjs` apne aap shuru karta hai.
+- **Zaroori (kanoon):** TrueData ka data apne members ko dikhane ke liye TrueData aur NSE dono ki
+  likhit permission (redistribution licence) chahiye. Bina iske ye feature on mat kariye.
+- TrueData set nahi hai to member ke apne Zerodha se live price aata hai, warna thoda delayed (Yahoo).
+
 ## Tarika 2: Hostinger "Node.js app" (managed hosting)
 
 `pirento-blank-ready.tar.xz` mein production dependencies (`node_modules`) aur built CSS pehle se

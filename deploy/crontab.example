@@ -8,6 +8,9 @@
 # Daily 02:10 UTC (07:40 IST): delete public sign-ups never confirmed within 7 days.
 10 2 * * * cd /srv/blank && set -a && . ./.env && set +a && node scripts/maintenance-signups.js >> /var/log/blank-cron.log 2>&1
 
+# Daily 03:00 UTC (08:30 IST): "your free trial ends soon" emails.
+0 3 * * * cd /srv/blank && set -a && . ./.env && set +a && node scripts/billing-reminders.js >> /var/log/blank-cron.log 2>&1
+
 # Monday 02:30 UTC (08:00 IST): weekly report emails for members who opted in.
 30 2 * * 1 cd /srv/blank && set -a && . ./.env && set +a && node scripts/send-weekly-reports.js >> /var/log/blank-cron.log 2>&1
 

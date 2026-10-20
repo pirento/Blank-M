@@ -33,3 +33,6 @@ export { Subscription } from './Subscription.js';
 export { Payment } from './Payment.js';
 export { BillingEvent } from './BillingEvent.js';
 export { TrialClaim } from './TrialClaim.js';
+export { UsageCounter } from './UsageCounter.js';
+export { Announcement } from './Announcement.js';
+export { LiveQuote, LiveSubscription } from './LiveQuote.js';

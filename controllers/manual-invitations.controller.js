@@ -21,6 +21,7 @@ import {
 } from '../services/admin/manual-invitations.js';
 import { AdminContractError } from '../services/admin/contracts.js';
 import { manualInvitationSchema } from '../shared/manual-invitations.js';
+import { welcomeMember } from '../services/notifications/emails.js';
 
 const email = z
   .string()
@@ -280,6 +281,7 @@ export async function handleAcceptManualInvitation(req, res) {
     if (result.id !== claim.id || result.email !== claim.email)
       throw new AdminContractError('The invitation acceptance could not be verified.');
     res.status(200).json({ accepted: true, email: result.email });
+    void welcomeMember(created).catch(() => undefined);
   } catch (error) {
     if (claim) {
       // Never delete an uncertain identity, retry creation, or reopen a
