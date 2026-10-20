@@ -8,6 +8,9 @@ import { calculateRiskPlan, deriveRiskPrices } from './risk-calculator.js';
 
 /** A frozen planning estimate, never a submitted order or a realised trade. */
 
+/** Most frozen plan records one member may keep (server, restore and browser all enforce it). */
+export const MAX_PLAN_RECORDS = 10_000;
+
 const PREFIX = 'blank_manual_plans:v1:';
 const CHANGED = 'blank:manual-plans-changed';
 const CORRUPT =

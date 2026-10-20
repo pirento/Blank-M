@@ -3,7 +3,11 @@
  */
 import { z } from 'zod';
 import { OrderPlanRecord, nextSequence } from '../models/index.js';
-import { validateOrderPlanRecord, samePlanRecord } from '../shared/order-plans.js';
+import {
+  MAX_PLAN_RECORDS,
+  validateOrderPlanRecord,
+  samePlanRecord,
+} from '../shared/order-plans.js';
 import { HttpError } from '../services/errors.js';
 
 const MAX_PAGE = 50;
@@ -19,23 +23,30 @@ function toCloudRow(row) {
   };
 }
 
-/** Exact-count pages in server-revision order, so history cannot be silently truncated. */
+/**
+ * Exact-count pages in server-revision order, so history cannot be silently truncated. With
+ * `after`, only records newer than that revision (a browser that already has the rest).
+ */
 export async function listRecords(req, res) {
   const query = z
     .object({
       offset: z.coerce.number().int().min(0).default(0),
+      after: z.coerce.number().int().min(0).optional(),
       limit: z.coerce.number().int().min(1).max(MAX_PAGE).default(MAX_PAGE),
     })
     .safeParse(req.query);
   if (!query.success) throw new HttpError('Invalid plan history page.', 400);
   const userId = req.member.userId;
+  const { offset, after, limit } = query.data;
+  const page =
+    after === undefined
+      ? OrderPlanRecord.find({ userId }).sort({ serverRevision: 1 }).skip(offset)
+      : OrderPlanRecord.find({ userId, serverRevision: { $gt: after } }).sort({
+          serverRevision: 1,
+        });
   const [count, rows] = await Promise.all([
     OrderPlanRecord.countDocuments({ userId }),
-    OrderPlanRecord.find({ userId })
-      .sort({ serverRevision: 1 })
-      .skip(query.data.offset)
-      .limit(query.data.limit)
-      .lean(),
+    page.limit(limit).lean(),
   ]);
   res.json({ rows: rows.map(toCloudRow), count });
 }
@@ -70,6 +81,12 @@ export async function appendRecord(req, res) {
   if (existing) {
     res.json({ inserted: false, matches: samePlanRecord(valid, toCloudRow(existing)) });
     return;
+  }
+  if ((await OrderPlanRecord.countDocuments({ userId })) >= MAX_PLAN_RECORDS) {
+    throw new HttpError(
+      `Plan history is full (${MAX_PLAN_RECORDS.toLocaleString('en-IN')} records). Contact the administrator.`,
+      409,
+    );
   }
   try {
     await OrderPlanRecord.create({

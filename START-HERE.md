@@ -87,7 +87,7 @@ theek hone par "OK again". Chalu karne ke liye:
   shaam ~4:15 baje aaj ke Zerodha/Dhan/Upstox/Fyers/Angel One trades journal mein khud aa jaate hain aur din ka P&L
   Telegram par aata hai. Zerodha ke liye us din Blank mein Zerodha login hona chahiye.
 - **Pre-market plan Telegram par:** Settings → "Pre-market plan on Telegram" on kariye. Har trading
-  din subah ~8:45 baje (market khulne se pehle) Telegram par chhota plan aata hai: watchlist, pichhle
+  din subah 8 se 9:15 baje ke beech (market khulne se pehle) Telegram par chhota plan aata hai: watchlist, pichhle
   din ka P&L, aapki baar-baar wali galtiyan, aapke rules aur aaj ki risk limits, aur AI key ho to
   4–6 focus points. Ye investment advice nahi hai. Server par cron line
   `scripts/premarket-plan.js` (`deploy/crontab.example`) lagani hogi.
@@ -175,6 +175,10 @@ jaisa).
 Ek insaan ko ek hi free trial milta hai: Gmail ke dots aur `+tag` wale email ek hi gine jaate hain,
 aur account delete karke dobara banane par bhi trial dobara nahi milta. Jo log 7 din tak email
 confirm nahi karte, unke sign-up roz apne aap hat jaate hain (`scripts/maintenance-signups.js`).
+
+**Member ka data delete karna** (privacy policy mein 30 din ka vaada hai): server par
+`cd /srv/blank && set -a && . ./.env && set +a && node scripts/delete-member.js email@x.com email@x.com`
+(email do baar, galti se na chale). Payments ka record rehta hai, baaki sab hat jaata hai.
 
 **Legal pages:** `/terms`, `/privacy`, `/refunds`, `/contact` bane hue hain (landing page ke footer
 mein link). Razorpay KYC mein inke link maangta hai. Text ek achha shuruaati draft hai — Business

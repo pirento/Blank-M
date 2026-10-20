@@ -11,6 +11,9 @@ const log = createLogger('ai-config');
 
 export const TRANSCRIPTION_MODEL = 'gpt-transcribe';
 export const EMBEDDING_MODEL = 'text-embedding-3-small';
+// 512 numbers per vector instead of 1536: about a third of the storage and search time, with
+// little loss for short journal entries. Changing it re-embeds every member on their next search.
+export const EMBEDDING_DIMENSIONS = 512;
 
 function allowed(value, values, fallback) {
   return values.includes(value) ? value : fallback;

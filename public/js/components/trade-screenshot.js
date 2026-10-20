@@ -8,11 +8,36 @@ import { api } from '../core/api.js';
 import { openModal } from '../core/dialog.js';
 import { notify, notifyError } from '../core/toast.js';
 
+const MAX_SIDE = 1600;
+
+/**
+ * A smaller copy of the image (longest side ≤ 1600 px, WebP) so a chart takes ~200 KB instead of a
+ * few MB on the server. Falls back to the original file if the browser cannot convert it.
+ */
+async function shrinkImage(file) {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/webp', 0.85));
+    // Browsers without WebP encoding return PNG, which may be larger: keep whichever is smaller.
+    if (!blob || blob.size >= file.size) return file;
+    const extension = blob.type === 'image/webp' ? 'webp' : 'png';
+    return new File([blob], `chart.${extension}`, { type: blob.type });
+  } catch {
+    return file;
+  }
+}
+
 /** Open the screenshot modal; uploads (POST) and removals (DELETE) go to /api/trades/:id/screenshot. */
 export function openTradeScreenshot(trade, { onChange }) {
   openModal({
     title: `${trade.symbol} chart`,
-    description: `${trade.date} · PNG, JPEG or WebP up to 5 MB.`,
+    description: `${trade.date} · PNG, JPEG or WebP up to 5 MB (large images are made smaller).`,
     content: (close) => {
       let busy = false;
       const status = h('p', { role: 'status', class: 'text-sm text-muted' });
@@ -28,7 +53,7 @@ export function openTradeScreenshot(trade, { onChange }) {
         busy = true;
         status.textContent = 'Uploading…';
         const form = new FormData();
-        form.append('file', file);
+        form.append('file', await shrinkImage(file));
         try {
           const result = await api(`/api/trades/${encodeURIComponent(trade.id)}/screenshot`, {
             method: 'POST',

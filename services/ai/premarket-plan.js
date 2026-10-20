@@ -170,7 +170,8 @@ export async function premarketPlanText(userId, settings, today) {
  * Sends today's plan to every opted-in member with a linked Telegram chat who has not had it yet.
  * Does nothing on weekends and NSE holidays, or once the market has opened (09:15 IST).
  */
-export async function runPremarketPlans({ now = new Date(), limit = 200 } = {}) {
+// A batch per call stays well inside the proxy's 180 s timeout (an AI call of ~8 s per member).
+export async function runPremarketPlans({ now = new Date(), limit = 10 } = {}) {
   const status = getMarketStatus(now);
   const ist = toIst(now);
   if (status === 'closed-weekend' || status === 'closed-holiday') {

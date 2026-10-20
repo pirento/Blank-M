@@ -233,7 +233,8 @@ export async function listPayments(_req, res) {
 
 /** GET /api/admin/memberships: Premium state of every member (for the members table). */
 export async function listMemberships(_req, res) {
-  const users = await User.find({}, { email: 1, role: 1 }).limit(5000).lean();
+  // shortcut: one response for every member (~50 bytes each, ~1 MB at 20k); page it past ~50k.
+  const users = await User.find({}, { email: 1, role: 1 }).limit(50_000).lean();
   const memberships = await membershipsByUser(users);
   res.json({
     memberships: users.map((user) => ({

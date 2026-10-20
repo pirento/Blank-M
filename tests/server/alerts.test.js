@@ -1,11 +1,12 @@
 // @vitest-environment node
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const market = vi.hoisted(() => ({ prices: {} }));
+const market = vi.hoisted(() => ({ prices: {}, reads: [] }));
 const pushes = vi.hoisted(() => ({ sent: [], fail: null }));
 vi.mock('../../services/market/index.js', async (original) => ({
   ...(await original()),
   getQuote: async (symbol) => {
+    market.reads.push(symbol);
     if (!(symbol in market.prices)) throw new Error('no quote');
     return { price: market.prices[symbol] };
   },
@@ -146,5 +147,25 @@ describe('price alerts', () => {
     });
     expect(insecure.status).toBe(400);
     expect((await send('get', '/api/push')).body).toMatchObject({ configured: true, devices: 0 });
+  });
+});
+
+describe('scheduled price check at scale', () => {
+  it('reads one price per symbol for every member’s alerts', async () => {
+    const { PriceAlert } = await import('../../models/index.js');
+    const { checkAllAlerts } = await import('../../services/notifications/price-alerts.js');
+    await PriceAlert.create(
+      ['u1', 'u2', 'u3'].map((userId) => ({
+        userId,
+        symbol: 'INFY',
+        condition: 'above',
+        price: 1000,
+        channels: { push: false, email: false, telegram: false },
+      })),
+    );
+    market.prices.INFY = 1500;
+    market.reads.length = 0;
+    expect(await checkAllAlerts()).toMatchObject({ checked: 3, fired: 3 });
+    expect(market.reads).toEqual(['INFY']);
   });
 });

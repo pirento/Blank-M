@@ -20,7 +20,7 @@ import {
 import { TRADE_SYMBOL_RE } from '../../models/Trade.js';
 import { computeGrossPnl, validateTradeInput } from '../../shared/pnl.js';
 import { isBusinessDate } from '../../shared/business-dates.js';
-import { validateOrderPlanRecord } from '../../shared/order-plans.js';
+import { MAX_PLAN_RECORDS, validateOrderPlanRecord } from '../../shared/order-plans.js';
 import { EMOTION_VALUES, normalizeTags, parsePlannedRisk } from '../../shared/trade-tags.js';
 import { contractDetails } from '../../shared/segments.js';
 import { HttpError } from '../errors.js';
@@ -28,6 +28,7 @@ import {
   loadAccountSettings,
   saveAccountSettings,
   toChatMessage,
+  trimChat,
   toRule,
   toStrategy,
   toTrade,
@@ -369,13 +370,17 @@ export async function restoreBackup(userId, raw, { includeSettings = false } = {
     await ChatMessage.create({
       userId,
       role: message.role,
-      text: message.text,
+      text: message.text.slice(0, 20_000),
       ...(message.timestamp ? { createdAt: new Date(message.timestamp) } : {}),
     });
     count('chatMessages', 'added');
   }
 
+  // A backup can hold more than the live limit; only the newest CHAT_KEEP messages stay.
+  await trimChat(userId);
+
   // Frozen plans name their owner, so they can only return to the same account.
+  let planCount = await OrderPlanRecord.countDocuments({ userId });
   for (const row of backup.orderPlans) {
     let valid;
     try {
@@ -384,10 +389,14 @@ export async function restoreBackup(userId, raw, { includeSettings = false } = {
       count('orderPlans', 'invalid');
       continue;
     }
-    if (await OrderPlanRecord.exists({ userId, recordKey: valid.record_key })) {
+    if (
+      planCount >= MAX_PLAN_RECORDS ||
+      (await OrderPlanRecord.exists({ userId, recordKey: valid.record_key }))
+    ) {
       count('orderPlans', 'skipped');
       continue;
     }
+    planCount += 1;
     await OrderPlanRecord.create({
       userId,
       recordKey: valid.record_key,

@@ -1,7 +1,7 @@
 /**
  * Scheduled pre-market plan (before the open): sends a short plan to the
  * linked Telegram chat of members who opted in. Run once per trading day at
- * about 08:45 IST; the server skips holidays and refuses after 09:15 IST.
+ * from about 08:00 IST; the server skips holidays and refuses after 09:15 IST.
  *
  * Usage:
  *   APP_URL=https://blank.example.com CRON_SECRET=... node scripts/premarket-plan.js
@@ -18,7 +18,7 @@ if (secret.length < 32) {
   process.exit(1);
 }
 
-const MAX_BATCHES = 50;
+const MAX_BATCHES = 500;
 // Each call handles one batch of members (each claimed for the day); repeat until none remain.
 for (let batch = 1; batch <= MAX_BATCHES; batch += 1) {
   const response = await fetch(`${base}/api/maintenance/premarket-plan`, {

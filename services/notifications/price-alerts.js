@@ -11,6 +11,9 @@ import { HttpError } from '../errors.js';
 import { getQuote } from '../market/index.js';
 import { createLogger } from '../logger.js';
 import { notifyMember } from './notify.js';
+import { inBatches } from '../batches.js';
+
+const QUOTE_BATCH = 8;
 
 const log = createLogger('alerts');
 export const MAX_ACTIVE_ALERTS = 50;
@@ -106,23 +109,25 @@ export async function reactivateAlert(userId, id) {
 export const alertReached = (alert, price) =>
   alert.condition === 'above' ? price >= alert.price : price <= alert.price;
 
-/** Checks the given active alerts (one price per member and symbol). Returns those that fired. */
+/**
+ * Checks the given active alerts and returns those that fired. One price is read per symbol (all
+ * members' alerts on it share it), a few symbols at a time.
+ */
 async function checkAlerts(rows) {
   const fired = [];
   const groups = new Map();
   for (const row of rows) {
-    const key = `${row.userId}:${row.symbol}`;
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(row);
+    if (!groups.has(row.symbol)) groups.set(row.symbol, []);
+    groups.get(row.symbol).push(row);
   }
-  for (const group of groups.values()) {
+  await inBatches([...groups.values()], QUOTE_BATCH, async (group) => {
     let price;
     try {
       price = Number((await getQuote(group[0].symbol, group[0].userId)).price);
     } catch {
-      continue;
+      return;
     }
-    if (!(price > 0)) continue;
+    if (!(price > 0)) return;
     for (const row of group) {
       if (!alertReached(row, price)) continue;
       const claimed = await PriceAlert.findOneAndUpdate(
@@ -144,7 +149,7 @@ async function checkAlerts(rows) {
       );
       fired.push(toAlert(claimed));
     }
-  }
+  });
   return fired;
 }
 

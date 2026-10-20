@@ -15,6 +15,7 @@ import {
 } from '../services/auth/accounts.js';
 import { reserveAttempts } from '../services/rate-window.js';
 import { endSubscriptionNow } from '../services/billing/subscriptions.js';
+import { detachRevokedMember } from '../services/admin/delete-member.js';
 import { iso } from '../models/helpers.js';
 import { createLogger, errorName } from '../services/logger.js';
 
@@ -291,6 +292,8 @@ export async function handleRevokeUser(req, res) {
         await endSubscriptionNow(invitation.authUserId).catch((error) =>
           log.error('subscription not cancelled after revoke', { error: errorName(error) }),
         );
+        // Stop background work for them too (broker quotes, push and Telegram alerts).
+        await detachRevokedMember(invitation.authUserId);
       } catch {
         log.error('sign-in ban incomplete after workspace revocation');
         res.status(502).json({

@@ -18,7 +18,7 @@ if (secret.length < 32) {
   process.exit(1);
 }
 
-const MAX_BATCHES = 50;
+const MAX_BATCHES = 400;
 // Each call handles one batch of members (each claimed for the day); repeat until none remain.
 for (let batch = 1; batch <= MAX_BATCHES; batch += 1) {
   const response = await fetch(`${base}/api/maintenance/daily-import`, {

@@ -49,7 +49,7 @@ export async function pushConfig(req, res) {
 
 /** POST /api/push/subscribe { subscription }: saves this browser for push; returns the device count. */
 export async function pushSubscribe(req, res) {
-  await push.subscribe(req.member.userId, req.body?.subscription, req.get('user-agent') ?? '');
+  await push.subscribe(req.member.userId, req.body?.subscription);
   res.status(201).json({ devices: await push.deviceCount(req.member.userId) });
 }
 
