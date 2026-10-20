@@ -12,11 +12,13 @@ import { AdminAuditLog, PlatformSetting } from '../../models/index.js';
 import { decryptSecret, encryptSecret } from '../crypto.js';
 import { HttpError } from '../errors.js';
 import { createLogger, errorName } from '../logger.js';
+import { loadPlan } from '../billing/plan.js';
 import { resetMailer } from '../mailer.js';
 import { PLATFORM_SETTINGS, settingDefinition } from './settings-registry.js';
 
 const log = createLogger('platform-settings');
 const REFRESH_MS = 60_000;
+const RAZORPAY_KEYS = ['RAZORPAY_KEY_ID', 'RAZORPAY_KEY_SECRET', 'RAZORPAY_WEBHOOK_SECRET'];
 
 /** The value each key had in .env before the panel overrode it (undefined = not set). */
 const envValues = new Map();
@@ -187,6 +189,15 @@ export async function savePlatformSettings(actor, changes) {
     if (!definition) throw new HttpError(`${key} cannot be changed from the admin panel.`, 400);
     return { definition, value: normalizeSettingValue(definition, raw) };
   });
+  // Without these keys webhooks fail and paying members silently drop to free.
+  const leavesPaymentsBroken = cleaned.some(({ definition: { key }, value }) => {
+    if (value !== null || !RAZORPAY_KEYS.includes(key)) return false;
+    const fallback = fromPanel.has(key) ? envValues.get(key) : process.env[key];
+    return !fallback?.trim();
+  });
+  if (leavesPaymentsBroken && (await loadPlan()).enabled) {
+    throw new HttpError('Switch billing off before removing the Razorpay keys.', 409);
+  }
   for (const { definition, value } of cleaned) {
     const key = definition.key;
     if (value === null) {

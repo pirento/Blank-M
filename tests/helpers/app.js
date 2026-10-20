@@ -5,7 +5,8 @@ import mongoose from 'mongoose';
 import { connectDatabase, disconnectDatabase } from '../../config/database.js';
 import { createApp } from '../../app.js';
 import { AllowedUser, User } from '../../models/index.js';
-import { hashPassword } from '../../services/auth/accounts.js';
+import { hashPassword, issueAdminSetupCode } from '../../services/auth/accounts.js';
+import { currentStep, totpCode } from '../../services/auth/totp.js';
 
 let server = null;
 
@@ -63,6 +64,23 @@ export async function signIn(app, { email, password }) {
     .send({ identifier: email, password });
   if (login.status !== 200) throw new Error(`login failed: ${login.status} ${login.text}`);
   return { agent, csrf: login.body.csrfToken };
+}
+
+/**
+ * Adds and verifies an authenticator for a signed-in session (`{ agent, csrf }` from signIn), so
+ * the session is aal2. Administrators get their one-time setup code straight from the service.
+ */
+export async function verifyAuthenticator(signedIn, user) {
+  const post = (path, body) =>
+    signedIn.agent.post(path).set('X-CSRF-Token', signedIn.csrf).send(body);
+  const setupCode = user.role === 'admin' ? await issueAdminSetupCode(user) : undefined;
+  const enrol = await post('/auth/mfa/enroll', { setupCode });
+  if (enrol.status !== 201) throw new Error(`enroll failed: ${enrol.status} ${enrol.text}`);
+  const verify = await post('/auth/mfa/verify', {
+    factorId: enrol.body.id,
+    code: totpCode(enrol.body.secret, currentStep()),
+  });
+  if (verify.status !== 200) throw new Error(`verify failed: ${verify.status} ${verify.text}`);
 }
 
 export { request, session };

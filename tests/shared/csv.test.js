@@ -350,3 +350,18 @@ describe('duplicate detection', () => {
     expect(lines.size).toBe(0);
   });
 });
+
+describe('CSV import fixes', () => {
+  it('reports source line numbers, keeps F&O segments and ignores "Order Type"', () => {
+    const text =
+      'Date,Symbol,Transaction Type,Order Type,Entry,Exit,Qty\n\n' +
+      '13-05-2026,INFY,BUY,MARKET,abc,2,1\n' +
+      '13-05-2026,NIFTY26OCT24500CE,BUY,LIMIT,100,120,75\n';
+    const parsed = parseCsv(text);
+    const mapping = guessMapping(parsed.headers);
+    expect(parsed.headers[mapping.type]).toBe('Transaction Type');
+    const { candidates, errors } = buildCandidates(parsed.rows, mapping);
+    expect(errors.map((error) => error.line)).toEqual([3]);
+    expect(candidates[0]).toMatchObject({ line: 4, segment: 'OPT', optionType: 'CE' });
+  });
+});

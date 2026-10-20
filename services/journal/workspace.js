@@ -501,8 +501,12 @@ const importTradeSchema = z
     notes: z.string().max(20000),
     strategyId: z.null(),
     createdAt: z.string().datetime(),
+    // F&O rows from a CSV (shared/csv.js); absent means equity.
+    segment: z.enum(['FUT', 'OPT']).optional(),
+    optionType: z.enum(['CE', 'PE']).optional(),
   })
-  .strict();
+  .strict()
+  .refine((trade) => trade.segment !== 'OPT' || trade.optionType, 'An option needs CE or PE.');
 
 export class ImportWriteError extends HttpError {
   constructor(message, outcome) {
@@ -555,6 +559,8 @@ export async function importTrade(userId, input) {
     charges: trade.charges,
     notes: trade.notes,
     createdAt: new Date(trade.createdAt),
+    segment: trade.segment ?? 'EQ',
+    optionType: trade.segment === 'OPT' ? (trade.optionType ?? null) : null,
   };
   try {
     await Trade.create(row);
@@ -570,7 +576,7 @@ export async function importTrade(userId, input) {
   const existing = await Trade.findOne({ _id: trade.id, userId }).lean();
   const matches =
     existing &&
-    ['strategyId', 'tradeDate', 'symbol', 'direction', 'notes'].every(
+    ['strategyId', 'tradeDate', 'symbol', 'direction', 'notes', 'segment'].every(
       (key) => existing[key] === row[key],
     ) &&
     ['entryPrice', 'exitPrice', 'quantity', 'grossPnl', 'charges'].every(

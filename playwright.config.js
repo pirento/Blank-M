@@ -36,6 +36,8 @@ export default defineConfig({
       E2E_MEMBERS: ['account', 'journal', 'plans', 'smoke', 'settings']
         .map((name) => `e2e-${name}@example.com`)
         .join(','),
+      // Keep in sync with MFA_ADMIN in tests/e2e/helpers.js.
+      E2E_MFA_ADMIN: 'e2e-mfa-admin@example.com:JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP',
     },
   },
 });

@@ -88,9 +88,11 @@ export function mountBilling() {
     // With billing off every feature is free, so there is nothing to show.
     if (!info.plan.enabled) return render(root);
     const { membership, plan, payments } = info;
+    // Any live Razorpay subscription can be cancelled, whatever gives Premium right now (a grant,
+    // the trial, or nothing while a failed charge is being retried).
     const renewing =
-      membership.state === 'active' ||
-      (membership.razorpayStatus === 'authenticated' && !membership.cancelAtPeriodEnd);
+      ['authenticated', 'active', 'pending'].includes(membership.razorpayStatus) &&
+      !membership.cancelAtPeriodEnd;
     const subscribe = button(
       state.busy ? 'Opening payment page…' : `Subscribe — ${rupees(plan.priceMonthly)}/month`,
       {

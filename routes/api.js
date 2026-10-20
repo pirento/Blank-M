@@ -76,7 +76,7 @@ router.all('/kite/authorize', premium.brokers, wrap(kite.authorize));
 router.all('/kite/callback', wrap(kite.callback));
 router.all('/kite/complete', wrap(kite.complete));
 router.all('/kite/status', wrap(kite.status));
-router.all('/kite/balance', wrap(kite.balance));
+router.all('/kite/balance', premium.brokers, wrap(kite.balance));
 router.all('/kite/portfolio', premium.brokers, wrap(kite.portfolio));
 router.all('/kite/fills', premium.brokers, wrap(kite.fills));
 router.all('/kite/fills/import', premium.brokers, wrap(kite.importFillsToJournal));
@@ -119,6 +119,7 @@ router.get('/admin/settings', requireApiAdmin, wrap(adminPanel.getSettings));
 router.put('/admin/settings', requireApiAdmin, requireAdminMfa, wrap(adminPanel.saveSettings));
 router.get('/admin/billing', requireApiAdmin, wrap(adminPanel.getBilling));
 router.put('/admin/billing', requireApiAdmin, requireAdminMfa, wrap(adminPanel.saveBilling));
+router.post('/admin/billing/check-keys', requireApiAdmin, wrap(adminPanel.checkRazorpayKeys));
 router.get('/admin/payments', requireApiAdmin, wrap(adminPanel.listPayments));
 router.get('/admin/memberships', requireApiAdmin, wrap(adminPanel.listMemberships));
 router.post(

@@ -44,6 +44,26 @@ for (const member of (process.env.E2E_MEMBERS || '').split(',').filter(Boolean))
     acceptedAt: new Date(),
   });
 }
+// End-to-end tests only: an administrator with a verified authenticator (E2E_MFA_ADMIN is
+// "email:base32-secret"), for admin actions that need one.
+if (process.env.E2E_MFA_ADMIN) {
+  const { encryptMfaSecret } = await import('../services/crypto.js');
+  const [mfaEmail, secret] = process.env.E2E_MFA_ADMIN.split(':');
+  const user = await User.create({
+    email: mfaEmail,
+    role: 'admin',
+    status: 'active',
+    passwordHash: await hashPassword(password),
+    emailConfirmedAt: new Date(),
+    factors: [{ status: 'verified', verifiedAt: new Date(), secret: encryptMfaSecret(secret) }],
+  });
+  await AllowedUser.create({
+    _id: mfaEmail,
+    role: 'admin',
+    authUserId: user._id,
+    acceptedAt: new Date(),
+  });
+}
 console.log(`In-memory workspace: sign in as ${email} / ${password}`);
 await import('../server.js');
 

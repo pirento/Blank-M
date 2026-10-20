@@ -3,6 +3,7 @@
  * emailed link exchange, setting a password and Google sign-in.
  */
 import { randomBytes } from 'node:crypto';
+import bcrypt from 'bcryptjs';
 import { AllowedUser, User } from '../models/index.js';
 import {
   accessProblem,
@@ -127,6 +128,15 @@ export async function setPassword(req, res) {
     (user.bannedUntil && user.bannedUntil > new Date())
   ) {
     throw new HttpError('Blank is invite-only. Ask your workspace administrator for access.', 403);
+  }
+  // Outside a recovery or activation link, a live session alone (an unattended browser, a stolen
+  // cookie) must not be enough to take the account over: ask for the current password.
+  const recovering = Boolean(req.session.auth?.passwordRecovery || req.session.auth?.activation);
+  if (!recovering && user.passwordHash) {
+    const current = String(req.body?.currentPassword ?? '');
+    if (!current || current.length > 128 || !(await bcrypt.compare(current, user.passwordHash))) {
+      throw new HttpError('Your current password is not correct.', 403);
+    }
   }
   await updatePassword(user, req.body?.password);
   // Other sessions authenticated with the old password are ended.

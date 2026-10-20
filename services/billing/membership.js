@@ -10,22 +10,55 @@
  *   trial running          → Premium ("trial")
  *   otherwise              → free features only ("free")
  */
-import { Subscription } from '../../models/index.js';
+import { Subscription, TrialClaim } from '../../models/index.js';
+import { sha256Hex } from '../crypto.js';
 import { HttpError } from '../errors.js';
 import { featureLabel, loadPlan } from './plan.js';
 
 const DAY_MS = 24 * 60 * 60_000;
+// Razorpay charges a renewal (and sends its webhook) some time after the paid month ends.
+// A renewing member keeps Premium this long past paidUntil so nothing stops in between.
+const RENEWAL_GRACE_MS = 2 * DAY_MS;
 const iso = (date) => (date ? new Date(date).toISOString() : null);
 const later = (date, now) => Boolean(date && new Date(date).getTime() > now);
+
+const GMAIL_DOMAINS = new Set(['gmail.com', 'googlemail.com']);
+
+/**
+ * The address a mailbox really is, so aliases count as one person: lower case, without a
+ * "+tag", and for Gmail without dots (a.b+x@gmail.com and ab@gmail.com are the same inbox).
+ */
+export function canonicalEmail(email) {
+  const [local = '', domain = ''] = String(email).trim().toLowerCase().split('@');
+  const name = local.split('+')[0];
+  return GMAIL_DOMAINS.has(domain) ? `${name.replaceAll('.', '')}@gmail.com` : `${name}@${domain}`;
+}
+
+/**
+ * Records this member's free trial; false when the same person (canonical email) already had
+ * one, e.g. under an alias or an account deleted since.
+ */
+async function claimTrial(user) {
+  const _id = sha256Hex(`trial\0${canonicalEmail(user.email)}`);
+  try {
+    await TrialClaim.create({ _id, userId: user._id });
+    return true;
+  } catch (error) {
+    if (error?.code !== 11000) throw error;
+    return Boolean(await TrialClaim.exists({ _id, userId: user._id }));
+  }
+}
 
 /**
  * The member's Subscription row, created on first sight with the trial starting
  * now (so members who existed before billing was switched on get a full trial).
+ * Only one trial per person: an alias of an address that already had one starts free.
  */
 async function subscriptionFor(user, plan, now) {
   const existing = await Subscription.findById(user._id).lean();
   if (existing) return existing;
-  const trialEndsAt = plan.trialDays > 0 ? new Date(now + plan.trialDays * DAY_MS) : null;
+  const trialEndsAt =
+    plan.trialDays > 0 && (await claimTrial(user)) ? new Date(now + plan.trialDays * DAY_MS) : null;
   try {
     await Subscription.create({ _id: user._id, trialEndsAt });
   } catch (error) {
@@ -50,14 +83,19 @@ export function computeMembership(plan, user, sub, now = Date.now()) {
     razorpayStatus: sub?.razorpayStatus ?? null,
     cancelAtPeriodEnd: Boolean(sub?.cancelAtPeriodEnd),
   };
+  const renewing = ['active', 'pending'].includes(sub?.razorpayStatus) && !sub?.cancelAtPeriodEnd;
+  const paidEnds =
+    sub?.paidUntil && renewing
+      ? new Date(new Date(sub.paidUntil).getTime() + RENEWAL_GRACE_MS)
+      : sub?.paidUntil;
   // The latest of the three dates is when Premium ends.
-  const ends = [sub?.grantUntil, sub?.paidUntil, sub?.trialEndsAt]
+  const ends = [sub?.grantUntil, paidEnds, sub?.trialEndsAt]
     .filter((date) => later(date, now))
     .map((date) => new Date(date).getTime());
   const endsAt = ends.length ? Math.max(...ends) : null;
   const state = later(sub?.grantUntil, now)
     ? 'granted'
-    : later(sub?.paidUntil, now)
+    : later(paidEnds, now)
       ? sub.cancelAtPeriodEnd
         ? 'cancelled'
         : 'active'

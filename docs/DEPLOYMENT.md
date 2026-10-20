@@ -103,7 +103,10 @@ sudo certbot --nginx -d blank.example.com
 Point your domain's **A record** to the VPS IP before running certbot. If the repository is private,
 clone it with a GitHub personal access token or a deploy key.
 
-**Updating:** `cd /srv/blank && git pull && pnpm install --frozen-lockfile --prod && pnpm run build && pm2 reload pirento-blank`
+**Updating:** back up first (`bash deploy/backup-mongo.sh`; re-running `deploy/setup-vps.sh` does
+this for you), then `cd /srv/blank && git pull && pnpm install --frozen-lockfile --prod && pnpm run build && pm2 reload pirento-blank`.
+New versions can add retention (TTL) indexes that delete old rows on first start (see
+docs/DATABASE.md), and the backup is the only way back.
 
 ## B. Docker Compose
 
@@ -138,6 +141,8 @@ Copy `deploy/crontab.example` into `crontab -e` and adjust the path:
 
 - **Daily** — `node scripts/maintenance-voice-notes.js` removes temporary voice-note uploads older
   than 24 hours.
+- **Daily** — `node scripts/maintenance-signups.js` deletes public sign-ups whose email was never
+  confirmed within 7 days (connects to MongoDB directly; admin invitations are never touched).
 - **Monday morning** — `node scripts/send-weekly-reports.js` emails last week's report to members who
   opted in (Settings → Email reports). Each member gets one email per week; re-running is safe.
 

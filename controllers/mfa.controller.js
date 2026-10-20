@@ -8,7 +8,13 @@ import { decryptMfaSecret, encryptMfaSecret } from '../services/crypto.js';
 import { generateTotpSecret, otpauthUri, verifyTotp } from '../services/auth/totp.js';
 import { HttpError } from '../services/errors.js';
 import { reserveAttempts } from '../services/rate-window.js';
-import { accessProblem, revokeUserSessions } from '../services/auth/accounts.js';
+import {
+  accessProblem,
+  consumeAdminSetupCode,
+  emailAdminSetupCode,
+  revokeUserSessions,
+} from '../services/auth/accounts.js';
+import { isMailConfigured } from '../services/mailer.js';
 
 const CODE_FAILED =
   'The code could not be verified. Use the latest code from your authenticator and try again.';
@@ -82,11 +88,51 @@ export async function listFactors(req, res) {
   res.json({ all: user.factors.map(publicFactor), aal: req.auth.session.aal });
 }
 
-/** Begin authenticator setup. Adding a factor to a protected account requires aal2. */
+/** An administrator who has no authenticator yet: adding the first one needs a setup code. */
+const needsSetupCode = (user) => user.role === 'admin' && !user.hasVerifiedFactor();
+
+/**
+ * POST /auth/mfa/admin-code: emails a one-time setup code to an administrator who has no
+ * authenticator yet. Without email the code comes from the server: scripts/admin-setup-code.js.
+ */
+export async function sendAdminSetupCode(req, res) {
+  const user = await signedInUser(req);
+  if (!needsSetupCode(user)) throw new HttpError('No setup code is needed for this account.', 400);
+  if (!isMailConfigured()) {
+    throw new HttpError(
+      'Email is not set up, so get the code on the server: node scripts/admin-setup-code.js your@email',
+      503,
+    );
+  }
+  const quota = await reserveAttempts([{ key: `mfa-code:${user._id}`, limit: 3 }], 60 * 60_000);
+  if (!quota.allowed) {
+    throw new HttpError('Too many codes requested. Wait an hour and try again.', 429, {
+      retryAfter: quota.retryAfterSeconds,
+    });
+  }
+  await emailAdminSetupCode(user);
+  res.json({ sent: true });
+}
+
+/**
+ * Begin authenticator setup. Adding a factor to a protected account requires aal2; an
+ * administrator's first factor requires a setup code ({ setupCode }), so a stolen password alone
+ * cannot add one.
+ */
 export async function enroll(req, res) {
   const user = await signedInUser(req);
   if (user.hasVerifiedFactor() && req.auth.session.aal !== 'aal2') {
     throw new HttpError('Complete authenticator verification to continue.', 403);
+  }
+  if (needsSetupCode(user)) {
+    await limitCodes(user._id);
+    if (!(await consumeAdminSetupCode(user, req.body?.setupCode))) {
+      throw new HttpError(
+        'Administrators need a setup code to add their first authenticator.',
+        403,
+        { code: 'admin_setup_code_required' },
+      );
+    }
   }
   if (user.factors.filter((factor) => factor.status === 'unverified').length >= 3) {
     throw new HttpError('Finish or remove unfinished authenticator setup first.', 409);
@@ -120,6 +166,16 @@ export async function enroll(req, res) {
 /** Verify an enrollment or complete the sign-in challenge; either way the session becomes aal2. */
 export async function verify(req, res) {
   const user = await signedInUser(req);
+  // Finishing a new authenticator on a protected account needs aal2, like starting one: otherwise
+  // a setup someone left unfinished (e.g. with a stolen password) would pass the sign-in check.
+  const pending = user.factors.find((item) => item._id === req.body?.factorId);
+  if (
+    pending?.status === 'unverified' &&
+    user.hasVerifiedFactor() &&
+    req.auth.session.aal !== 'aal2'
+  ) {
+    throw new HttpError('Complete authenticator verification to continue.', 403);
+  }
   const factor = await checkCode(user, req.body?.factorId, req.body?.code);
   if (factor.status === 'unverified') {
     await User.updateOne(

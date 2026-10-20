@@ -48,6 +48,8 @@ export function mountMfa() {
     busy: false,
     error: '',
     enrollment: null,
+    // Administrators adding a first authenticator: { sent, message } while asking for the setup code.
+    setupCode: null,
     removing: null,
     backupAccepted: false,
   };
@@ -84,12 +86,31 @@ export function mountMfa() {
     }
   }
 
-  const enroll = () =>
+  const enroll = (setupCode) =>
     run(async () => {
-      const result = await api('/auth/mfa/enroll', { method: 'POST', body: {} });
-      state.enrollment = { id: result.id, secret: result.secret, qrCode: result.qrCode };
-      state.backupAccepted = false;
-    }, 'Authenticator setup could not start. Check your connection and try again.');
+      try {
+        const result = await api('/auth/mfa/enroll', { method: 'POST', body: { setupCode } });
+        state.enrollment = { id: result.id, secret: result.secret, qrCode: result.qrCode };
+        state.setupCode = null;
+        state.backupAccepted = false;
+      } catch (error) {
+        // An administrator's first authenticator needs a one-time code: ask for it.
+        if (error?.payload?.code !== 'admin_setup_code_required') throw error;
+        if (state.setupCode) throw new Error();
+        state.setupCode = { sent: false, message: '' };
+      }
+    }, 'Authenticator setup could not start. Check the code or your connection and try again.');
+
+  const sendSetupCode = () =>
+    run(async () => {
+      try {
+        await api('/auth/mfa/admin-code', { method: 'POST', body: {} });
+        state.setupCode = { sent: true, message: 'A setup code was sent to your email.' };
+      } catch (error) {
+        // No email on this server: the message says how to get the code on the server.
+        state.setupCode = { sent: false, message: errorMessage(error, 'The code was not sent.') };
+      }
+    }, 'The code could not be sent. Try again.');
 
   const discard = (factorId) =>
     run(async () => {
@@ -108,7 +129,52 @@ export function mountMfa() {
     const verified = state.factors.filter((factor) => factor.status === 'verified');
     const body = [h('p', { class: 'text-sm leading-relaxed text-muted' }, RECOVERY_NOTE)];
     if (state.loading) body.push(statusLine(t('Checking authenticators…')));
-    else if (state.enrollment) {
+    else if (state.setupCode) {
+      const field = input({
+        id: 'mfa-setup-code',
+        inputmode: 'numeric',
+        autocomplete: 'one-time-code',
+        pattern: '[0-9]{8}',
+        maxlength: '8',
+        placeholder: t('8-digit setup code'),
+        required: true,
+        disabled: state.busy,
+      });
+      const form = h(
+        'form',
+        { class: 'space-y-4' },
+        h(
+          'p',
+          { class: 'text-sm' },
+          'Administrators need a one-time setup code to add their first authenticator, so a stolen password alone cannot add one. Get it by email, or on the server with: node scripts/admin-setup-code.js your@email',
+        ),
+        h('div', { class: 'space-y-2' }, label(t('Setup code'), 'mfa-setup-code'), field),
+        state.setupCode.message ? statusLine(state.setupCode.message) : null,
+        h(
+          'div',
+          { class: 'flex flex-wrap gap-3' },
+          button(t('Continue'), { type: 'submit', disabled: state.busy }),
+          button(state.setupCode.sent ? t('Email a new code') : t('Email me a code'), {
+            variant: 'outline',
+            disabled: state.busy,
+            onclick: () => void sendSetupCode(),
+          }),
+          button(t('Cancel'), {
+            variant: 'outline',
+            disabled: state.busy,
+            onclick: () => {
+              state.setupCode = null;
+              paint();
+            },
+          }),
+        ),
+      );
+      form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        if (/^\d{8}$/.test(field.value.trim())) void enroll(field.value.trim());
+      });
+      body.push(form);
+    } else if (state.enrollment) {
       let code = '';
       const submit = button(state.busy ? 'Verifying…' : 'Enable authenticator', {
         type: 'submit',

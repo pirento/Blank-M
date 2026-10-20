@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
-import { MEMBERS, apiRequest, signIn, unique } from './helpers.js';
+import { MEMBERS, apiRequest, signIn, signInWithAuthenticator, unique } from './helpers.js';
 
 test('charge rates persist and a backup downloads and restores', async ({ page }) => {
   await signIn(page, MEMBERS.account);
@@ -38,7 +38,8 @@ test('invite a member with a private link, then reset their password and suspend
   browser,
 }) => {
   const email = `member-${unique()}@example.com`;
-  await signIn(page);
+  // Reset links and suspending need an administrator who has verified an authenticator.
+  await signInWithAuthenticator(page);
   await page.goto('/admin/members');
   await page.fill('#manual-invite-email', email);
   await page.getByRole('button', { name: 'Create private invitation' }).click();

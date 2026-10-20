@@ -24,9 +24,24 @@ async function verifiedConnection(userId) {
 }
 
 /**
- * One form-encoded POST to Kite. A transport failure is reported with
- * `outcome: 'unknown'`, because the request may still have reached Zerodha.
- * `what` names the request in messages ("order", "GTT").
+ * The error for a request whose result we cannot know: it may still have reached Zerodha, so it
+ * must not be treated as rejected (that would let the same real order be sent again).
+ */
+function unknownOutcome(what) {
+  const error = new MarketDataError(
+    what === 'order'
+      ? 'The order outcome is unknown. Check your Zerodha order book before trying again.'
+      : `The ${what} outcome is unknown. Check your Zerodha GTT list before trying again.`,
+    504,
+  );
+  error.outcome = 'unknown';
+  return error;
+}
+
+/**
+ * One form-encoded POST to Kite. A transport failure, a Kite server error (5xx) or an unreadable
+ * answer is reported with `outcome: 'unknown'`, because the request may still have reached
+ * Zerodha. `what` names the request in messages ("order", "GTT").
  */
 async function kitePost(userId, connection, path, fields, what) {
   const controller = new AbortController();
@@ -45,14 +60,7 @@ async function kitePost(userId, connection, path, fields, what) {
       body: new URLSearchParams(fields),
     });
   } catch {
-    const error = new MarketDataError(
-      what === 'order'
-        ? 'The order outcome is unknown. Check your Zerodha order book before trying again.'
-        : `The ${what} outcome is unknown. Check your Zerodha GTT list before trying again.`,
-      504,
-    );
-    error.outcome = 'unknown';
-    throw error;
+    throw unknownOutcome(what);
   } finally {
     clearTimeout(timer);
   }
@@ -60,6 +68,7 @@ async function kitePost(userId, connection, path, fields, what) {
     await throwAuthFailure(response, userId, connection);
   }
   const payload = await response.json().catch(() => null);
+  if (response.status >= 500 || !payload) throw unknownOutcome(what);
   if (!response.ok || payload?.status !== 'success') {
     // Kite's own message explains rejections such as margin or circuit limits.
     const message = typeof payload?.message === 'string' ? payload.message.slice(0, 300) : null;
@@ -95,8 +104,8 @@ export async function placeKiteLimitOrder(userId, order) {
     },
     'order',
   );
-  if (typeof data?.order_id !== 'string')
-    throw new MarketDataError('Zerodha returned no order ID.', 502);
+  // Accepted but no ID: the order may exist, so its outcome is unknown, not rejected.
+  if (typeof data?.order_id !== 'string') throw unknownOutcome('order');
   return { orderId: data.order_id };
 }
 
@@ -156,7 +165,7 @@ export async function placeKiteGtt(userId, { symbol, side, product, quantity, la
   );
   const triggerId = data?.trigger_id;
   if (!Number.isSafeInteger(triggerId) && typeof triggerId !== 'string') {
-    throw new MarketDataError('Zerodha returned no GTT ID.', 502);
+    throw unknownOutcome('GTT');
   }
   return { triggerId: String(triggerId) };
 }

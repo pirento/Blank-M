@@ -39,7 +39,8 @@ for (let batch = 1; batch <= MAX_BATCHES; batch += 1) {
   totals.sent += payload.sent;
   totals.skipped += payload.skipped;
   totals.failed += payload.failed;
-  if (!payload.moreMayRemain || payload.sent === 0) break;
+  // Every member in a batch is claimed for the week, so each batch moves on to new members.
+  if (!payload.moreMayRemain) break;
 }
 console.log(
   `Weekly reports: ${totals.sent} sent, ${totals.skipped} skipped, ${totals.failed} failed.`,

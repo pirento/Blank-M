@@ -4,7 +4,8 @@
 #   sudo bash deploy/setup-vps.sh blank.example.com you@example.com
 # Installs Node.js 22, pnpm, PM2, Nginx, Certbot and MongoDB 8, copies the code
 # to /srv/blank, creates .env with fresh secrets, builds, starts the app and
-# requests an HTTPS certificate. Safe to re-run: existing .env is kept.
+# requests an HTTPS certificate. Safe to re-run: existing .env is kept, and on an
+# existing install the database is backed up before the new code goes in.
 set -euo pipefail
 
 DOMAIN="${1:?Usage: sudo bash deploy/setup-vps.sh <domain> <email>}"
@@ -42,6 +43,14 @@ echo "==> Firewall: SSH and web only (the app and MongoDB stay on localhost)"
 ufw allow OpenSSH
 ufw allow 'Nginx Full'
 ufw --force enable
+
+# Updating an existing install: back up the database first. A new version can add retention
+# (TTL) indexes that delete old rows on first start, so a copy from just before is kept.
+if [ -f "$APP_DIR/.env" ] && [ -f "$APP_DIR/deploy/backup-mongo.sh" ]; then
+  echo "==> Backup before updating"
+  sudo -u "$APP_USER" bash "$APP_DIR/deploy/backup-mongo.sh" ||
+    { echo "!! Backup failed. Fix it (df -h /, mongod running?) before updating."; exit 1; }
+fi
 
 echo "==> Code in ${APP_DIR}"
 mkdir -p "$APP_DIR"

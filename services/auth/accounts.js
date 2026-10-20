@@ -3,7 +3,7 @@
  * and username sign-in with rate limits, sessions and signed-in devices,
  * activation and password recovery links.
  */
-import { createHmac, randomBytes, randomUUID } from 'node:crypto';
+import { createHmac, randomBytes, randomInt, randomUUID } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import {
@@ -26,6 +26,7 @@ const INVALID = 'That username or email and password are not recognised.';
 const ACCESS_DENIED = 'This account no longer has access to the workspace.';
 const RECOVERY_TTL_MS = 60 * 60_000;
 export const ACTIVATION_TTL_MS = 24 * 60 * 60_000;
+const ADMIN_SETUP_TTL_MS = 15 * 60_000;
 
 // A fixed hash compared for unknown identities so a missing account does not
 // return measurably faster than a wrong password.
@@ -365,6 +366,94 @@ export async function signUp(email, clientAddress) {
     return;
   }
   await sendActivationEmail(account, { selfSignup: true });
+}
+
+/**
+ * Removes public sign-ups whose email was never confirmed after `days` days (the link lasts 24
+ * hours), so typos and abandoned sign-ups do not pile up. Admin invitations are left alone, and so
+ * is anyone holding a still-valid activation link. Returns how many were removed.
+ */
+export async function deleteUnconfirmedSignups({ days = 7, now = new Date() } = {}) {
+  const before = new Date(now.getTime() - days * 24 * 60 * 60_000);
+  const stale = await AllowedUser.find(
+    { invitedBy: null, acceptedAt: null, invitedAt: { $lt: before }, authUserId: { $ne: null } },
+    { authUserId: 1 },
+  )
+    .limit(1000)
+    .lean();
+  let removed = 0;
+  for (const row of stale) {
+    const linkStillValid = await AuthToken.exists({
+      userId: row.authUserId,
+      purpose: 'activate',
+      usedAt: null,
+      expiresAt: { $gt: now },
+    });
+    if (linkStillValid) continue;
+    // Conditional: someone confirming right now keeps their account.
+    const gone = await User.deleteOne({
+      _id: row.authUserId,
+      role: 'member',
+      emailConfirmedAt: null,
+      passwordHash: null,
+    });
+    if (!gone.deletedCount) continue;
+    await AllowedUser.deleteOne({ _id: row._id, authUserId: row.authUserId, acceptedAt: null });
+    removed += 1;
+  }
+  return removed;
+}
+
+/* ------------------------- first authenticator for an administrator ------------------------- */
+// A stolen admin password alone must not be enough to add an authenticator (which unlocks every
+// admin change). So an administrator without one first needs a one-time code that only the real
+// owner can get: by email, or from the server itself (scripts/admin-setup-code.js).
+
+// The user id is part of the hash: two administrators can get the same 8 digits.
+const setupCodeHash = (userId, code) => sha256Hex(`admin-mfa\0${userId}\0${code}`);
+
+/** A new 8-digit, 15-minute setup code for this administrator; earlier unused codes stop working. */
+export async function issueAdminSetupCode(user) {
+  const code = String(randomInt(0, 100_000_000)).padStart(8, '0');
+  await AuthToken.updateMany(
+    { userId: user._id, purpose: 'admin-mfa', usedAt: null },
+    { $set: { usedAt: new Date() } },
+  );
+  await AuthToken.create({
+    tokenHash: setupCodeHash(user._id, code),
+    purpose: 'admin-mfa',
+    userId: user._id,
+    email: user.email,
+    expiresAt: new Date(Date.now() + ADMIN_SETUP_TTL_MS),
+  });
+  return code;
+}
+
+/** Emails a setup code to the administrator (callers check isMailConfigured first). */
+export async function emailAdminSetupCode(user) {
+  const code = await issueAdminSetupCode(user);
+  await sendMail({
+    to: user.email,
+    subject: 'Your Pirento Blank authenticator setup code',
+    text: `Someone signed in to your administrator account and wants to add an authenticator.\n\nSetup code (valid 15 minutes): ${code}\n\nIf this was not you, change your password now: someone knows it.`,
+  });
+}
+
+/** Uses up a setup code; true only for this administrator's latest unexpired, unused code. */
+export async function consumeAdminSetupCode(user, code) {
+  if (!/^\d{8}$/.test(String(code ?? ''))) return false;
+  const now = new Date();
+  const record = await AuthToken.findOneAndUpdate(
+    {
+      tokenHash: setupCodeHash(user._id, String(code)),
+      purpose: 'admin-mfa',
+      userId: user._id,
+      usedAt: null,
+      expiresAt: { $gt: now },
+    },
+    { $set: { usedAt: now } },
+  );
+  return Boolean(record);
 }
 
 /** Consume a single-use emailed link and return its account. */

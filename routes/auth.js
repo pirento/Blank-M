@@ -19,6 +19,7 @@ router.get('/google', auth.googleStart);
 router.get('/google/callback', wrap(auth.googleCallback));
 
 router.get('/mfa/factors', wrap(mfa.listFactors));
+router.post('/mfa/admin-code', wrap(mfa.sendAdminSetupCode));
 router.post('/mfa/enroll', wrap(mfa.enroll));
 router.post('/mfa/verify', wrap(mfa.verify));
 router.post('/mfa/unenroll', wrap(mfa.unenroll));

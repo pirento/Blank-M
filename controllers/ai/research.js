@@ -61,6 +61,8 @@ export async function handlePicks(req, res) {
       res.status(200).json(researchResult(existing));
       return;
     }
+    // Before anything is stored: a member over the limit must not fill the database with runs.
+    await enforceAiRateLimit(user.id);
     const universe = await loadResearchUniverse();
     const { analysisModel } = await resolveAiConfig();
     const allowedSymbols = new Set(
@@ -97,7 +99,6 @@ For each, return an allowed NSE symbol, a concise reason, a detailed news explan
       return;
     }
     pending = { userId: user.id, requestId: body.requestId };
-    await enforceAiRateLimit(user.id);
     if (Date.now() >= Date.parse(universe.metadata.expiresAt))
       throw new ResearchUniverseError(
         'The verified constituent snapshot expired before the model request could start. Run a new analysis to refresh it.',

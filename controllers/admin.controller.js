@@ -14,6 +14,7 @@ import {
   sendActivationEmail,
 } from '../services/auth/accounts.js';
 import { reserveAttempts } from '../services/rate-window.js';
+import { endSubscriptionNow } from '../services/billing/subscriptions.js';
 import { iso } from '../models/helpers.js';
 import { createLogger, errorName } from '../services/logger.js';
 
@@ -229,6 +230,8 @@ export async function handleCreateResetLink(req, res) {
   if (!requireMethod(req, res, 'POST')) return;
   try {
     const admin = await requireAdmin(req);
+    // A reset link takes over a member's account: a stolen admin password alone must not do it.
+    assertAdminStepUp(req);
     await requireAccessAdmin(admin.user.id);
     const body = emailBodySchema.parse(readJsonBody(req));
     const quota = await reserveAttempts(
@@ -260,6 +263,7 @@ export async function handleRevokeUser(req, res) {
   if (!requireMethod(req, res, 'POST')) return;
   try {
     const admin = await requireAdmin(req);
+    assertAdminStepUp(req);
     const body = revokeSchema.parse(readJsonBody(req));
     if (body.userId === admin.user.id) {
       throw new AdminContractError('You cannot revoke your own administrator account.', 400);
@@ -283,6 +287,10 @@ export async function handleRevokeUser(req, res) {
           { $set: { status: 'revoked', bannedUntil: FAR_FUTURE } },
         );
         await revokeUserSessions(invitation.authUserId);
+        // A revoked member can no longer cancel, so stop their Razorpay renewals here.
+        await endSubscriptionNow(invitation.authUserId).catch((error) =>
+          log.error('subscription not cancelled after revoke', { error: errorName(error) }),
+        );
       } catch {
         log.error('sign-in ban incomplete after workspace revocation');
         res.status(502).json({

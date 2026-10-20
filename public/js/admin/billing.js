@@ -37,6 +37,19 @@ function checkbox(id, checked, text, hint) {
   };
 }
 
+/** Asks the server to try the saved Razorpay keys and shows the answer. */
+async function checkKeys() {
+  try {
+    const result = await api('/api/admin/billing/check-keys', { method: 'POST', body: {} });
+    notify(
+      `Razorpay accepted the keys (${result.mode} mode).${result.webhookSecretSet ? '' : ' Add the webhook secret too.'}`,
+      result.webhookSecretSet ? 'success' : 'info',
+    );
+  } catch (error) {
+    notify(errorMessage(error, 'Razorpay could not be checked.'), 'error');
+  }
+}
+
 function planCard() {
   const { plan, allFeatures, razorpayConfigured, webhookUrl } = state.billing;
   const enabled = checkbox(
@@ -83,6 +96,8 @@ function planCard() {
             badge('Razorpay set up', 'positive'),
             ' Webhook URL for Razorpay (events: subscription.*, payment.failed): ',
             h('code', { class: 'break-all' }, webhookUrl ?? 'set APP_URL in .env'),
+            ' ',
+            button('Check keys', { variant: 'outline', size: 'sm', onclick: checkKeys }),
           )
         : h(
             'p',

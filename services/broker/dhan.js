@@ -10,6 +10,7 @@ import { HttpError } from '../errors.js';
 import { createLogger, errorName } from '../logger.js';
 import { MAX_ROWS, brokerRequest } from './broker-api.js';
 import { brokerTradingDate } from './portfolio.js';
+import { NSE_HOLIDAYS } from '../../shared/market.js';
 
 const log = createLogger('dhan');
 const API_BASE = 'https://api.dhan.co/v2';
@@ -131,10 +132,10 @@ const WEEKLY_MONTHS = '123456789OND';
  * day, so two expiries of one strike stay separate positions).
  */
 export function contractSymbol(trade) {
-  const base = String(trade.tradingSymbol ?? '')
-    .split('-')[0]
-    .trim()
-    .toUpperCase();
+  // Dhan writes BAJAJ-AUTO-Oct2026-FUT: drop only the "-Oct2026-…" part, since the underlying
+  // itself can contain a hyphen. A plain underlying (from other brokers) is kept whole.
+  const raw = String(trade.tradingSymbol ?? '').trim();
+  const base = (/^(.+?)-[A-Za-z]{3}\d{4}(?:-|$)/.exec(raw)?.[1] ?? raw).toUpperCase();
   const expiry = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(trade.drvExpiryDate ?? ''));
   if (!base || !expiry) return null;
   const [, year, month, day] = expiry.map(Number);
@@ -144,10 +145,15 @@ export function contractSymbol(trade) {
   const strike = Number(trade.drvStrikePrice);
   if (!(strike > 0)) return null;
   const kind = trade.drvOptionType === 'CALL' ? 'CE' : 'PE';
-  // The month's last expiry is the monthly contract; no later expiry fits in the same month.
+  // The month's last expiry is the monthly contract; no later expiry fits in the same month. An
+  // expiry moved earlier by a holiday counts from its scheduled day (the holidays right after it).
   const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const isoDay = (value) =>
+    `${year}-${String(month).padStart(2, '0')}-${String(value).padStart(2, '0')}`;
+  let scheduled = day;
+  while (scheduled < daysInMonth && NSE_HOLIDAYS.has(isoDay(scheduled + 1))) scheduled += 1;
   const prefix =
-    day + 7 > daysInMonth
+    scheduled + 7 > daysInMonth
       ? monthly
       : `${base}${yy}${WEEKLY_MONTHS[month - 1]}${String(day).padStart(2, '0')}`;
   return `${prefix}${strike}${kind}`;

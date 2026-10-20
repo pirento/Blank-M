@@ -18,7 +18,7 @@ import { isMailConfigured } from '../services/mailer.js';
 import { isKiteConfigured } from '../services/market/index.js';
 import { isTelegramConfigured } from '../services/telegram/api.js';
 import { isPushConfigured } from '../services/notifications/push.js';
-import { isRazorpayConfigured } from '../services/billing/razorpay.js';
+import { checkKeys, isRazorpayConfigured } from '../services/billing/razorpay.js';
 import { PREMIUM_FEATURES, loadPlan, publicPlan, savePlan } from '../services/billing/plan.js';
 import {
   billingMetrics,
@@ -179,6 +179,21 @@ export async function getBilling(_req, res) {
     allFeatures: PREMIUM_FEATURES,
     razorpayConfigured: isRazorpayConfigured(),
     webhookUrl: env.appUrl ? `${new URL(env.appUrl).origin}/api/billing/razorpay/webhook` : null,
+  });
+}
+
+/**
+ * POST /api/admin/billing/check-keys: asks Razorpay whether the saved keys work (a read-only
+ * call), so a typo shows up here instead of at a member's checkout.
+ */
+export async function checkRazorpayKeys(_req, res) {
+  if (!isRazorpayConfigured())
+    throw new HttpError('Add the Razorpay key id and secret first.', 409);
+  const { mode } = await checkKeys();
+  res.json({
+    ok: true,
+    mode,
+    webhookSecretSet: Boolean(process.env.RAZORPAY_WEBHOOK_SECRET?.trim()),
   });
 }
 

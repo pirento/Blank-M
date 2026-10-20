@@ -67,6 +67,7 @@ Common browser helpers live in `public/js/core/` (`dom.js` element builder, card
 | Sign-in, sessions, password reset                    | `services/auth/accounts.js`, `controllers/auth.controller.js`                                                              |
 | Authenticator (MFA)                                  | `services/auth/totp.js`, `controllers/mfa.controller.js`                                                                   |
 | Admin panel pages and API keys                       | `routes/admin.js`, `controllers/admin-panel.controller.js`, `services/platform/`, `public/js/admin/`                       |
+| Terms, Privacy, Refund, Contact pages                | `views/pages/legal.ejs`, `pages.controller.js` (`legal`), business details in the registry                                 |
 | Premium plan, trial, payments, feature gates         | `services/billing/`, `controllers/billing.controller.js`, `routes/api.js` (`premium.*`)                                    |
 | Invitations and member access                        | `controllers/admin.controller.js`, `services/admin/`                                                                       |
 | Trades, strategies, rules, watchlist storage         | `services/journal/workspace.js`, `controllers/workspace.controller.js`                                                     |
@@ -168,6 +169,7 @@ Common browser helpers live in `public/js/core/` (`dom.js` element builder, card
 | `Payment.js`          | Razorpay payments.                                                                                 |
 | `PlatformSetting.js`  | Admin panel settings: API keys (encrypted) and the Premium plan.                                   |
 | `Subscription.js`     | A member's trial, paid period and admin grant.                                                     |
+| `TrialClaim.js`       | One free trial per person (digest of the canonical email).                                         |
 | `Ai.js`               | AI models                                                                                          |
 | `AllowedUser.js`      | The invite-only allowlist.                                                                         |
 | `AuthToken.js`        | Single-use emailed links                                                                           |
@@ -397,6 +399,8 @@ The admin panel's browser modules (one per page in `views/admin/`, plus `shell.j
 | File                         | What it does                                         |
 | ---------------------------- | ---------------------------------------------------- |
 | `create-admin.js`            | Bootstrap the first administrator.                   |
+| `admin-setup-code.js`        | Code for an admin's first authenticator (no email).  |
+| `maintenance-signups.js`     | Daily: delete sign-ups unconfirmed after 7 days.     |
 | `dev-memory.js`              | Local preview without installing MongoDB             |
 | `daily-import.js`            | Scheduled daily automatic journal (after the close). |
 | `premarket-plan.js`          | Scheduled pre-market plan on Telegram (08:45 IST).   |

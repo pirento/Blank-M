@@ -45,6 +45,10 @@ beforeEach(async () => {
     const path = String(url).replace('https://api.razorpay.com/v1', '');
     razorpay.calls.push({ path, body: options.body ? JSON.parse(options.body) : null });
     if (path === '/plans') return Response.json({ id: 'plan_test1' });
+    if (path === '/plans?count=1') return Response.json({ items: [] });
+    if (path === '/subscriptions/sub_test1/cancel') {
+      return Response.json({ id: 'sub_test1', status: 'cancelled', paid_count: 1 });
+    }
     if (path === '/subscriptions') {
       return Response.json({
         id: 'sub_test1',
@@ -66,7 +70,11 @@ async function adminSession({ mfa = true } = {}) {
   const send = (method, path, body) =>
     session.agent[method](path).set('X-CSRF-Token', session.csrf).send(body);
   if (mfa) {
-    const enrol = await send('post', '/auth/mfa/enroll', {});
+    // An administrator's first authenticator needs the emailed setup code.
+    expect((await send('post', '/auth/mfa/admin-code', {})).status).toBe(200);
+    const setupCode = mails.at(-1).text.match(/\b\d{8}\b/)[0];
+    const enrol = await send('post', '/auth/mfa/enroll', { setupCode });
+    expect(enrol.status).toBe(201);
     await send('post', '/auth/mfa/verify', {
       factorId: enrol.body.id,
       code: totpCode(enrol.body.secret, currentStep()),
@@ -162,6 +170,24 @@ describe('admin panel', () => {
     await admin.send('put', '/api/admin/settings', { changes: { OPENAI_API_KEY: '' } });
     expect(process.env.OPENAI_API_KEY).toBeUndefined();
   });
+
+  it('needs a one-time setup code before an administrator adds a first authenticator', async () => {
+    const admin = await adminSession({ mfa: false });
+    const noCode = await admin.send('post', '/auth/mfa/enroll', {});
+    expect(noCode.status).toBe(403);
+    expect(noCode.body.code).toBe('admin_setup_code_required');
+    expect((await admin.send('post', '/auth/mfa/admin-code', {})).status).toBe(200);
+    const code = mails.at(-1).text.match(/\b\d{8}\b/)[0];
+    const wrong = code === '00000000' ? '00000001' : '00000000';
+    expect((await admin.send('post', '/auth/mfa/enroll', { setupCode: wrong })).status).toBe(403);
+    expect((await admin.send('post', '/auth/mfa/enroll', { setupCode: code })).status).toBe(201);
+    // Single use.
+    expect((await admin.send('post', '/auth/mfa/enroll', { setupCode: code })).status).toBe(403);
+
+    // Members need no code.
+    const member = await memberSession();
+    expect((await member.send('post', '/auth/mfa/admin-code', {})).status).toBe(400);
+  });
 });
 
 describe('Premium', () => {
@@ -182,6 +208,12 @@ describe('Premium', () => {
     const admin = await adminSession();
     const refused = await admin.send('put', '/api/admin/billing', { enabled: true });
     expect(refused.status).toBe(409);
+    expect((await admin.send('post', '/api/admin/billing/check-keys', {})).status).toBe(409);
+    await admin.send('put', '/api/admin/settings', {
+      changes: { RAZORPAY_KEY_ID: 'rzp_test_abcdefgh123', RAZORPAY_KEY_SECRET: 'secret-value' },
+    });
+    const checked = await admin.send('post', '/api/admin/billing/check-keys', {});
+    expect(checked.body).toEqual({ ok: true, mode: 'test', webhookSecretSet: false });
   });
 
   it('puts chosen features behind Premium and lets the admin grant days', async () => {
@@ -206,6 +238,22 @@ describe('Premium', () => {
     expect(granted.body.membership).toMatchObject({ premium: true, state: 'granted' });
     expect((await member.send('post', '/api/paper', {})).status).not.toBe(402);
     expect((await member.agent.get('/backtest')).status).toBe(200);
+  });
+
+  it('gives one free trial per person, not per email alias', async () => {
+    const { canonicalEmail } = await import('../../services/billing/membership.js');
+    expect(canonicalEmail('A.B+promo@GoogleMail.com')).toBe('ab@gmail.com');
+    expect(canonicalEmail('a.b+x@zoho.com')).toBe('a.b@zoho.com');
+
+    const admin = await adminSession();
+    await billingOn(admin, { trialDays: 14 });
+    const states = [];
+    for (const email of ['trader.one@gmail.com', 'traderone+2@gmail.com', 'other@gmail.com']) {
+      const created = await createMember({ email });
+      const session = await signIn(app, { email, password: created.password });
+      states.push((await session.agent.get('/api/billing')).body.membership.state);
+    }
+    expect(states).toEqual(['trial', 'free', 'trial']);
   });
 
   it('starts checkout on Razorpay and activates Premium from a signed webhook', async () => {
@@ -321,6 +369,47 @@ describe('Premium webhooks and checkout edge cases', () => {
     expect(after).toMatchObject({ razorpayStatus: 'cancelled', cancelAtPeriodEnd: true });
   });
 
+  it('keeps a renewing member through the renewal gap, and stops billing when access is revoked', async () => {
+    const { computeMembership } = await import('../../services/billing/membership.js');
+    const plan = { enabled: true, features: ['paper'] };
+    const member = { role: 'member' };
+    const ended = new Date(Date.now() - 86_400_000);
+    const renewing = { paidUntil: ended, razorpayStatus: 'active', cancelAtPeriodEnd: false };
+    expect(computeMembership(plan, member, renewing).premium).toBe(true);
+    expect(computeMembership(plan, member, { ...renewing, cancelAtPeriodEnd: true }).premium).toBe(
+      false,
+    );
+    const longAgo = new Date(Date.now() - 3 * 86_400_000);
+    expect(computeMembership(plan, member, { ...renewing, paidUntil: longAgo }).premium).toBe(
+      false,
+    );
+
+    const { admin, member: payer } = await payingMember();
+    await signedWebhook(entity('active', 30), 'evt_a');
+    const paid = await paidUntil(payer);
+    // Cancelled while a charge was failing: the unpaid cycle is not a free month.
+    await signedWebhook(entity('cancelled', 60), 'evt_b');
+    expect(await paidUntil(payer)).toBe(paid);
+
+    // Clearing the payment keys while billing is on would break every renewal.
+    const cleared = await admin.send('put', '/api/admin/settings', {
+      changes: { RAZORPAY_WEBHOOK_SECRET: '' },
+    });
+    expect(cleared.status).toBe(409);
+  });
+
+  it('cancels the Razorpay subscription of a member whose access is revoked', async () => {
+    const { admin, member } = await payingMember();
+    await signedWebhook(entity('active', 30), 'evt_a');
+    const revoked = await admin.send('post', '/api/admin/users/revoke', {
+      email: 'member@example.com',
+      userId: member.userId,
+    });
+    expect(revoked.status).toBe(200);
+    const cancel = razorpay.calls.find((call) => call.path === '/subscriptions/sub_test1/cancel');
+    expect(cancel.body).toEqual({ cancel_at_cycle_end: 0 });
+  });
+
   it('needs the webhook secret to switch billing on and an authenticator to invite admins', async () => {
     const admin = await adminSession();
     await admin.send('put', '/api/admin/settings', {
@@ -338,6 +427,25 @@ describe('Premium webhooks and checkout edge cases', () => {
     });
     expect(invite.status).toBe(403);
     expect(invite.body.error).toMatch(/authenticator/);
+  });
+});
+
+describe('legal pages', () => {
+  it('are public and show the business details set in the admin panel', async () => {
+    const admin = await adminSession();
+    await admin.send('put', '/api/admin/settings', {
+      changes: { BUSINESS_NAME: 'Pirento Group', SUPPORT_EMAIL: 'help@pirento.test' },
+    });
+    for (const path of ['/terms', '/privacy', '/refunds', '/contact']) {
+      const page = await supertest(app).get(path);
+      expect(page.status).toBe(200);
+      expect(page.text).toContain('Pirento Group');
+    }
+    expect((await supertest(app).get('/contact')).text).toContain('help@pirento.test');
+    expect(
+      (await admin.send('put', '/api/admin/settings', { changes: { SUPPORT_EMAIL: 'nope' } }))
+        .status,
+    ).toBe(400);
   });
 });
 
@@ -371,5 +479,20 @@ describe('sign-up', () => {
     expect((await send('admin@example.com')).body).toEqual({ ok: true });
     expect(mails).toHaveLength(before);
     expect((await send('not-an-email')).status).toBe(400);
+
+    // Never confirmed: removed after 7 days, once the link has expired; activated members stay.
+    const { deleteUnconfirmedSignups } = await import('../../services/auth/accounts.js');
+    const invited = await createMember({ email: 'invited@example.com' });
+    await User.updateOne({ _id: invited.user._id }, { $set: { emailConfirmedAt: null } });
+    await AllowedUser.updateMany(
+      {},
+      { $set: { invitedAt: new Date(Date.now() - 8 * 86_400_000) } },
+    );
+    expect(await deleteUnconfirmedSignups()).toBe(0); // the activation link is still valid
+    const later = new Date(Date.now() + 2 * 86_400_000);
+    expect(await deleteUnconfirmedSignups({ now: later })).toBe(1);
+    expect(await User.exists({ email: 'new@example.com' })).toBeNull();
+    expect(await AllowedUser.exists({ _id: 'new@example.com' })).toBeNull();
+    expect(await User.exists({ email: 'invited@example.com' })).toBeTruthy();
   });
 });

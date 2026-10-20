@@ -11,6 +11,7 @@ import { HttpError } from '../errors.js';
 import { createLogger } from '../logger.js';
 import { reserveAttempts } from '../rate-window.js';
 import { accessProblem } from '../auth/accounts.js';
+import { hasFeature } from '../billing/membership.js';
 import { createTrade, toTrade } from '../journal/workspace.js';
 import { botUsername, isTelegramConfigured, sendTelegramMessage } from './api.js';
 
@@ -66,6 +67,9 @@ export async function sendToMember(userId, text) {
   if (!isTelegramConfigured()) return false;
   const link = await TelegramLink.findOne({ userId }).lean();
   if (!link) return false;
+  // Telegram is a Premium feature when the administrator bills for it, also after linking.
+  const user = await User.findById(userId).lean();
+  if (!user || !(await hasFeature(user, 'telegram'))) return false;
   try {
     await sendTelegramMessage(link.chatId, text);
     return true;
@@ -220,7 +224,9 @@ export async function handleUpdate(update) {
         ? 'This chat is not linked. In Blank, open Settings → Telegram and choose “Link Telegram”.'
         : (await accessProblem(user))
           ? 'Your Blank access is not active.'
-          : await runCommand(link, command, args);
+          : !(await hasFeature(user, 'telegram'))
+            ? 'The Telegram bot is part of Premium. Renew it in Blank → Settings → Plan & billing.'
+            : await runCommand(link, command, args);
   }
   try {
     await sendTelegramMessage(chat.id, reply);

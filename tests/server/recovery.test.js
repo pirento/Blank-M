@@ -7,6 +7,7 @@ import {
   signIn,
   startTestApp,
   stopTestApp,
+  verifyAuthenticator,
 } from '../helpers/app.js';
 
 let app;
@@ -29,6 +30,8 @@ async function anonymous() {
 async function admin() {
   const created = await createMember({ email: 'admin@example.com', role: 'admin' });
   const session = await signIn(app, { email: 'admin@example.com', password: created.password });
+  // Access changes (revoke, reset links) need a verified authenticator.
+  await verifyAuthenticator(session, created.user);
   return {
     ...session,
     send: (path, body) => session.agent.post(path).set('X-CSRF-Token', session.csrf).send(body),
