@@ -12,7 +12,7 @@ import { NAV_LINKS, ADMIN_NAV_GROUP } from '../config/nav.js';
 import { createHash } from 'node:crypto';
 import { openShareLink } from '../services/journal/share-links.js';
 import { reserveAttempts } from '../services/rate-window.js';
-import { canUseFeature, membershipFor } from '../services/billing/membership.js';
+import { allowFeature, membershipFor } from '../services/billing/membership.js';
 import { featureLabel, loadPlan, publicPlan } from '../services/billing/plan.js';
 
 const TITLES = Object.fromEntries(
@@ -52,12 +52,13 @@ export function workspacePage(
     const userId = req.member.userId;
     const membership = await membershipFor(req.member.user);
     // A Premium page for a free member shows the upgrade page instead (billing on only).
-    // A free member keeps the page while free uses of the feature are left this month.
+    // A free member may open the page while free days (or AI uses) are left this month; opening a
+    // per-day feature's page uses today.
     const locked =
       feature &&
       !membership.premium &&
       membership.premiumFeatures.includes(feature) &&
-      !(await canUseFeature(req.member.user, feature));
+      !(await allowFeature(req.member.user, feature)).ok;
     if (locked) {
       const plan = await loadPlan();
       return res.status(402).renderWorkspace('pages/upgrade', {

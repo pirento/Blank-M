@@ -8,6 +8,7 @@ import { endLiveQuoteStreams } from './controllers/market.controller.js';
 import { hasOpenAiKey } from './services/ai/openai-key.js';
 import { ensureAiConfiguration } from './services/ai/config.js';
 import { createLogger } from './services/logger.js';
+import { startAnnouncementResumer } from './services/admin/announcements.js';
 import {
   applyPlatformSettings,
   startPlatformSettingsRefresh,
@@ -22,6 +23,8 @@ async function start() {
   // API keys saved in the admin panel override .env; keep them in step every minute.
   await applyPlatformSettings();
   startPlatformSettingsRefresh();
+  // Finishes an announcement a restart interrupted (one process takes it, by lease).
+  startAnnouncementResumer();
   await ensureAiConfiguration();
   const app = createApp();
   const server = app.listen(env.port, env.host, () => {

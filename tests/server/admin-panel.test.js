@@ -247,21 +247,31 @@ describe('Premium', () => {
     expect((await member.agent.get('/backtest')).status).toBe(200);
   });
 
-  it('lets free members use a Premium feature a few times a month, then asks for Premium', async () => {
+  it('counts free AI requests and free days of other features, then asks for Premium', async () => {
     const admin = await adminSession();
-    await billingOn(admin, { trialDays: 0, features: ['paper'], freeQuota: { paper: 2 } });
+    await billingOn(admin, {
+      trialDays: 0,
+      features: ['paper', 'ai'],
+      freeQuota: { paper: 1, ai: 2 },
+    });
     const member = await memberSession();
+    // Per day: opening the page and any number of requests today use one day.
     expect((await member.agent.get('/paper')).status).toBe(200);
-    for (let use = 0; use < 2; use += 1) {
-      expect((await member.send('post', '/api/paper', {})).status).not.toBe(402);
+    for (let use = 0; use < 3; use += 1) {
+      expect((await member.send('post', '/api/paper/refresh', {})).status).not.toBe(402);
     }
-    const third = await member.send('post', '/api/paper', {});
+    // Per request: each AI request uses one; reading results does not.
+    for (let use = 0; use < 2; use += 1) {
+      expect((await member.send('post', '/api/ai/rule', {})).status).not.toBe(402);
+    }
+    expect((await member.agent.get('/api/ai/coach-reviews')).status).toBe(402);
+    const third = await member.send('post', '/api/ai/rule', {});
     expect(third.status).toBe(402);
     expect(third.body.error).toMatch(/2 free uses/);
     expect((await member.agent.get('/api/billing')).body.freeUsage).toEqual({
-      paper: { used: 2, limit: 2 },
+      paper: { used: 1, limit: 1, unit: 'days' },
+      ai: { used: 2, limit: 2, unit: 'uses' },
     });
-    expect((await member.agent.get('/paper')).status).toBe(402);
     // Invalid allowances are refused.
     const bad = await admin.send('put', '/api/admin/billing', { freeQuota: { paper: -1 } });
     expect(bad.status).toBe(400);
@@ -641,5 +651,34 @@ describe('member emails', () => {
     });
     const recipients = mails.slice(before).map((mail) => mail.to);
     expect(recipients.sort()).toEqual(['admin@example.com', 'member@example.com']);
+  });
+
+  it('finishes an interrupted announcement without emailing anyone twice', async () => {
+    const { Announcement } = await import('../../models/index.js');
+    const { resumeAnnouncements } = await import('../../services/admin/announcements.js');
+    const first = await createMember({ email: 'first@example.com' });
+    await createMember({ email: 'second@example.com' });
+    const [lowest] = [
+      first.user._id,
+      (await User.findOne({ email: 'second@example.com' }))._id,
+    ].sort();
+    await Announcement.create({
+      subject: 'Half sent',
+      body: 'Hi',
+      audience: 'all',
+      createdBy: 'admin',
+      lastUserId: lowest,
+      leaseUntil: new Date(Date.now() - 1000),
+    });
+    // A second "sending" announcement is refused while one is in progress.
+    await expect(
+      Announcement.create({ subject: 'x', body: 'y', audience: 'all', createdBy: 'admin' }),
+    ).rejects.toMatchObject({ code: 11000 });
+    const before = mails.length;
+    await resumeAnnouncements();
+    const row = await Announcement.findOne({ subject: 'Half sent' }).lean();
+    expect(row).toMatchObject({ status: 'done', sent: 1 });
+    expect(mails.length - before).toBe(1);
+    expect(mails.at(-1).to).not.toBe((await User.findById(lowest)).email);
   });
 });

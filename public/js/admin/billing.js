@@ -150,7 +150,7 @@ function planCard() {
         h(
           'legend',
           { class: 'mb-2 text-sm text-fg' },
-          'Premium features (free members get only the free uses per month; each request counts)',
+          'Premium features. Free / month: AI counts each AI request; every other feature counts days of use (the first use each day).',
         ),
         ...features.map((feature) => feature.element),
         h(

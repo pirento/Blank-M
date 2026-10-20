@@ -34,5 +34,11 @@ export function fromTrueDataSymbol(name) {
  * NaN when the text is not a time.
  */
 export function istToMillis(text) {
-  return Date.parse(`${String(text).slice(0, 19)}+05:30`);
+  const value = String(text);
+  // EOD bars may carry only the date.
+  const time = /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00` : value.slice(0, 19);
+  return Date.parse(`${time}+05:30`);
 }
+
+/** LiveQuote id of the feed's heartbeat (a colon never appears in a symbol). */
+export const FEED_HEARTBEAT_ID = ':feed';

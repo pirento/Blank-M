@@ -288,6 +288,8 @@ export function createMarketHistoryChart({
   };
   async function load(next) {
     if (!allowed()) return;
+    // The previous interval's live updates stop at once, even if this load fails.
+    stopLive();
     pending?.abort();
     const controller = new AbortController();
     pending = controller;
@@ -326,8 +328,10 @@ export function createMarketHistoryChart({
       if (live) {
         let painted = 0;
         const chartInterval = interval;
-        stopLive = watchLiveQuotes([symbol], (_symbol, price) => {
-          applyLivePrice(candles, chartInterval, price);
+        stopLive = watchLiveQuotes([symbol], (_symbol, price, at) => {
+          // Only prices traded in the last two minutes move the chart (none after the close).
+          if (Date.now() - at > 2 * 60_000) return;
+          applyLivePrice(candles, chartInterval, price, at);
           // At most one redraw a second.
           if (Date.now() - painted < 1000) return;
           painted = Date.now();

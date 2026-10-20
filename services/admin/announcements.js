@@ -45,6 +45,8 @@ export async function listAnnouncements() {
   return rows.map(toAnnouncement);
 }
 
+const LEASE_MS = 2 * 60_000;
+
 /**
  * Records the announcement, audits it and starts sending in the background. Returns it at once;
  * the admin page shows its progress. Only one announcement can be sending at a time.
@@ -55,12 +57,18 @@ export async function startAnnouncement(actor, input) {
   if (!parsed.success) {
     throw new HttpError('Write a subject (≤150 characters) and a message (≤10,000).', 400);
   }
-  // A send that stopped (server restart) stops counting as "in progress" after 30 quiet minutes.
-  const active = { status: 'sending', updatedAt: { $gt: new Date(Date.now() - 30 * 60_000) } };
-  if (await Announcement.exists(active)) {
-    throw new HttpError('Another announcement is still being sent.', 409);
+  let row;
+  try {
+    row = await Announcement.create({
+      ...parsed.data,
+      createdBy: actor.id,
+      leaseUntil: new Date(Date.now() + LEASE_MS),
+    });
+  } catch (error) {
+    if (error?.code === 11000)
+      throw new HttpError('Another announcement is still being sent.', 409);
+    throw error;
   }
-  const row = await Announcement.create({ ...parsed.data, createdBy: actor.id });
   await AdminAuditLog.create({
     actorId: actor.id,
     actorEmail: actor.email,
@@ -68,14 +76,40 @@ export async function startAnnouncement(actor, input) {
     target: row._id,
     details: { subject: row.subject, audience: row.audience },
   });
-  void sendAnnouncement(row).catch(async (error) => {
-    log.error('announcement stopped', { error: errorName(error) });
-    await Announcement.updateOne(
-      { _id: row._id },
-      { $set: { status: 'done', finishedAt: new Date() } },
-    );
-  });
+  void runSafely(row.toObject());
   return toAnnouncement(row.toObject());
+}
+
+/**
+ * Picks up an announcement whose sender stopped (a restart or deploy) and finishes it from where
+ * it stopped. Called every minute by each web process; the lease makes sure only one sends.
+ */
+export async function resumeAnnouncements() {
+  const now = new Date();
+  const row = await Announcement.findOneAndUpdate(
+    { status: 'sending', $or: [{ leaseUntil: null }, { leaseUntil: { $lt: now } }] },
+    { $set: { leaseUntil: new Date(now.getTime() + LEASE_MS) } },
+    { new: true },
+  ).lean();
+  if (row) await runSafely(row);
+}
+
+/** Starts the once-a-minute check for stopped announcements; returns a stop function. */
+export function startAnnouncementResumer() {
+  const timer = setInterval(() => {
+    resumeAnnouncements().catch((error) => log.warn('resume failed', { error: errorName(error) }));
+  }, 60_000);
+  timer.unref();
+  return () => clearInterval(timer);
+}
+
+async function runSafely(row) {
+  try {
+    await sendAnnouncement(row);
+  } catch (error) {
+    // The lease lapses and another run (or this process in a minute) continues from lastUserId.
+    log.error('announcement paused', { error: errorName(error) });
+  }
 }
 
 /** Whether a member belongs to the announcement's audience. */
@@ -87,7 +121,7 @@ function inAudience(audience, membership) {
 async function sendAnnouncement(row) {
   const plan = await loadPlan();
   const origin = process.env.APP_URL ? new URL(process.env.APP_URL).origin : '';
-  let lastId = '';
+  let lastId = row.lastUserId ?? '';
   for (;;) {
     const users = await User.find(
       { _id: { $gt: lastId }, status: 'active', emailConfirmedAt: { $ne: null } },
@@ -97,37 +131,43 @@ async function sendAnnouncement(row) {
       .limit(BATCH)
       .lean();
     if (!users.length) break;
-    lastId = users.at(-1)._id;
     const ids = users.map((user) => user._id);
     const [settings, subs] = await Promise.all([
       AccountSettings.find({ _id: { $in: ids } }, { announcementEmails: 1 }).lean(),
       Subscription.find({ _id: { $in: ids } }).lean(),
     ]);
     const optedOut = new Set(
-      settings.filter((s) => s.announcementEmails === false).map((s) => s._id),
+      settings.filter((item) => item.announcementEmails === false).map((item) => item._id),
     );
     const subById = new Map(subs.map((sub) => [sub._id, sub]));
-    const counts = { sent: 0, skipped: 0, failed: 0 };
     for (const user of users) {
       const membership = computeMembership(plan, user, subById.get(user._id) ?? null);
-      if (optedOut.has(user._id) || !inAudience(row.audience, membership)) {
-        counts.skipped += 1;
-        continue;
+      let outcome = 'skipped';
+      if (!optedOut.has(user._id) && inAudience(row.audience, membership)) {
+        const ok = await sendQuietly(user.email, row.subject, [
+          row.body,
+          '',
+          '—',
+          origin
+            ? `You get these emails as a Pirento Blank member. Turn them off: ${origin}/settings`
+            : 'Turn these emails off in Settings → Email reports.',
+        ]);
+        outcome = ok ? 'sent' : 'failed';
       }
-      const ok = await sendQuietly(user.email, row.subject, [
-        row.body,
-        '',
-        '—',
-        origin
-          ? `You get these emails as a Pirento Blank member. Turn them off: ${origin}/settings`
-          : 'Turn these emails off in Settings → Email reports.',
-      ]);
-      counts[ok ? 'sent' : 'failed'] += 1;
+      lastId = user._id;
+      // Saved after every member, so a restart never emails anyone twice; also renews the lease.
+      const kept = await Announcement.updateOne(
+        { _id: row._id, status: 'sending' },
+        {
+          $inc: { [outcome]: 1 },
+          $set: { lastUserId: lastId, leaseUntil: new Date(Date.now() + LEASE_MS) },
+        },
+      );
+      if (!kept.modifiedCount) return;
     }
-    await Announcement.updateOne({ _id: row._id }, { $inc: counts });
   }
   await Announcement.updateOne(
     { _id: row._id },
-    { $set: { status: 'done', finishedAt: new Date() } },
+    { $set: { status: 'done', finishedAt: new Date(), leaseUntil: null } },
   );
 }

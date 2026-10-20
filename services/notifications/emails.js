@@ -73,11 +73,15 @@ export async function welcomeMember(user) {
  * the member's Subscription after the event was applied.
  */
 export async function billingEventEmail(event, record) {
+  const payment = event.payload?.payment?.entity;
+  // payment.failed carries only the payment: find the member through its subscription id.
+  record ??= payment?.subscription_id
+    ? await Subscription.findOne({ razorpaySubscriptionId: payment.subscription_id }).lean()
+    : null;
   if (!record?._id) return false;
   const user = await User.findById(record._id, { email: 1 }).lean();
   if (!user) return false;
   const plan = await loadPlan();
-  const payment = event.payload?.payment?.entity;
   const billingLink = origin() ? `${origin()}/billing` : null;
   switch (event.event) {
     case 'subscription.charged':
@@ -115,10 +119,17 @@ export async function billingEventEmail(event, record) {
 export async function sendTrialReminders(now = new Date(), limit = 500) {
   const plan = await loadPlan();
   if (!plan.enabled || !isMailConfigured()) return 0;
+  const ends = { $gt: now, $lte: new Date(now.getTime() + 3 * DAY_MS) };
   const due = await Subscription.find({
-    trialEndsAt: { $gt: now, $lte: new Date(now.getTime() + 3 * DAY_MS) },
+    trialEndsAt: ends,
     trialReminderSentAt: null,
-    razorpayStatus: { $nin: ['created', 'authenticated', 'active', 'pending'] },
+    // Not already subscribed (an unfinished checkout, "created", still gets the reminder)...
+    razorpayStatus: { $nin: ['authenticated', 'active', 'pending'] },
+    // ...and Premium really ends with the trial (no admin grant or paid month after it).
+    $and: [
+      { $or: [{ grantUntil: null }, { grantUntil: { $lte: ends.$lte } }] },
+      { $or: [{ paidUntil: null }, { paidUntil: { $lte: ends.$lte } }] },
+    ],
   })
     .limit(limit)
     .lean();
@@ -143,6 +154,8 @@ export async function sendTrialReminders(now = new Date(), limit = 500) {
       ],
     );
     if (ok) sent += 1;
+    // Not sent (mail server down): try again on the next run.
+    else await Subscription.updateOne({ _id: sub._id }, { $set: { trialReminderSentAt: null } });
   }
   return sent;
 }

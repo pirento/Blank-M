@@ -7,6 +7,7 @@
 import { LiveQuote, LiveSubscription } from '../../../models/index.js';
 import { createLogger, errorName } from '../../logger.js';
 import {
+  FEED_HEARTBEAT_ID,
   fromTrueDataSymbol,
   istToMillis,
   isTrueDataConfigured,
@@ -52,6 +53,8 @@ export function startTrueDataFeed({ WebSocketImpl = globalThis.WebSocket } = {})
   let stopped = false;
   let lastMessage = 0;
   let retryMs = 2000;
+  // True once TrueData accepted the login on the current connection.
+  let ready = false;
   const ids = new Map();
   const subscribed = new Set();
   const pending = new Map();
@@ -70,6 +73,7 @@ export function startTrueDataFeed({ WebSocketImpl = globalThis.WebSocket } = {})
     const url = new URL(`wss://push.truedata.in:${port}`);
     url.searchParams.set('user', process.env.TRUEDATA_USER.trim());
     url.searchParams.set('password', process.env.TRUEDATA_PASSWORD.trim());
+    ready = false;
     socket = new WebSocketImpl(url.toString());
     lastMessage = Date.now();
     socket.onopen = () => log.info('connected');
@@ -82,31 +86,50 @@ export function startTrueDataFeed({ WebSocketImpl = globalThis.WebSocket } = {})
         return;
       }
       if (message?.success === false) {
-        // Wrong login or plan: wait a minute before trying again.
         log.warn('truedata refused', { message: String(message.message).slice(0, 200) });
-        retryMs = 60_000;
-        socket.close();
+        // Before the login is accepted it is the login or plan: wait a minute and try again. Later
+        // refusals (e.g. one symbol) are only logged, so one bad symbol cannot stop everyone's feed.
+        if (!ready) {
+          retryMs = 60_000;
+          reconnect();
+        }
         return;
       }
       if (message?.message === 'TrueData Real Time Data Service') {
+        ready = true;
         retryMs = 2000;
         subscribed.clear();
         void syncSymbols();
       }
       for (const tick of readFeedMessage(message, ids)) pending.set(tick.symbol, tick);
     };
-    socket.onclose = () => {
-      socket = null;
-      if (!stopped) setTimeout(connect, retryMs).unref();
-      retryMs = Math.min(retryMs * 2, 60_000);
-    };
-    socket.onerror = () => socket?.close();
+    socket.onclose = () => reconnect();
+    socket.onerror = () => reconnect();
+  }
+
+  /** Drops the current connection (without waiting for a closing handshake) and connects again. */
+  function reconnect() {
+    const old = socket;
+    socket = null;
+    ready = false;
+    if (old) {
+      old.onclose = old.onmessage = old.onerror = null;
+      try {
+        old.close();
+      } catch {
+        // already closed
+      }
+    }
+    if (!stopped) setTimeout(connect, retryMs).unref();
+    retryMs = Math.min(retryMs * 2, 60_000);
   }
 
   /** Subscribes to newly wanted symbols and drops ones nobody watches any more. */
   async function syncSymbols() {
     if (socket?.readyState !== 1) return;
+    // The most recently wanted first, so the same symbols stay within the plan's limit.
     const rows = await LiveSubscription.find({ expiresAt: { $gt: new Date() } }, { _id: 1 })
+      .sort({ expiresAt: -1 })
       .limit(MAX_SYMBOLS)
       .lean();
     const wanted = new Set(rows.map((row) => row._id));
@@ -141,8 +164,16 @@ export function startTrueDataFeed({ WebSocketImpl = globalThis.WebSocket } = {})
     ),
     setInterval(() => {
       syncSymbols().catch((error) => log.warn('sync failed', { error: errorName(error) }));
-      // No message (not even a heartbeat) for a while: the connection is dead; reconnect.
-      if (socket && Date.now() - lastMessage > SILENCE_MS) socket.close();
+      // No message (not even a heartbeat) for a while: the connection is dead; reconnect now.
+      if (socket && Date.now() - lastMessage > SILENCE_MS) reconnect();
+      // Tells web processes the feed is alive (they fall back to brokers when it is not).
+      if (ready) {
+        LiveQuote.updateOne(
+          { _id: FEED_HEARTBEAT_ID },
+          { $set: { price: 0, at: new Date() } },
+          { upsert: true },
+        ).catch(() => undefined);
+      }
     }, SYNC_MS),
   ];
   connect();

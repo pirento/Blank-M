@@ -81,19 +81,23 @@ describe('shared live feed', () => {
         this.onclose?.();
       }
     }
-    // A page starts watching RELIANCE; the feed subscribes to it and its prices reach the page.
+    // Without a running feed the page falls back to the member's broker (null here).
     const ticks = [];
-    const stopWatching = await subscribeVendorQuotes(['RELIANCE'], {
-      onTick: (tick) => ticks.push(tick),
-    });
-    expect(await LiveSubscription.exists({ _id: 'RELIANCE' })).toBeTruthy();
+    const onTick = (tick) => ticks.push(tick);
+    expect(await subscribeVendorQuotes(['RELIANCE'], { onTick })).toBeNull();
 
     const feed = startTrueDataFeed({ WebSocketImpl: FakeSocket });
+    // The feed logs in and reports itself alive; then the page starts watching RELIANCE.
+    await vi.waitFor(async () => expect(await LiveQuote.exists({ _id: ':feed' })).toBeTruthy(), {
+      timeout: 8000,
+    });
+    expect(sockets[0].url).toContain('user=td-user');
+    const stopWatching = await subscribeVendorQuotes(['RELIANCE'], { onTick });
+    expect(await LiveSubscription.exists({ _id: 'RELIANCE' })).toBeTruthy();
     await vi.waitFor(
-      () => expect(sockets[0]?.sent).toContainEqual({ method: 'addsymbol', symbols: ['RELIANCE'] }),
+      () => expect(sockets[0].sent).toContainEqual({ method: 'addsymbol', symbols: ['RELIANCE'] }),
       { timeout: 8000 },
     );
-    expect(sockets[0].url).toContain('user=td-user');
     sockets[0].onmessage({
       data: JSON.stringify({ symbollist: [['RELIANCE', '7', '2026-10-20T09:20:00', 2900]] }),
     });
@@ -106,10 +110,17 @@ describe('shared live feed', () => {
       async () => expect((await LiveQuote.findById('RELIANCE').lean())?.price).toBe(2905.5),
       { timeout: 5000 },
     );
-    await vi.waitFor(() => expect(ticks.at(-1)).toEqual({ symbol: 'RELIANCE', price: 2905.5 }), {
-      timeout: 5000,
-    });
+    await vi.waitFor(
+      () => expect(ticks.at(-1)).toMatchObject({ symbol: 'RELIANCE', price: 2905.5 }),
+      {
+        timeout: 5000,
+      },
+    );
     expect(await vendorQuote('RELIANCE')).toMatchObject({ price: 2905.5, source: 'truedata' });
+
+    // A refused symbol after login is only logged: the connection (and everyone's feed) stays.
+    sockets[0].onmessage({ data: JSON.stringify({ success: false, message: 'Symbol not found' }) });
+    expect(sockets[0].readyState).toBe(1);
 
     stopWatching();
     feed.stop();

@@ -192,11 +192,12 @@ export async function quoteStream(req, res) {
   // Proxies close idle connections; a comment every 25 s keeps the stream open.
   const keepAlive = setInterval(() => res.write(': keep-alive\n\n'), 25_000);
   const handlers = {
-    onTick: ({ symbol, price }) => {
+    // `at` (trade time, ms) comes from the data vendor; Zerodha ticks are "now".
+    onTick: ({ symbol, price, at }) => {
       const now = Date.now();
       if (now - (lastSent.get(symbol) ?? 0) < 1000) return;
       lastSent.set(symbol, now);
-      res.write(`data: ${JSON.stringify({ symbol, price })}\n\n`);
+      res.write(`data: ${JSON.stringify({ symbol, price, at: at ?? now })}\n\n`);
     },
     onEnd: () => stream.end(),
   };

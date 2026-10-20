@@ -151,7 +151,7 @@ function mountBilling() {
                   ? h(
                       'span',
                       { class: 'tnum text-xs' },
-                      `${Math.max(free.limit - free.used, 0)} of ${free.limit} free uses left this month`,
+                      `${Math.max(free.limit - free.used, 0)} of ${free.limit} free ${free.unit} left this month`,
                     )
                   : null,
               );
