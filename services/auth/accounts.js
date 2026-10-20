@@ -275,7 +275,8 @@ export async function requestPasswordRecovery(email, address = 'unknown') {
     );
   }
   const user = await User.findOne({ email: normalized });
-  if (!user || (await accessProblem(user))) return;
+  // Administrators have no password (Google + authenticator), so there is nothing to reset.
+  if (!user || user.role === 'admin' || (await accessProblem(user))) return;
   const token = await issueToken(user, 'recover', RECOVERY_TTL_MS);
   await sendMail({
     to: user.email,

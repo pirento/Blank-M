@@ -29,12 +29,18 @@ site "502 Bad Gateway" dikhati hai (`df -h /` se dekhiye).
    sudo bash deploy/setup-vps.sh aapka-domain.com aap@example.com
    ```
 
-3. Admin banaiye:
+3. Admin banaiye (admin ka koi password nahi hota — sirf Google account + Authenticator app):
 
    ```bash
    cd /srv/blank
-   ADMIN_EMAIL=aap@example.com ADMIN_PASSWORD='kam-se-kam-12-akshar' node scripts/create-admin.js
+   ADMIN_EMAIL=aapka-gmail@gmail.com node scripts/create-admin.js
    ```
+
+   Pehle `/srv/blank/.env` mein Google sign-in ki keys daaliye (`GOOGLE_CLIENT_ID`,
+   `GOOGLE_CLIENT_SECRET`, `GOOGLE_AUTH_ENABLED="true"`; neeche "Google se login" dekhiye) aur
+   `pm2 reload pirento-blank`. Phir `https://aapka-domain.com/admin/login` → "Sign in with Google"
+   → Authenticator app lagaiye (setup code email se aata hai; email set nahi hai to
+   `node scripts/admin-setup-code.js aapka-gmail@gmail.com`).
 
 4. `/srv/blank/.env` mein `KITE_API_KEY` aur `KITE_API_SECRET` daaliye, phir `pm2 reload pirento-blank`.
 5. VPS ka IP (`curl https://api.ipify.org`) Kite developer profile mein whitelist kariye.

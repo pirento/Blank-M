@@ -83,4 +83,51 @@ export async function verifyAuthenticator(signedIn, user) {
   if (verify.status !== 200) throw new Error(`verify failed: ${verify.status} ${verify.text}`);
 }
 
+/**
+ * Signs an administrator in the only way administrators can: Google (faked here) and then their
+ * authenticator (added on first sign-in). Returns `{ agent, csrf }` with an aal2 session.
+ */
+export async function signInAdmin(app, user, { authenticator = true } = {}) {
+  const realFetch = globalThis.fetch;
+  const previous = {
+    GOOGLE_AUTH_ENABLED: process.env.GOOGLE_AUTH_ENABLED,
+    GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
+  };
+  Object.assign(process.env, {
+    GOOGLE_AUTH_ENABLED: 'true',
+    GOOGLE_CLIENT_ID: previous.GOOGLE_CLIENT_ID || 'test-client',
+    GOOGLE_CLIENT_SECRET: previous.GOOGLE_CLIENT_SECRET || 'test-secret',
+  });
+  globalThis.fetch = async (url, options) => {
+    if (String(url) === 'https://oauth2.googleapis.com/token') {
+      return Response.json({ access_token: 'google-token' });
+    }
+    if (String(url) === 'https://openidconnect.googleapis.com/v1/userinfo') {
+      return Response.json({ email: user.email, email_verified: true, sub: `sub-${user._id}` });
+    }
+    return realFetch(url, options);
+  };
+  const agent = request.agent(app);
+  try {
+    const started = await agent.get('/auth/google?for=admin');
+    const state = new URL(started.headers.location).searchParams.get('state');
+    const done = await agent.get(`/auth/google/callback?state=${state}&code=test`);
+    if (done.headers.location !== '/admin')
+      throw new Error(`admin sign-in failed: ${done.headers.location}`);
+  } finally {
+    globalThis.fetch = realFetch;
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+  // Any page carries the session's CSRF token.
+  const page = await agent.get('/terms');
+  const csrf = /name="csrf-token" content="([^"]*)"/.exec(page.text)?.[1];
+  const session = { agent, csrf };
+  if (authenticator) await verifyAuthenticator(session, user);
+  return session;
+}
+
 export { request, session };

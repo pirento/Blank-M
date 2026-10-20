@@ -243,7 +243,13 @@ export async function handleCreateResetLink(req, res) {
       throw new AdminContractError('Too many reset links requested. Try again later.', 400);
     }
     const user = await User.findOne({ email: body.email });
-    if (!user || !user.emailConfirmedAt || !user.passwordHash || (await accessProblem(user))) {
+    if (
+      !user ||
+      user.role === 'admin' ||
+      !user.emailConfirmedAt ||
+      !user.passwordHash ||
+      (await accessProblem(user))
+    ) {
       throw new AdminContractError(
         'Reset links are available only for members with active, activated access.',
         409,

@@ -1,15 +1,14 @@
 import { expect, test } from '@playwright/test';
-import { ADMIN, MEMBERS, signIn, trackErrors } from './helpers.js';
+import { MEMBERS, signIn, signInWithAuthenticator, trackErrors } from './helpers.js';
 
-test('the admin panel has its own sign-in and every page opens without errors', async ({
+test('administrators sign in with Google and an authenticator; every admin page opens', async ({
   page,
 }) => {
   const errors = trackErrors(page);
   await page.goto('/admin');
   await expect(page).toHaveURL(/\/admin\/login$/);
-  await page.fill('#admin-email', ADMIN.email);
-  await page.fill('#admin-password', ADMIN.password);
-  await page.getByRole('button', { name: 'Sign in to the admin panel' }).click();
+  // Administrators sign in with Google and then their authenticator code.
+  await signInWithAuthenticator(page);
   await expect(page).toHaveURL(/\/admin$/);
   await expect(page.locator('[data-admin-dashboard]')).toContainText('Members');
   await expect(page.locator('[data-admin-dashboard]')).toContainText('Integrations');

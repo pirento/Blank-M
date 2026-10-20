@@ -2,7 +2,7 @@
 import { createHmac } from 'node:crypto';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { createMember, resetDatabase, signIn, startTestApp, stopTestApp } =
+const { createMember, resetDatabase, signIn, signInAdmin, startTestApp, stopTestApp } =
   await import('../helpers/app.js');
 const supertest = (await import('supertest')).default;
 const { AdminAuditLog, AllowedUser, Payment, PlatformSetting, User } =
@@ -70,10 +70,13 @@ afterEach(() => {
   globalThis.fetch = realFetch;
 });
 
-/** An administrator signed in at the admin panel, optionally with a verified authenticator. */
+/**
+ * An administrator signed in with Google at the admin panel, optionally with a verified
+ * authenticator (without one, everything but adding it is refused).
+ */
 async function adminSession({ mfa = true } = {}) {
   const created = await createMember({ email: 'admin@example.com', role: 'admin' });
-  const session = await signIn(app, { email: 'admin@example.com', password: created.password });
+  const session = await signInAdmin(app, created.user, { authenticator: false });
   const send = (method, path, body) =>
     session.agent[method](path).set('X-CSRF-Token', session.csrf).send(body);
   if (mfa) {
@@ -112,25 +115,35 @@ function signedWebhook(body, eventId) {
 }
 
 describe('admin panel', () => {
-  it('has its own sign-in that only administrators pass', async () => {
+  it('lets administrators in only with Google and an authenticator', async () => {
     const member = await createMember({ email: 'member@example.com' });
     const page = await supertest(app).get('/admin/login');
     expect(page.status).toBe(200);
     expect(page.text).toContain('Administrator sign-in');
+    expect(page.text).not.toContain('type="password"');
     expect((await supertest(app).get('/admin')).headers.location).toBe('/admin/login');
+    // The old password endpoint is gone.
+    expect((await supertest(app).post('/auth/admin/login').send({})).status).toBeGreaterThanOrEqual(
+      400,
+    );
 
-    const agent = supertest.agent(app);
-    const csrf = (await agent.get('/admin/login')).text.match(
-      /name="csrf-token" content="([^"]+)"/,
-    )[1];
-    const refused = await agent
-      .post('/auth/admin/login')
-      .set('X-CSRF-Token', csrf)
-      .send({ identifier: 'member@example.com', password: member.password });
-    expect(refused.status).toBe(401);
-    expect(refused.body.error).toBe('That username or email and password are not recognised.');
+    // A member's Google account cannot use the admin sign-in.
+    await expect(signInAdmin(app, member.user)).rejects.toThrow(/admin sign-in failed/);
 
-    const admin = await adminSession({ mfa: false });
+    // An administrator's password does not work anywhere.
+    const created = await createMember({ email: 'admin@example.com', role: 'admin' });
+    await expect(
+      signIn(app, { email: 'admin@example.com', password: created.password }),
+    ).rejects.toThrow(/403/);
+
+    // Google without an authenticator: only the "add an authenticator" screen.
+    const noCode = await signInAdmin(app, created.user, { authenticator: false });
+    const setup = await noCode.agent.get('/admin');
+    expect(setup.status).toBe(403);
+    expect(setup.text).toContain('Add an authenticator to continue');
+    expect((await noCode.agent.get('/api/admin/overview')).status).toBe(403);
+
+    const admin = await signInAdmin(app, created.user);
     const overview = await admin.agent.get('/api/admin/overview');
     expect(overview.status).toBe(200);
     expect(overview.body.members.total).toBe(2);
@@ -580,7 +593,11 @@ describe('Google sign-in', () => {
     expect(
       await googleRoundTrip(
         supertest.agent(app),
-        { email: 'admin@example.com' },
+        // The same Google account the administrator signed in with before.
+        {
+          email: 'admin@example.com',
+          sub: `sub-${(await User.findOne({ email: 'admin@example.com' }))._id}`,
+        },
         '/auth/google?for=admin',
       ),
     ).toBe('/admin');

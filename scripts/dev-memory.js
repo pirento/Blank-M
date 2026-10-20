@@ -8,6 +8,30 @@ const mongo = await MongoMemoryServer.create();
 process.env.MONGODB_URI = mongo.getUri('blank-dev');
 process.env.APP_URL ||= `http://localhost:${process.env.PORT || 3000}`;
 
+// End-to-end tests only (E2E_GOOGLE_STUB=1, set by playwright.config.js): a stand-in for Google's
+// token and profile endpoints, so tests can sign in "with Google" offline. The browser side is
+// faked in tests/e2e/helpers.js; the "code" Google returns is simply the email to sign in as.
+// This file is the in-memory preview server and is never used in production.
+if (process.env.E2E_GOOGLE_STUB === '1') {
+  Object.assign(process.env, {
+    GOOGLE_AUTH_ENABLED: 'true',
+    GOOGLE_CLIENT_ID: 'e2e-client',
+    GOOGLE_CLIENT_SECRET: 'e2e-secret',
+  });
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, options) => {
+    if (String(url) === 'https://oauth2.googleapis.com/token') {
+      const code = new URLSearchParams(String(options?.body ?? '')).get('code');
+      return Response.json({ access_token: code });
+    }
+    if (String(url) === 'https://openidconnect.googleapis.com/v1/userinfo') {
+      const email = String(options?.headers?.Authorization ?? '').replace('Bearer ', '');
+      return Response.json({ email, email_verified: true, sub: `e2e-${email}` });
+    }
+    return realFetch(url, options);
+  };
+}
+
 const { connectDatabase } = await import('../config/database.js');
 const { AllowedUser, User } = await import('../models/index.js');
 const { hashPassword } = await import('../services/auth/accounts.js');

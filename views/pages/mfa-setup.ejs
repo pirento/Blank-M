@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <%- include('../partials/head', { title: 'Add an authenticator' }) %>
+  </head>
+  <body>
+    <%# Administrators must add an authenticator app before they can use anything (they sign in with Google + this code). %>
+    <main class="flex min-h-dvh items-center justify-center bg-canvas px-4 py-8 text-fg">
+      <div class="w-full max-w-lg space-y-4">
+        <div class="flex flex-col items-start gap-3">
+          <%- include('../partials/brand') %>
+          <div>
+            <h1 class="text-lg font-semibold">Add an authenticator to continue</h1>
+            <p class="mt-1 text-sm text-muted">Administrator accounts sign in with Google and a code from an authenticator app (Google Authenticator, Microsoft Authenticator or similar). Add one now; you will need it every time you sign in.</p>
+          </div>
+        </div>
+        <div data-mfa></div>
+        <button type="button" data-sign-out class="<%= buttonClass('ghost') %>">Sign out</button>
+      </div>
+    </main>
+    <script type="application/json" id="page-data"><%- safeJson({}) %></script>
+    <script type="module" src="/js/pages/mfa-setup.js" nonce="<%= cspNonce %>"></script>
+  </body>
+</html>
