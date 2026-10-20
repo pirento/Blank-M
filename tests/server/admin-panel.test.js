@@ -17,6 +17,7 @@ const realFetch = globalThis.fetch;
 let app;
 let mails;
 let razorpay;
+let googleProfile;
 
 beforeAll(async () => {
   Object.assign(process.env, {
@@ -41,6 +42,12 @@ beforeEach(async () => {
   razorpay = { calls: [] };
   // Only Razorpay is faked; supertest's own requests go through.
   globalThis.fetch = vi.fn(async (url, options) => {
+    if (String(url) === 'https://oauth2.googleapis.com/token') {
+      return Response.json({ access_token: 'google-token' });
+    }
+    if (String(url) === 'https://openidconnect.googleapis.com/v1/userinfo') {
+      return Response.json(googleProfile);
+    }
     if (!String(url).startsWith('https://api.razorpay.com/')) return realFetch(url, options);
     const path = String(url).replace('https://api.razorpay.com/v1', '');
     razorpay.calls.push({ path, body: options.body ? JSON.parse(options.body) : null });
@@ -238,6 +245,36 @@ describe('Premium', () => {
     expect(granted.body.membership).toMatchObject({ premium: true, state: 'granted' });
     expect((await member.send('post', '/api/paper', {})).status).not.toBe(402);
     expect((await member.agent.get('/backtest')).status).toBe(200);
+  });
+
+  it('counts free AI requests and free days of other features, then asks for Premium', async () => {
+    const admin = await adminSession();
+    await billingOn(admin, {
+      trialDays: 0,
+      features: ['paper', 'ai'],
+      freeQuota: { paper: 1, ai: 2 },
+    });
+    const member = await memberSession();
+    // Per day: opening the page and any number of requests today use one day.
+    expect((await member.agent.get('/paper')).status).toBe(200);
+    for (let use = 0; use < 3; use += 1) {
+      expect((await member.send('post', '/api/paper/refresh', {})).status).not.toBe(402);
+    }
+    // Per request: each AI request uses one; reading results does not.
+    for (let use = 0; use < 2; use += 1) {
+      expect((await member.send('post', '/api/ai/rule', {})).status).not.toBe(402);
+    }
+    expect((await member.agent.get('/api/ai/coach-reviews')).status).toBe(402);
+    const third = await member.send('post', '/api/ai/rule', {});
+    expect(third.status).toBe(402);
+    expect(third.body.error).toMatch(/2 free uses/);
+    expect((await member.agent.get('/api/billing')).body.freeUsage).toEqual({
+      paper: { used: 1, limit: 1, unit: 'days' },
+      ai: { used: 2, limit: 2, unit: 'uses' },
+    });
+    // Invalid allowances are refused.
+    const bad = await admin.send('put', '/api/admin/billing', { freeQuota: { paper: -1 } });
+    expect(bad.status).toBe(400);
   });
 
   it('gives one free trial per person, not per email alias', async () => {
@@ -494,5 +531,154 @@ describe('sign-up', () => {
     expect(await User.exists({ email: 'new@example.com' })).toBeNull();
     expect(await AllowedUser.exists({ _id: 'new@example.com' })).toBeNull();
     expect(await User.exists({ email: 'invited@example.com' })).toBeTruthy();
+  });
+});
+
+describe('Google sign-in', () => {
+  /** Runs the Google redirect round trip for `profile`; returns the final redirect. */
+  async function googleRoundTrip(agent, profile, start = '/auth/google') {
+    googleProfile = { email_verified: true, sub: `sub-${profile.email}`, ...profile };
+    const started = await agent.get(start);
+    const state = new URL(started.headers.location).searchParams.get('state');
+    return (await agent.get(`/auth/google/callback?state=${state}&code=abc`)).headers.location;
+  }
+
+  beforeEach(() => {
+    Object.assign(process.env, {
+      GOOGLE_AUTH_ENABLED: 'true',
+      GOOGLE_CLIENT_ID: 'client-id',
+      GOOGLE_CLIENT_SECRET: 'client-secret',
+    });
+  });
+  afterEach(() => {
+    for (const key of ['GOOGLE_AUTH_ENABLED', 'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET'])
+      delete process.env[key];
+  });
+
+  it('creates a member while sign-up is open, and lets only administrators into the admin panel', async () => {
+    // Sign-up closed: a new Google address is refused.
+    expect(await googleRoundTrip(supertest.agent(app), { email: 'new@gmail.com' })).toBe(
+      '/login?error=invite_only',
+    );
+
+    const admin = await adminSession();
+    await admin.send('put', '/api/admin/billing', { signupOpen: true });
+    forgetPlanCache();
+    const visitor = supertest.agent(app);
+    expect(await googleRoundTrip(visitor, { email: 'New@Gmail.com' })).toBe('/dashboard');
+    expect((await visitor.get('/api/workspace')).status).toBe(200);
+    await vi.waitFor(() => expect(mails.at(-1)?.subject).toBe('Welcome to Pirento Blank'));
+
+    // The admin sign-in with Google refuses a member and lets an administrator through.
+    expect(
+      await googleRoundTrip(
+        supertest.agent(app),
+        { email: 'new@gmail.com' },
+        '/auth/google?for=admin',
+      ),
+    ).toBe('/admin/login?error=google');
+    expect(
+      await googleRoundTrip(
+        supertest.agent(app),
+        { email: 'admin@example.com' },
+        '/auth/google?for=admin',
+      ),
+    ).toBe('/admin');
+  });
+});
+
+describe('member emails', () => {
+  it('emails payments, trial reminders and announcements (respecting opt-outs)', async () => {
+    const { Subscription } = await import('../../models/index.js');
+    const { sendTrialReminders } = await import('../../services/notifications/emails.js');
+    const admin = await adminSession();
+    await admin.send('put', '/api/admin/settings', {
+      changes: {
+        RAZORPAY_KEY_ID: 'rzp_test_abcdefgh123',
+        RAZORPAY_KEY_SECRET: 'secret-value',
+        RAZORPAY_WEBHOOK_SECRET: WEBHOOK_SECRET,
+      },
+    });
+    await admin.send('put', '/api/admin/billing', { enabled: true, trialDays: 2 });
+    forgetPlanCache();
+    const member = await memberSession();
+    await member.agent.get('/api/billing'); // starts the 2-day trial
+
+    // Trial ending within 3 days: one reminder, never two.
+    expect(await sendTrialReminders()).toBe(1);
+    expect(await sendTrialReminders()).toBe(0);
+    expect(mails.at(-1)).toMatchObject({ to: 'member@example.com' });
+    expect(mails.at(-1).subject).toMatch(/trial ends/);
+
+    // A charged renewal emails a receipt.
+    await Subscription.updateOne(
+      { _id: member.userId },
+      { $set: { razorpaySubscriptionId: 'sub_test1' } },
+    );
+    await signedWebhook(
+      {
+        event: 'subscription.charged',
+        payload: {
+          subscription: {
+            entity: {
+              id: 'sub_test1',
+              status: 'active',
+              current_end: Math.floor(Date.now() / 1000) + 30 * 86400,
+              paid_count: 1,
+            },
+          },
+          payment: { entity: { id: 'pay_1', amount: 49900, status: 'captured' } },
+        },
+      },
+      'evt_charge',
+    );
+    await vi.waitFor(() => expect(mails.at(-1).subject).toMatch(/Payment received/));
+
+    // An announcement reaches members who did not opt out.
+    const other = await createMember({ email: 'quiet@example.com' });
+    const { AccountSettings } = await import('../../models/index.js');
+    await AccountSettings.create({ _id: other.user._id, announcementEmails: false });
+    const before = mails.length;
+    const sent = await admin.send('post', '/api/admin/announcements', {
+      subject: 'New feature',
+      body: 'Hello all',
+      audience: 'all',
+    });
+    expect(sent.status).toBe(202);
+    await vi.waitFor(async () => {
+      const list = (await admin.agent.get('/api/admin/announcements')).body.announcements;
+      expect(list[0]).toMatchObject({ status: 'done', sent: 2, skipped: 1 });
+    });
+    const recipients = mails.slice(before).map((mail) => mail.to);
+    expect(recipients.sort()).toEqual(['admin@example.com', 'member@example.com']);
+  });
+
+  it('finishes an interrupted announcement without emailing anyone twice', async () => {
+    const { Announcement } = await import('../../models/index.js');
+    const { resumeAnnouncements } = await import('../../services/admin/announcements.js');
+    const first = await createMember({ email: 'first@example.com' });
+    await createMember({ email: 'second@example.com' });
+    const [lowest] = [
+      first.user._id,
+      (await User.findOne({ email: 'second@example.com' }))._id,
+    ].sort();
+    await Announcement.create({
+      subject: 'Half sent',
+      body: 'Hi',
+      audience: 'all',
+      createdBy: 'admin',
+      lastUserId: lowest,
+      leaseUntil: new Date(Date.now() - 1000),
+    });
+    // A second "sending" announcement is refused while one is in progress.
+    await expect(
+      Announcement.create({ subject: 'x', body: 'y', audience: 'all', createdBy: 'admin' }),
+    ).rejects.toMatchObject({ code: 11000 });
+    const before = mails.length;
+    await resumeAnnouncements();
+    const row = await Announcement.findOne({ subject: 'Half sent' }).lean();
+    expect(row).toMatchObject({ status: 'done', sent: 1 });
+    expect(mails.length - before).toBe(1);
+    expect(mails.at(-1).to).not.toBe((await User.findById(lowest)).email);
   });
 });

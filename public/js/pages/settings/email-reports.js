@@ -13,6 +13,7 @@ export function mountEmailReports() {
     loading: true,
     enabled: false,
     coach: false,
+    announcements: true,
     aiConfigured: Boolean(data.health?.aiAvailable),
     configured: Boolean(data.health?.email),
     busy: false,
@@ -24,6 +25,7 @@ export function mountEmailReports() {
       const result = await api('/api/account/notifications');
       state.enabled = result.weeklyReportEmail;
       state.coach = result.weeklyAiCoach;
+      state.announcements = result.announcementEmails;
       state.configured = result.emailConfigured;
       state.aiConfigured = result.aiConfigured;
     } catch (error) {
@@ -87,6 +89,24 @@ export function mountEmailReports() {
             : 'The weekly email will not include an AI coach review.';
         }),
     );
+    const announcementsToggle = h('input', {
+      type: 'checkbox',
+      class: 'mt-1 h-4 w-4 accent-accent',
+      checked: state.announcements,
+      disabled: state.loading || state.busy,
+    });
+    announcementsToggle.addEventListener(
+      'change',
+      () =>
+        void act(async () => {
+          const result = await api('/api/account/notifications', {
+            method: 'PUT',
+            body: { announcementEmails: announcementsToggle.checked },
+          });
+          state.announcements = result.announcementEmails;
+          return state.announcements ? 'Team emails are on.' : 'Team emails are off.';
+        }),
+    );
     render(
       root,
       card(
@@ -134,6 +154,21 @@ export function mountEmailReports() {
                 state.aiConfigured
                   ? 'Uses your trades, tags and rules; counts toward your AI usage.'
                   : 'AI is not configured on this server.',
+              ),
+            ),
+          ),
+          h(
+            'label',
+            { class: 'flex items-start gap-3 text-sm' },
+            announcementsToggle,
+            h(
+              'span',
+              {},
+              'Emails from the Pirento Blank team',
+              h(
+                'span',
+                { class: 'block text-xs text-muted' },
+                'Occasional news and announcements. Billing and account emails are always sent.',
               ),
             ),
           ),

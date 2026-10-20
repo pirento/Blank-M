@@ -28,6 +28,7 @@ import {
 } from '../services/billing/subscriptions.js';
 import { describePlatformSettings, savePlatformSettings } from '../services/platform/settings.js';
 import { env } from '../config/env.js';
+import { listAnnouncements, startAnnouncement } from '../services/admin/announcements.js';
 
 const DAY_MS = 24 * 60 * 60_000;
 const actorOf = (req) => ({ id: req.member.userId, email: req.member.user.email });
@@ -38,7 +39,17 @@ const actorOf = (req) => ({ id: req.member.userId, email: req.member.user.email 
 export function loginPage(req, res) {
   const { user, mfaRequired, accessError } = req.auth;
   if (user && !accessError && !mfaRequired && user.role === 'admin') return res.redirect('/admin');
-  res.render('admin/login', { title: 'Admin sign-in' });
+  const errors = {
+    google:
+      'Google sign-in could not be completed, or that Google account is not an administrator.',
+    google_unavailable: 'Google sign-in is not set up (admin panel → Integrations).',
+    invite_only: 'That Google account is not an administrator.',
+  };
+  res.render('admin/login', {
+    title: 'Admin sign-in',
+    googleEnabled: env.googleAuthEnabled,
+    initialError: errors[req.query.error] ?? null,
+  });
 }
 
 /** The data every admin page embeds for its browser module. */
@@ -67,6 +78,12 @@ export const ADMIN_PAGES = [
     'API keys and switches for the whole platform.',
   ],
   ['/ai', 'ai', 'AI models', 'Which OpenAI models the platform uses.'],
+  [
+    '/announcements',
+    'announcements',
+    'Announcements',
+    'Email all members, or only Premium or free.',
+  ],
   ['/audit', 'audit', 'Audit log', 'Every change made in the admin panel.'],
 ];
 
@@ -204,6 +221,7 @@ const planSchema = z
     priceMonthly: z.number().optional(),
     trialDays: z.number().optional(),
     features: z.array(z.string()).max(20).optional(),
+    freeQuota: z.record(z.number()).optional(),
     signupOpen: z.boolean().optional(),
   })
   .strict();
@@ -268,4 +286,14 @@ export async function listAudit(req, res) {
       createdAt: row.createdAt.toISOString(),
     })),
   });
+}
+
+/** GET /api/admin/announcements: the latest announcements and their progress. */
+export async function listAnnouncementsHandler(_req, res) {
+  res.json({ announcements: await listAnnouncements() });
+}
+
+/** POST /api/admin/announcements { subject, body, audience }: starts sending (202). */
+export async function sendAnnouncementHandler(req, res) {
+  res.status(202).json({ announcement: await startAnnouncement(actorOf(req), req.body ?? {}) });
 }

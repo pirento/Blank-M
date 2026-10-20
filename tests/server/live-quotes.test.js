@@ -124,7 +124,8 @@ describe('live quote stream', () => {
         });
       });
     expect(response.headers['content-type']).toMatch(/text\/event-stream/);
-    expect(text).toContain('data: {"symbol":"INFY","price":1500.25}');
+    // Zerodha ticks carry the time they were sent as "at".
+    expect(text).toMatch(/data: \{"symbol":"INFY","price":1500.25,"at":\d+\}/);
     expect(sockets[0].url).toBe('wss://ws.kite.trade?api_key=test-key&access_token=access-token');
     expect(sockets[0].sent).toEqual([
       { a: 'subscribe', v: [408065, 2953217] },

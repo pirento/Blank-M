@@ -17,5 +17,16 @@ module.exports = {
       kill_timeout: 30000,
       time: true,
     },
+    {
+      // The live market data feed (TrueData allows one connection per login, so exactly one
+      // process). Idle until a TrueData login is set in the admin panel.
+      name: 'pirento-feed',
+      script: 'scripts/market-feed.js',
+      instances: 1,
+      exec_mode: 'fork',
+      env: { NODE_ENV: 'production' },
+      max_memory_restart: '256M',
+      time: true,
+    },
   ],
 };

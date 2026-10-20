@@ -16,12 +16,14 @@ import {
   signUp,
   updatePassword,
   verifyPasswordSignIn,
+  signUpWithGoogle,
 } from '../services/auth/accounts.js';
 import { HttpError } from '../services/errors.js';
 import { env } from '../config/env.js';
 import { clientAddress } from '../services/http.js';
 import { loadPlan } from '../services/billing/plan.js';
 import { isMailConfigured } from '../services/mailer.js';
+import { welcomeMember } from '../services/notifications/emails.js';
 
 /** Password sign-in with an invited email or a claimed username. */
 export async function login(req, res) {
@@ -138,7 +140,9 @@ export async function setPassword(req, res) {
       throw new HttpError('Your current password is not correct.', 403);
     }
   }
+  const activating = Boolean(req.session.auth?.activation) && !user.emailConfirmedAt;
   await updatePassword(user, req.body?.password);
+  if (activating) void welcomeMember(user).catch(() => undefined);
   // Other sessions authenticated with the old password are ended.
   await revokeUserSessions(user._id, req.sessionID);
   req.session.auth.passwordRecovery = false;
@@ -160,14 +164,21 @@ function googleRedirectUri() {
   return `${origin}/auth/google/callback`;
 }
 
-/** Optional Google sign-in for already-invited addresses. It never creates access. */
+/**
+ * GET /auth/google[?for=admin]: starts Google sign-in. Members: an invited address, or a new
+ * account while public sign-up is open. `for=admin` comes from the admin sign-in page and only
+ * lets administrators in (then on to /admin).
+ */
 export function googleStart(req, res) {
+  const forAdmin = req.query.for === 'admin';
   if (!env.googleAuthEnabled || !env.appUrl) {
-    res.redirect('/login?error=google_unavailable');
+    res.redirect(
+      forAdmin ? '/admin/login?error=google_unavailable' : '/login?error=google_unavailable',
+    );
     return;
   }
   const state = randomBytes(32).toString('base64url');
-  req.session.googleState = { value: state, expiresAt: Date.now() + 10 * 60_000 };
+  req.session.googleState = { value: state, expiresAt: Date.now() + 10 * 60_000, forAdmin };
   const url = new URL(GOOGLE_AUTHORIZE);
   url.searchParams.set('client_id', process.env.GOOGLE_CLIENT_ID);
   url.searchParams.set('redirect_uri', googleRedirectUri());
@@ -180,12 +191,14 @@ export function googleStart(req, res) {
 
 /**
  * GET /auth/google/callback: checks the OAuth state, reads the verified Google profile and signs in
- * the matching invited account. Any failure redirects back to /login with an error code.
+ * the matching account; while sign-up is open, a new Google address gets a new member account.
+ * Any failure redirects back to the sign-in page it came from with an error code.
  */
 export async function googleCallback(req, res) {
   const expected = req.session?.googleState;
   if (req.session) delete req.session.googleState;
-  const fail = () => res.redirect('/login?error=google');
+  const loginPage = expected?.forAdmin ? '/admin/login' : '/login';
+  const fail = () => res.redirect(`${loginPage}?error=google`);
   try {
     const state = typeof req.query.state === 'string' ? req.query.state : '';
     const code = typeof req.query.code === 'string' ? req.query.code : '';
@@ -226,13 +239,22 @@ export async function googleCallback(req, res) {
     ) {
       return fail();
     }
-    const invitation = await AllowedUser.findById(email).lean();
-    const user = invitation?.authUserId ? await User.findById(invitation.authUserId) : null;
-    // Invite-only: Google can authenticate an invited identity, never create one.
-    if (!invitation || invitation.revokedAt || !user || user.email !== email) {
-      return res.redirect('/login?error=invite_only');
+    let invitation = await AllowedUser.findById(email).lean();
+    // A new address may join with Google while public sign-up is open (members only).
+    let created = false;
+    if (!invitation && !expected.forAdmin) {
+      created = await signUpWithGoogle(email, clientAddress(req));
+      if (created) invitation = await AllowedUser.findById(email).lean();
     }
+    const user = invitation?.authUserId ? await User.findById(invitation.authUserId) : null;
+    // Otherwise invite-only: Google can authenticate an invited identity, never create one.
+    if (!invitation || invitation.revokedAt || !user || user.email !== email) {
+      return res.redirect(`${loginPage}?error=invite_only`);
+    }
+    if (expected.forAdmin && user.role !== 'admin')
+      return res.redirect(`${loginPage}?error=google`);
     if (user.googleSubject && user.googleSubject !== profile.sub) return fail();
+    const firstSignIn = created || !user.emailConfirmedAt;
     user.googleSubject = profile.sub;
     user.emailConfirmedAt ??= new Date();
     if (!user.displayName && typeof profile.name === 'string')
@@ -242,10 +264,12 @@ export async function googleCallback(req, res) {
       { _id: email, acceptedAt: null },
       { $set: { acceptedAt: user.emailConfirmedAt } },
     );
-    if (await accessProblem(user)) return res.redirect('/login?error=invite_only');
+    if (await accessProblem(user)) return res.redirect(`${loginPage}?error=invite_only`);
     await establishSession(req, user, { method: 'oauth' });
     await recordSignIn(user);
-    res.redirect('/dashboard');
+    if (firstSignIn) void welcomeMember(user).catch(() => undefined);
+    // An administrator with an authenticator still has to enter its code (the /admin guard asks).
+    res.redirect(expected.forAdmin ? '/admin' : '/dashboard');
   } catch {
     fail();
   }

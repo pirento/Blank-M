@@ -43,6 +43,8 @@ const WORKSPACE_PAGES = [
   ['/strategy', 'strategy', ['trades', 'strategies', 'rules']],
   ['/analytics', 'analytics', ['trades', 'strategies', 'rules', 'chatMessages'], [], 'ai'],
   ['/settings', 'settings', ['settings']],
+  ['/billing', 'billing', []],
+  ['/chart', 'chart', []],
   ['/journal', 'journal', ['trades', 'strategies', 'rules', 'settings']],
   ['/import', 'import', ['trades', 'settings']],
   ['/backtest', 'backtest', ['trades', 'strategies', 'rules', 'settings'], CHARTS, 'backtest'],

@@ -68,6 +68,9 @@ Common browser helpers live in `public/js/core/` (`dom.js` element builder, card
 | Authenticator (MFA)                                  | `services/auth/totp.js`, `controllers/mfa.controller.js`                                                                   |
 | Admin panel pages and API keys                       | `routes/admin.js`, `controllers/admin-panel.controller.js`, `services/platform/`, `public/js/admin/`                       |
 | Terms, Privacy, Refund, Contact pages                | `views/pages/legal.ejs`, `pages.controller.js` (`legal`), business details in the registry                                 |
+| Free monthly uses of Premium features                | `services/billing/usage.js`, `requirePremium` in `services/billing/membership.js`                                          |
+| Member emails (welcome, billing, trial reminders)    | `services/notifications/emails.js`; announcements: `services/admin/announcements.js`                                       |
+| Live prices for everyone (TrueData) and live chart   | `services/market/truedata/`, `services/market/vendor-quotes.js`, `public/js/pages/chart.js`                                |
 | Premium plan, trial, payments, feature gates         | `services/billing/`, `controllers/billing.controller.js`, `routes/api.js` (`premium.*`)                                    |
 | Invitations and member access                        | `controllers/admin.controller.js`, `services/admin/`                                                                       |
 | Trades, strategies, rules, watchlist storage         | `services/journal/workspace.js`, `controllers/workspace.controller.js`                                                     |
@@ -402,6 +405,8 @@ The admin panel's browser modules (one per page in `views/admin/`, plus `shell.j
 | `admin-setup-code.js`        | Code for an admin's first authenticator (no email).  |
 | `maintenance-signups.js`     | Daily: delete sign-ups unconfirmed after 7 days.     |
 | `delete-member.js`           | Delete a member and all their data (on request).     |
+| `billing-reminders.js`       | Daily: "your trial ends soon" emails.                |
+| `market-feed.js`             | The TrueData live feed process (PM2 app).            |
 | `dev-memory.js`              | Local preview without installing MongoDB             |
 | `daily-import.js`            | Scheduled daily automatic journal (after the close). |
 | `premarket-plan.js`          | Scheduled pre-market plan on Telegram (08:00 IST).   |

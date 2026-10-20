@@ -4,6 +4,31 @@
  */
 import { h, icon, buttonClass, render } from '../core/dom.js';
 import { CHART_INTERVALS, fetchChartHistory } from '../lib/market-chart.js';
+import { watchLiveQuotes } from '../lib/live-quotes.js';
+
+const SOURCE_NAMES = { truedata: 'TrueData (live)', kite: 'Zerodha Kite', yahoo: 'Yahoo Finance' };
+const STEP_MS = { '5m': 5 * 60_000, '15m': 15 * 60_000, '1h': 60 * 60_000 };
+const istDay = (time) => new Date(time + 330 * 60_000).toISOString().slice(0, 10);
+
+/**
+ * Moves the last candle with a live price, or starts a new one when the price belongs to a later
+ * interval. Changes `candles` in place.
+ */
+export function applyLivePrice(candles, interval, price, now = Date.now()) {
+  const last = candles.at(-1);
+  if (!last) return;
+  const step = STEP_MS[interval];
+  const sameCandle = step ? now < last.time + step : istDay(now) === istDay(last.time);
+  if (sameCandle) {
+    last.close = price;
+    last.high = Math.max(last.high, price);
+    last.low = Math.min(last.low, price);
+    return;
+  }
+  // Intraday candles start on the interval grid of the last one (NSE hours start at 09:15).
+  const time = step ? last.time + Math.floor((now - last.time) / step) * step : now;
+  candles.push({ time, open: price, high: price, low: price, close: price, volume: 0 });
+}
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const dateText = (time) =>
@@ -182,9 +207,17 @@ export function candlePlot(candles, symbol, marks = {}) {
  * Explicitly refreshed historical candle snapshots with provider provenance.
  * Returns `{ element, setSymbol }`; changing the symbol resets the chart.
  */
-export function createMarketHistoryChart({ accountId, symbol: initialSymbol, available = true }) {
+export function createMarketHistoryChart({
+  accountId,
+  symbol: initialSymbol,
+  available = true,
+  live = false,
+  initialInterval = '1d',
+}) {
   let symbol = initialSymbol;
-  let interval = '1d';
+  let interval = initialInterval;
+  // With `live`, the chart follows live prices (the platform's data vendor or the member's broker).
+  let stopLive = () => undefined;
   let requests = 0;
   let pending = null;
   const section = h('section', {
@@ -233,7 +266,10 @@ export function createMarketHistoryChart({ accountId, symbol: initialSymbol, ava
       icon('refresh-cw', 13, loading ? 'animate-spin' : ''),
       requests ? ' Refresh chart' : ' Load history',
     );
-    note.textContent = `Historical candle snapshot · ${interval === '1d' ? '180 calendar days' : '7 calendar days'} · Refresh manually. Provider delays and gaps may occur.`;
+    const span = interval === '1d' ? '180 calendar days' : '7 calendar days';
+    note.textContent = live
+      ? `${span} · The last candle follows live prices when a live feed is available (the platform's data feed or your Zerodha).`
+      : `Historical candle snapshot · ${span} · Refresh manually. Provider delays and gaps may occur.`;
   };
   const idle = () => {
     render(
@@ -252,6 +288,8 @@ export function createMarketHistoryChart({ accountId, symbol: initialSymbol, ava
   };
   async function load(next) {
     if (!allowed()) return;
+    // The previous interval's live updates stop at once, even if this load fails.
+    stopLive();
     pending?.abort();
     const controller = new AbortController();
     pending = controller;
@@ -272,15 +310,34 @@ export function createMarketHistoryChart({ accountId, symbol: initialSymbol, ava
     try {
       const history = await fetchChartHistory(accountId, symbol, interval, controller.signal);
       if (controller.signal.aborted || pending !== controller) return;
-      render(
-        body,
-        candlePlot(history.candles, symbol),
-        h(
-          'p',
-          { class: 'reference-history-note' },
-          `${history.source === 'kite' ? 'Zerodha Kite' : 'Yahoo Finance'} · ${history.currency || 'Currency unavailable'} · Last candle ${dateText(history.candles.at(-1).time)} IST. The latest candle may still be forming.`,
-        ),
-      );
+      const candles = history.candles;
+      const paintCandles = (livePrice) =>
+        render(
+          body,
+          candlePlot(candles, symbol),
+          h(
+            'p',
+            { class: 'reference-history-note' },
+            livePrice
+              ? `Live · ${numberText(livePrice)} · ${SOURCE_NAMES[history.source]} history. The last candle moves with each price.`
+              : `${SOURCE_NAMES[history.source]} · ${history.currency || 'Currency unavailable'} · Last candle ${dateText(candles.at(-1).time)} IST. The latest candle may still be forming.`,
+          ),
+        );
+      paintCandles(null);
+      stopLive();
+      if (live) {
+        let painted = 0;
+        const chartInterval = interval;
+        stopLive = watchLiveQuotes([symbol], (_symbol, price, at) => {
+          // Only prices traded in the last two minutes move the chart (none after the close).
+          if (Date.now() - at > 2 * 60_000) return;
+          applyLivePrice(candles, chartInterval, price, at);
+          // At most one redraw a second.
+          if (Date.now() - painted < 1000) return;
+          painted = Date.now();
+          paintCandles(price);
+        });
+      }
     } catch (failure) {
       if (controller.signal.aborted || pending !== controller) return;
       render(
@@ -307,12 +364,18 @@ export function createMarketHistoryChart({ accountId, symbol: initialSymbol, ava
     element: section,
     setSymbol(next) {
       if (next === symbol) return;
+      stopLive();
       pending?.abort();
       pending = null;
       symbol = next;
-      interval = '1d';
+      interval = initialInterval;
       requests = 0;
       idle();
+      if (live) void load(interval);
     },
+    /** Loads the chart now (pages that open straight on a chart). */
+    load: () => load(interval),
+    /** Stops following live prices (when the page goes away). */
+    stop: () => stopLive(),
   };
 }

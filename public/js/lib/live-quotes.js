@@ -4,7 +4,10 @@
  * `unavailable`, the browser stops asking and the page keeps its own refresh.
  */
 
-/** Calls `onPrice(symbol, price)` for each live price; returns a function that stops it. */
+/**
+ * Calls `onPrice(symbol, price, at)` for each live price (`at`: trade time in ms); returns a
+ * function that stops it.
+ */
 export function watchLiveQuotes(symbols, onPrice) {
   if (!symbols.length || typeof EventSource === 'undefined') return () => undefined;
   const source = new EventSource(
@@ -18,7 +21,7 @@ export function watchLiveQuotes(symbols, onPrice) {
       return;
     }
     if (symbols.includes(tick?.symbol) && Number.isFinite(tick.price) && tick.price > 0) {
-      onPrice(tick.symbol, tick.price);
+      onPrice(tick.symbol, tick.price, Number.isFinite(tick.at) ? tick.at : Date.now());
     }
   });
   source.addEventListener('unavailable', () => source.close());

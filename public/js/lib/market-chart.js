@@ -25,7 +25,7 @@ const candleSchema = z
   .refine((c) => c.low <= Math.min(c.open, c.close) && c.high >= Math.max(c.open, c.close));
 const historySchema = z.object({
   symbol: z.string(),
-  source: z.enum(['kite', 'yahoo']),
+  source: z.enum(['truedata', 'kite', 'yahoo']),
   currency: z
     .string()
     .regex(/^[A-Z]{3}$/)

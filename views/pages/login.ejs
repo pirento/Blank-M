@@ -112,15 +112,7 @@ const changesPassword = mode === 'activate' || mode === 'recover';
         <div class="my-6 flex items-center gap-3 text-xs text-subtle">
           <span class="h-px flex-1 bg-line"></span>or<span class="h-px flex-1 bg-line"></span>
         </div>
-        <a href="/auth/google" class="<%= buttonClass('outline', 'lg', 'w-full') %>">
-          <svg viewBox="0 0 18 18" aria-hidden="true" class="h-4 w-4">
-            <path fill="#4285F4" d="M17.64 9.205c0-.638-.057-1.252-.164-1.841H9v3.482h4.844a4.14 4.14 0 0 1-1.797 2.715v2.258h2.909c1.702-1.567 2.684-3.878 2.684-6.614Z" />
-            <path fill="#34A853" d="M9 18c2.43 0 4.468-.806 5.956-2.181l-2.91-2.258c-.805.54-1.835.86-3.046.86-2.344 0-4.328-1.585-5.037-3.714H.956v2.332A9 9 0 0 0 9 18Z" />
-            <path fill="#FBBC05" d="M3.963 10.707A5.41 5.41 0 0 1 3.681 9c0-.592.102-1.168.282-1.707V4.961H.956A9 9 0 0 0 0 9c0 1.452.347 2.827.956 4.039l3.007-2.332Z" />
-            <path fill="#EA4335" d="M9 3.58c1.321 0 2.507.455 3.441 1.346l2.582-2.582C13.464.892 11.426 0 9 0A9 9 0 0 0 .956 4.961l3.007 2.332C4.672 5.165 6.656 3.58 9 3.58Z" />
-          </svg>
-          <span class="ml-2">Continue with Google</span>
-        </a>
+        <%- include('../partials/google-button', { href: '/auth/google' }) %>
         <% } %>
         <% if (mode === 'reset') { %>
         <a href="/login" class="focus-ring mt-6 block min-h-6 w-full rounded-control text-center text-sm font-medium text-accent">Return to sign in</a>

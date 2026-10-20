@@ -129,6 +129,13 @@ router.post(
   wrap(adminPanel.grantMemberPremium),
 );
 router.get('/admin/audit', requireApiAdmin, wrap(adminPanel.listAudit));
+router.get('/admin/announcements', requireApiAdmin, wrap(adminPanel.listAnnouncementsHandler));
+router.post(
+  '/admin/announcements',
+  requireApiAdmin,
+  requireAdminMfa,
+  wrap(adminPanel.sendAnnouncementHandler),
+);
 
 /* ------------------------------- administration ------------------------------ */
 router.get('/admin/users', wrap(admin.handleListUsers));

@@ -25,6 +25,7 @@ import { env } from '../config/env.js';
 import { isMailConfigured } from '../services/mailer.js';
 import { createLogger, errorName } from '../services/logger.js';
 import { subscribeLiveQuotes } from '../services/market/kite/ticker.js';
+import { subscribeVendorQuotes } from '../services/market/vendor-quotes.js';
 
 const log = createLogger('market');
 
@@ -190,15 +191,20 @@ export async function quoteStream(req, res) {
   };
   // Proxies close idle connections; a comment every 25 s keeps the stream open.
   const keepAlive = setInterval(() => res.write(': keep-alive\n\n'), 25_000);
-  unsubscribe = await subscribeLiveQuotes(userId, symbols, {
-    onTick: ({ symbol, price }) => {
+  const handlers = {
+    // `at` (trade time, ms) comes from the data vendor; Zerodha ticks are "now".
+    onTick: ({ symbol, price, at }) => {
       const now = Date.now();
       if (now - (lastSent.get(symbol) ?? 0) < 1000) return;
       lastSent.set(symbol, now);
-      res.write(`data: ${JSON.stringify({ symbol, price })}\n\n`);
+      res.write(`data: ${JSON.stringify({ symbol, price, at: at ?? now })}\n\n`);
     },
     onEnd: () => stream.end(),
-  });
+  };
+  // The platform's data vendor for everyone; otherwise the member's own Zerodha feed.
+  unsubscribe =
+    (await subscribeVendorQuotes(symbols, handlers)) ??
+    (await subscribeLiveQuotes(userId, symbols, handlers));
   const headers = {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'private, no-store',

@@ -80,10 +80,40 @@ function planCard() {
     step: '1',
     value: String(plan.trialDays),
   });
-  const features = allFeatures.map((feature) => ({
-    key: feature.key,
-    ...checkbox(`feature-${feature.key}`, plan.features.includes(feature.key), feature.label),
-  }));
+  const features = allFeatures.map((feature) => {
+    const toggle = checkbox(
+      `feature-${feature.key}`,
+      plan.features.includes(feature.key),
+      feature.label,
+    );
+    // Free members may still use a Premium feature this many times a month (0 = never).
+    const freeUses = input({
+      id: `free-${feature.key}`,
+      type: 'number',
+      min: '0',
+      max: '100000',
+      step: '1',
+      value: String(plan.freeQuota?.[feature.key] ?? 0),
+      class: 'w-24',
+      'aria-label': `Free uses per month: ${feature.label}`,
+    });
+    return {
+      key: feature.key,
+      box: toggle.box,
+      freeUses,
+      element: h(
+        'div',
+        { class: 'flex flex-wrap items-start justify-between gap-3' },
+        toggle.element,
+        h(
+          'label',
+          { class: 'flex items-center gap-2 text-xs text-muted' },
+          'Free / month',
+          freeUses,
+        ),
+      ),
+    };
+  });
   return card(
     {},
     cardHeader('', cardTitle('Premium plan')),
@@ -120,7 +150,7 @@ function planCard() {
         h(
           'legend',
           { class: 'mb-2 text-sm text-fg' },
-          'Premium features (free members cannot use these)',
+          'Premium features. Free / month: AI counts each AI request; every other feature counts days of use (the first use each day).',
         ),
         ...features.map((feature) => feature.element),
         h(
@@ -149,6 +179,9 @@ function planCard() {
                 features: features
                   .filter((feature) => feature.box.checked)
                   .map((feature) => feature.key),
+                freeQuota: Object.fromEntries(
+                  features.map((feature) => [feature.key, Number(feature.freeUses.value) || 0]),
+                ),
               },
             });
             notify('Plan saved.', 'success');

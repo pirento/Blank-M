@@ -225,7 +225,7 @@ export async function handleUpdate(update) {
         : (await accessProblem(user))
           ? 'Your Blank access is not active.'
           : !(await hasFeature(user, 'telegram'))
-            ? 'The Telegram bot is part of Premium. Renew it in Blank → Settings → Plan & billing.'
+            ? 'The Telegram bot is part of Premium. Renew it in Blank → Billing.'
             : await runCommand(link, command, args);
   }
   try {

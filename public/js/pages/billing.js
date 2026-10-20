@@ -1,9 +1,9 @@
 /**
- * Settings page — Plan & billing: the member's Premium status (trial days left,
- * paid until, granted), Subscribe (opens Razorpay's payment page), Cancel
- * renewal, and payment history. Hidden while billing is switched off.
+ * Billing page: the member's Premium status (trial days left, paid until,
+ * granted), this month's free uses of Premium features, Subscribe (opens
+ * Razorpay's payment page), Cancel renewal, and payment history.
  */
-import { t } from '../../core/i18n.js';
+import { t } from '../core/i18n.js';
 import {
   $,
   h,
@@ -14,10 +14,10 @@ import {
   cardContent,
   render,
   badge,
-} from '../../core/dom.js';
-import { api, errorMessage } from '../../core/api.js';
-import { confirmDialog } from '../../core/dialog.js';
-import { cardDescription, statusLine } from './shared.js';
+} from '../core/dom.js';
+import { api, errorMessage } from '../core/api.js';
+import { confirmDialog } from '../core/dialog.js';
+import { cardDescription, statusLine } from './settings/shared.js';
 
 const rupees = (value) =>
   new Intl.NumberFormat('en-IN', {
@@ -48,8 +48,8 @@ function describe(membership, plan) {
   }
 }
 
-/** Mounts the Plan & billing card. */
-export function mountBilling() {
+/** Mounts the plan card. */
+function mountBilling() {
   const root = $('[data-billing]');
   if (!root) return;
   const state = { info: null, busy: false, message: '' };
@@ -85,9 +85,10 @@ export function mountBilling() {
         root,
         state.message ? statusLine(state.message, 'alert', 'text-sm text-negative') : null,
       );
-    // With billing off every feature is free, so there is nothing to show.
-    if (!info.plan.enabled) return render(root);
-    const { membership, plan, payments } = info;
+    if (!info.plan.enabled) {
+      return render(root, statusLine(t('Every feature is free right now. Nothing to pay.')));
+    }
+    const { membership, plan, payments, freeUsage = {} } = info;
     // Any live Razorpay subscription can be cancelled, whatever gives Premium right now (a grant,
     // the trial, or nothing while a failed charge is being retried).
     const renewing =
@@ -139,7 +140,22 @@ export function mountBilling() {
           h(
             'ul',
             { class: 'space-y-1 text-sm text-muted' },
-            ...plan.features.map((feature) => h('li', {}, `• ${feature.label}`)),
+            ...plan.features.map((feature) => {
+              const free = membership.premium ? null : freeUsage[feature.key];
+              return h(
+                'li',
+                { class: 'flex flex-wrap justify-between gap-2' },
+                h('span', {}, `• ${feature.label}`),
+                // Free members see how many of this month's free uses are left.
+                free
+                  ? h(
+                      'span',
+                      { class: 'tnum text-xs' },
+                      `${Math.max(free.limit - free.used, 0)} of ${free.limit} free ${free.unit} left this month`,
+                    )
+                  : null,
+              );
+            }),
           ),
           info.paymentsAvailable
             ? null
@@ -182,3 +198,5 @@ export function mountBilling() {
   // Coming back from Razorpay's page: ask Razorpay for the latest status once.
   void load(new URLSearchParams(window.location.search).has('billing'));
 }
+
+mountBilling();

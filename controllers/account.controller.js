@@ -119,6 +119,8 @@ export async function getNotifications(req, res) {
     weeklyAiCoach: Boolean(row?.weeklyAiCoach),
     dailyAutoImport: Boolean(row?.dailyAutoImport),
     premarketPlan: Boolean(row?.premarketPlan),
+    // On unless the member turned it off.
+    announcementEmails: row?.announcementEmails !== false,
     emailConfigured: isMailConfigured(),
     aiConfigured: hasOpenAiKey(),
   });
@@ -135,6 +137,7 @@ export async function saveNotifications(req, res) {
       weeklyAiCoach: z.boolean().optional(),
       dailyAutoImport: z.boolean().optional(),
       premarketPlan: z.boolean().optional(),
+      announcementEmails: z.boolean().optional(),
     })
     .refine((value) => Object.values(value).some((item) => item !== undefined))
     .safeParse(req.body);
@@ -155,6 +158,7 @@ export async function saveNotifications(req, res) {
     weeklyAiCoach: Boolean(row.weeklyAiCoach),
     dailyAutoImport: Boolean(row.dailyAutoImport),
     premarketPlan: Boolean(row.premarketPlan),
+    announcementEmails: row.announcementEmails !== false,
   });
 }
 

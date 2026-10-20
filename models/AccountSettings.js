@@ -8,8 +8,13 @@ const accountSettingsSchema = new mongoose.Schema(
     charges: { type: mongoose.Schema.Types.Mixed, default: null },
     /** F&O charge rates: { futures, options }, same fields as `charges`. */
     foCharges: { type: mongoose.Schema.Types.Mixed, default: null },
-    /** Opt-in weekly summary email, and the last week (Monday date) it was sent for. */
+    /**
+     * Weekly summary email and the last week it was sent for. Turned on for new members when their
+     * account is activated (welcomeMember); off by default so existing members are not signed up.
+     */
     weeklyReportEmail: { type: Boolean, default: false },
+    /** Emails the administrator sends to all members (on unless the member turns them off). */
+    announcementEmails: { type: Boolean, default: true },
     weeklyReportSentFor: { type: String, default: null },
     /** Add an AI coach review of the week to the weekly email. */
     weeklyAiCoach: { type: Boolean, default: false },

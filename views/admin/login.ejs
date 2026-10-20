@@ -27,12 +27,18 @@
             <label class="<%= LABEL_CLASS %>" for="admin-password">Password</label>
             <input id="admin-password" name="password" type="password" autocomplete="current-password" class="<%= FIELD_CLASS %>" />
           </div>
-          <p data-admin-login-error role="alert" class="border border-negative bg-negative-soft px-3 py-2 text-sm text-negative" hidden></p>
+          <p data-admin-login-error role="alert" class="border border-negative bg-negative-soft px-3 py-2 text-sm text-negative" <%= initialError ? '' : 'hidden' %>><%= initialError || '' %></p>
           <button type="submit" class="<%= buttonClass('default', 'lg', 'login-submit w-full') %>">
             <span>Sign in to the admin panel</span>
             <%- icon('arrow-right', { size: 17 }) %>
           </button>
         </form>
+        <% if (googleEnabled) { %>
+        <div class="my-6 flex items-center gap-3 text-xs text-subtle">
+          <span class="h-px flex-1 bg-line"></span>or<span class="h-px flex-1 bg-line"></span>
+        </div>
+        <%- include('../partials/google-button', { href: '/auth/google?for=admin' }) %>
+        <% } %>
         <small>Only administrator accounts can sign in here. You will be asked for your authenticator code next if one is set up.</small>
       </main>
     </div>
