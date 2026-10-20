@@ -292,5 +292,6 @@
   "Not available yet": "अभी उपलब्ध नहीं",
   "Status unavailable": "स्थिति उपलब्ध नहीं",
   "Connections are read-only unless you turn on live orders in Settings. Your funds stay with your broker.": "जब तक आप सेटिंग्स में लाइव ऑर्डर चालू नहीं करते, कनेक्शन केवल पढ़ने के लिए हैं। आपका पैसा आपके ब्रोकर के पास ही रहता है।",
-  "Report a problem": "समस्या बताएँ"
+  "Report a problem": "समस्या बताएँ",
+  "Charts by TradingView Lightweight Charts. Prices are for research and may be delayed; this is not investment advice.": "चार्ट: TradingView Lightweight Charts। कीमतें केवल शोध के लिए हैं और देर से आ सकती हैं; यह निवेश सलाह नहीं है।"
 }
