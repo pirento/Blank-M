@@ -18,7 +18,6 @@ $('[data-refresh-all]').addEventListener('click', () => {
   if (!state.private.busy) void reloadPrivate();
   void loadMemberships();
   void loadAccessRequests();
-  void loadAccessRequests();
 });
 
 paint();
