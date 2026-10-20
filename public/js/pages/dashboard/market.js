@@ -3,7 +3,9 @@
  * price history chart.
  */
 import { $, h, icon, buttonClass, render } from '../../core/dom.js';
-import { fetchBrokerStatus, fetchQuote } from '../../lib/quotes.js';
+import { fetchQuote } from '../../lib/quotes.js';
+import { api } from '../../core/api.js';
+import { t } from '../../core/i18n.js';
 import { createMarketHistoryChart } from '../../components/market-history-chart.js';
 import { data, watchlist } from './shared.js';
 
@@ -203,29 +205,36 @@ function selectSymbol(symbol) {
   void loadQuote();
 }
 
-/** Fills the broker status label from the broker status API, falling back after 15s or on error. */
+const BROKER_STATUS = {
+  zerodha: '/api/kite/status',
+  dhan: '/api/dhan',
+  upstox: '/api/upstox',
+  fyers: '/api/fyers',
+  angel: '/api/angel',
+};
+
+/** Shows each broker's link status on the Trading account card, with Connect or Manage. */
 export async function loadBrokerStatus() {
-  const target = $('[data-broker-status]');
-  let failed = false;
-  const timer = setTimeout(() => {
-    failed = true;
-    target.textContent = 'Status unavailable';
-  }, 15_000);
-  try {
-    const broker = await fetchBrokerStatus();
-    if (failed) return;
-    if (!broker || typeof broker.connected !== 'boolean' || typeof broker.configured !== 'boolean')
-      throw new Error('Invalid broker status');
-    const expiry = broker.expiresAt ? Date.parse(broker.expiresAt) : NaN;
-    const linked = broker.connected && Number.isFinite(expiry) && expiry > Date.now();
-    target.textContent = linked
-      ? 'Read-only session linked'
-      : broker.connected
-        ? 'Session needs verification'
-        : 'Disconnected';
-  } catch {
-    target.textContent = 'Status unavailable';
-  } finally {
-    clearTimeout(timer);
-  }
+  await Promise.all(
+    Object.entries(BROKER_STATUS).map(async ([key, path]) => {
+      const row = $(`[data-broker-row="${key}"]`);
+      if (!row) return;
+      const label = row.querySelector('[data-broker-state]');
+      const action = row.querySelector('[data-broker-action]');
+      try {
+        const status = await api(path, { timeout: 15_000 });
+        if (typeof status?.connected !== 'boolean') throw new Error('Invalid broker status');
+        label.textContent = status.connected
+          ? t('Linked')
+          : status.expired
+            ? t('Session expired: connect again')
+            : status.configured === false
+              ? t('Not available yet')
+              : t('Not linked');
+        action.textContent = status.connected ? t('Manage') : t('Connect');
+      } catch {
+        label.textContent = t('Status unavailable');
+      }
+    }),
+  );
 }
