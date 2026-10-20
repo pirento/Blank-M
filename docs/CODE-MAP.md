@@ -69,7 +69,7 @@ Common browser helpers live in `public/js/core/` (`dom.js` element builder, card
 | Admin panel pages and API keys                       | `routes/admin.js`, `controllers/admin-panel.controller.js`, `services/platform/`, `public/js/admin/`                       |
 | Terms, Privacy, Refund, Contact pages                | `views/pages/legal.ejs`, `pages.controller.js` (`legal`), business details in the registry                                 |
 | Free monthly uses of Premium features                | `services/billing/usage.js`, `requirePremium` in `services/billing/membership.js`                                          |
-| Member emails (welcome, billing, trial reminders)    | `services/notifications/emails.js`; announcements: `services/admin/announcements.js`                                       |
+| Member emails (welcome, billing, trial reminders)    | `services/notifications/emails.js` (HTML layout: `email-layout.js`); announcements: `services/admin/announcements.js`      |
 | Live prices for everyone (TrueData) and live chart   | `services/market/truedata/`, `services/market/vendor-quotes.js`, `public/js/pages/chart.js`                                |
 | Premium plan, trial, payments, feature gates         | `services/billing/`, `controllers/billing.controller.js`, `routes/api.js` (`premium.*`)                                    |
 | Invitations and member access                        | `controllers/admin.controller.js`, `services/admin/`                                                                       |
@@ -167,7 +167,9 @@ Common browser helpers live in `public/js/core/` (`dom.js` element builder, card
 | File                  | What it does                                                                                       |
 | --------------------- | -------------------------------------------------------------------------------------------------- |
 | `AccountSettings.js`  | Per-user account settings.                                                                         |
+| `AccessRequest.js`    | Home page requests to join (deleted 90 days after the decision).                                   |
 | `AdminAuditLog.js`    | Who changed what in the admin panel (2-year retention).                                            |
+| `ProblemReport.js`    | Problems members report from Settings (deleted 180 days after fixed).                              |
 | `BillingEvent.js`     | Razorpay webhook events already applied (90 days).                                                 |
 | `Payment.js`          | Razorpay payments.                                                                                 |
 | `PlatformSetting.js`  | Admin panel settings: API keys (encrypted) and the Premium plan.                                   |
@@ -204,6 +206,7 @@ Common browser helpers live in `public/js/core/` (`dom.js` element builder, card
 | `charts.js`                  | Chart.js area and bar charts in the app's colours (repainted on theme change).                                           |
 | `markdown.js`                | Safe markdown rendering for AI output (marked + DOMPurify) with app styling.                                             |
 | `market-history-chart.js`    | Price history chart for one instrument                                                                                   |
+| `pro-chart.js`               | Live chart page: TradingView Lightweight Charts (candles, volume, crosshair, live)                                       |
 | `strategy-evidence-panel.js` | Strategy evidence panel                                                                                                  |
 | `trade-form.js`              | One trade form, used both to log a new trade in the Journal and to correct an existing one from the Transactions ledger. |
 | `trade-replay.js`            | Trade replay: the trade day's candles with its entry, exit and stop-loss marked.                                         |
@@ -250,6 +253,7 @@ Common browser helpers live in `public/js/core/` (`dom.js` element builder, card
 | `dashboard.js`                      | Overview page                                                         |
 | `import.js`                         | Bulk import from a broker CSV or Excel workbook.                      |
 | `journal.js`                        | Journal page                                                          |
+| `landing.js`                        | Home page "Request access" form                                       |
 | `login.js`                          | Login page                                                            |
 | `mfa-challenge.js`                  | Authenticator challenge after sign-in (verifies a 6-digit TOTP code). |
 | `options.js`                        | Options payoff page: F&O legs, payoff at expiry and today, Greeks.    |
@@ -319,21 +323,22 @@ Common browser helpers live in `public/js/core/` (`dom.js` element builder, card
 
 ### `public/js/pages/settings/`
 
-| File               | What it does                                                               |
-| ------------------ | -------------------------------------------------------------------------- |
-| `ai.js`            | Settings page — Blank AI.                                                  |
-| `backup.js`        | Settings page — data backup.                                               |
-| `broker.js`        | Settings page — broker connection.                                         |
-| `broker-links.js`  | Settings page — Upstox, Fyers and Angel One connections (today's fills).   |
-| `capital.js`       | Settings page — capital preferences.                                       |
-| `charges.js`       | Settings page — charges.                                                   |
-| `daily-journal.js` | Settings page — daily automatic journal and pre-market plan on Telegram.   |
-| `email-reports.js` | Settings page — email reports.                                             |
-| `live-trading.js`  | Settings page — live orders.                                               |
-| `mfa.js`           | Settings page — MFA settings.                                              |
-| `sessions.js`      | Settings page — signed-in devices.                                         |
-| `shared.js`        | Shared state and small helpers used by more than one section of this page. |
-| `username.js`      | Settings page — username settings.                                         |
+| File                | What it does                                                               |
+| ------------------- | -------------------------------------------------------------------------- |
+| `ai.js`             | Settings page — Blank AI.                                                  |
+| `backup.js`         | Settings page — data backup.                                               |
+| `broker.js`         | Settings page — broker connection.                                         |
+| `broker-links.js`   | Settings page — Upstox, Fyers and Angel One connections (today's fills).   |
+| `capital.js`        | Settings page — capital preferences.                                       |
+| `charges.js`        | Settings page — charges.                                                   |
+| `daily-journal.js`  | Settings page — daily automatic journal and pre-market plan on Telegram.   |
+| `email-reports.js`  | Settings page — email reports.                                             |
+| `live-trading.js`   | Settings page — live orders.                                               |
+| `report-problem.js` | Settings page — report a problem to the administrators.                    |
+| `mfa.js`            | Settings page — MFA settings.                                              |
+| `sessions.js`       | Settings page — signed-in devices.                                         |
+| `shared.js`         | Shared state and small helpers used by more than one section of this page. |
+| `username.js`       | Settings page — username settings.                                         |
 
 ### `public/js/pages/today/`
 
@@ -350,27 +355,27 @@ Common browser helpers live in `public/js/core/` (`dom.js` element builder, card
 
 The admin panel's browser modules (one per page in `views/admin/`, plus `shell.js` and `shared.js`).
 
-| File              | What it does                                                          |
-| ----------------- | --------------------------------------------------------------------- |
-| `login.js`        | Admin sign-in page (administrators only).                             |
-| `shell.js`        | Admin panel sign-out button, loaded on every admin page.              |
-| `shared.js`       | Page data, the authenticator notice and formatters for admin pages.   |
-| `dashboard.js`    | Overview: members, Premium and revenue, integrations, server health.  |
-| `members.js`      | Members: invitations, access, and each member's Premium (`members/`). |
-| `billing.js`      | Plans & billing: price, trial, Premium features, sign-up, payments.   |
-| `integrations.js` | API keys and switches (services/platform/settings-registry.js).       |
-| `ai.js`           | Which OpenAI models the platform uses.                                |
-| `audit.js`        | Every change made in the admin panel.                                 |
+| File              | What it does                                                                             |
+| ----------------- | ---------------------------------------------------------------------------------------- |
+| `shell.js`        | Admin panel sign-out button, loaded on every admin page.                                 |
+| `shared.js`       | Page data, the authenticator notice and formatters for admin pages.                      |
+| `dashboard.js`    | Overview: numbers, 30-day charts, live activity, problem reports, health (auto-refresh). |
+| `members.js`      | Members: access requests, invitations, access, Premium (`members/`).                     |
+| `billing.js`      | Plans & billing: price, trial, Premium features, sign-up, payments.                      |
+| `integrations.js` | API keys and switches (services/platform/settings-registry.js).                          |
+| `ai.js`           | Which OpenAI models the platform uses.                                                   |
+| `audit.js`        | Every change made in the admin panel.                                                    |
 
 ### `public/js/admin/members/`
 
-| File               | What it does                                     |
-| ------------------ | ------------------------------------------------ |
-| `email-members.js` | Members invited by email                         |
-| `paint.js`         | Renders the members page from the current state. |
-| `premium.js`       | Each member's Premium status and "Give Premium". |
-| `private-links.js` | Private invitation links                         |
-| `shared.js`        | Members page state and small formatting helpers. |
+| File                 | What it does                                     |
+| -------------------- | ------------------------------------------------ |
+| `access-requests.js` | Home page access requests: approve or reject.    |
+| `email-members.js`   | Members invited by email                         |
+| `paint.js`           | Renders the members page from the current state. |
+| `premium.js`         | Each member's Premium status and "Give Premium". |
+| `private-links.js`   | Private invitation links                         |
+| `shared.js`          | Members page state and small formatting helpers. |
 
 ### `services/billing/`
 
@@ -422,17 +427,21 @@ The admin panel's browser modules (one per page in `views/admin/`, plus `shell.j
 | `http.js`         | Rejects anything but the expected method, so handlers can assume it.             |
 | `icons.js`        | Lucide icons for EJS templates and the sprite used by browser modules.           |
 | `logger.js`       | Structured logging.                                                              |
-| `mailer.js`       | Outgoing email over SMTP (replaceable in tests).                                 |
+| `mailer.js`       | Outgoing email over SMTP, text plus branded HTML (replaceable in tests).         |
 | `rate-window.js`  | Durable fixed-window rate limits shared by all server processes.                 |
 | `storage-path.js` | Storage download interpolates object paths into a URL under service credentials. |
 | `storage.js`      | File storage in MongoDB GridFS                                                   |
 
 ### `services/admin/`
 
-| File                    | What it does                                      |
-| ----------------------- | ------------------------------------------------- |
-| `contracts.js`          | Error for administrator and invitation operations |
-| `manual-invitations.js` | Private invitation links (no email needed)        |
+| File                    | What it does                                             |
+| ----------------------- | -------------------------------------------------------- |
+| `access-requests.js`    | Home page access requests, approval and rejection emails |
+| `announcements.js`      | Admin emails to members, with lease and resume           |
+| `contracts.js`          | Error for administrator and invitation operations        |
+| `overview-report.js`    | Admin overview: 30-day series and the activity feed      |
+| `problem-reports.js`    | Member problem reports and "mark fixed" emails           |
+| `manual-invitations.js` | Private invitation links (no email needed)               |
 
 ### `services/ai/`
 

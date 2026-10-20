@@ -212,16 +212,60 @@ hai — kisi expert se confirm kariye.
 1. console.cloud.google.com → APIs & Services → Credentials → Create OAuth client ID → Web
    application.
 2. Authorized redirect URI: `https://aapka-domain.com/auth/google/callback`.
-3. Client ID + secret admin panel → Integrations → Google sign-in mein daaliye, "Enabled" tick.
+3. **Pehli baar:** Client ID + secret server ki `.env` mein daaliye (`GOOGLE_CLIENT_ID`,
+   `GOOGLE_CLIENT_SECRET`, `GOOGLE_AUTH_ENABLED="true"`) aur restart kariye — kyunki admin bina
+   Google ke login hi nahi kar sakta. Baad mein admin panel → Integrations se badal sakte hain.
 
-Member login page, sign-up page aur admin login page teeno par "Continue with Google" aa jaata hai.
-Sign-up khula ho to naya member Google se seedha account bana sakta hai. Admin login par sirf admin
-account andar jaata hai, aur authenticator ho to uska code bhi maanga jaata hai.
+### Login aur access ka poora flow
+
+**Admin:**
+
+1. `ADMIN_EMAIL=aapka@gmail.com pnpm run seed:admin` (koi password nahi).
+2. `/admin/login` → "Sign in with Google" (wahi Gmail).
+3. Pehli baar authenticator app (Google Authenticator / Authy) jodna padta hai: 8 ankon ka setup
+   code email par aata hai, ya server par `node scripts/admin-setup-code.js aapka@gmail.com`.
+4. Iske baad har baar: Google + authenticator ka 6 ankon ka code. Admin ka koi password, reset link
+   ya member login page se entry nahi hai.
+
+**Naya member (request se):**
+
+1. Home page (`/`) ke neeche "Request access" form: naam, email (Google wali behtar), phone
+   (optional), note. Member ko "request mili" email jaata hai, sab admins ko "nayi request" email.
+2. Admin panel → Members → **Access requests** → Approve ya Reject.
+3. Approve: member ko professional email jaata hai — "Set my password" button (24 ghante) aur
+   "Sign in with Google" (usi email wale Google account se, password ki zaroorat nahi).
+   Reject: ek vinamra email.
+4. Member `/login` se Google ya password se andar aata hai. Chaahe to Settings → Authenticator bhi
+   laga sakta hai.
+
+**Doosre raste:** admin khud invite (Members → Email invitation / Private link), ya Plans &
+billing mein "Open sign-up" chalu karke seedha sign-up.
+
+**Member ka broker:** Overview (dashboard) ke "Trading account" card par Zerodha, Dhan, Upstox,
+Fyers, Angel One — har ek ka status aur Connect button (Settings ke us broker par le jaata hai).
+
+**Problem / bug report:** member Settings → "Report a problem" (menu mein bhi link). Admin ko email
+jaata hai, Overview par "Problem reports" mein dikhta hai; "Mark fixed" dabane par member ko note ke
+saath email.
+
+**Admin Overview:** members, naye members, paying, revenue, pending requests, open reports, 30 din
+ke charts (naye members, revenue), live activity (sign-up, request, payment, report, admin kaam) —
+har 30 second mein apne aap refresh.
+
+**Emails:** sab emails ab brand wale HTML design mein (button, footer mein business details aur
+Terms/Privacy links) aur saath mein plain text bhi. Business details admin panel → Integrations →
+Business details se aate hain.
+
+**Legal pages:** `/terms`, `/privacy` (DPDP Act 2023 ke rights, kaun data dekhta hai, kitne din
+rakha jaata hai), `/disclaimer` (SEBI / risk), `/refunds`, `/contact`. Bechne se pehle CA/lawyer se
+padhwa lijiye.
 
 ### Live price aur live chart (TrueData)
 
-Menu → **Live chart**: kisi bhi NSE symbol ka chart, jiski aakhri candle live price ke saath chalti
-hai (TradingView par jaane ki zaroorat nahi). Watchlist ka "Chart" button bhi yahin khulta hai.
+Menu → **Live chart**: kisi bhi NSE symbol ka TradingView jaisa chart (TradingView ki open-source
+Lightweight Charts library): candles + volume, crosshair par O/H/L/C, scroll se zoom, drag se pan,
+5m/15m/1H/1D, aur aakhri candle live price ke saath chalti hai (TradingView site par jaane ki
+zaroorat nahi). Watchlist ka "Chart" button bhi yahin khulta hai.
 
 - TrueData (truedata.in) ka market data plan lijiye. Admin panel → Integrations → Live market data
   mein login aur password daaliye. Feed ek alag process (`pirento-feed`) mein chalta hai, jo
