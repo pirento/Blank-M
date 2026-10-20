@@ -30,6 +30,8 @@ export function sessionMiddleware({ store } = {}) {
         stringify: false,
         ttl: SESSION_MAX_AGE_MS / 1000,
         autoRemove: 'native',
+        // Refresh a session's expiry at most once an hour, not on every request.
+        touchAfter: 3600,
       }),
     cookie: {
       httpOnly: true,

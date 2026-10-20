@@ -174,3 +174,12 @@ export async function expiredObjects(bucketName, cutoff, limit) {
     updated_at: file.uploadDate.toISOString(),
   }));
 }
+
+/** Deletes every file in the member's `<userId>/` folder of a bucket; returns how many. */
+export async function removeOwnerFolder(bucketName, userId) {
+  const { gridfs } = bucket(bucketName);
+  // Owner ids are UUIDs (checked by isSafeOwnerStoragePath), so the prefix needs no escaping.
+  const files = await gridfs.find({ filename: { $regex: `^${userId}/` } }).toArray();
+  for (const file of files) await gridfs.delete(file._id);
+  return files.length;
+}

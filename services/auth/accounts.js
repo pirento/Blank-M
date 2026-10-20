@@ -79,9 +79,10 @@ export async function verifyPasswordSignIn(input, clientAddress) {
   const emailLogin = identifier.includes('@');
   if (!emailLogin && !USERNAME_PATTERN.test(identifier)) throw new HttpError(INVALID, 401);
 
+  // No platform-wide bucket: successful sign-ins would count too, and a morning rush (or an
+  // attacker spread over many addresses) could lock every member out.
   const quota = await reserveAttempts(
     [
-      { key: 'login:g', limit: 1000 },
       { key: `login:c:${opaque('client', clientAddress || 'unidentified-client')}`, limit: 60 },
       { key: `login:i:${opaque('identifier', identifier)}`, limit: 10 },
     ],

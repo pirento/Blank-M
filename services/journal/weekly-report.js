@@ -132,7 +132,8 @@ export async function sendWeeklyReport(user, period) {
  * Send last week's report to every member who opted in, at most once per week
  * per member. Returns counts; a failed send is counted and not retried that week.
  */
-export async function sendWeeklyReports({ today = todayInIst(), limit = 200 } = {}) {
+// A batch per call stays well inside the proxy's 180 s timeout (email, maybe an AI coach review).
+export async function sendWeeklyReports({ today = todayInIst(), limit = 15 } = {}) {
   if (!isMailConfigured()) return { sent: 0, skipped: 0, failed: 0, configured: false };
   const period = lastCompletedWeek(today);
   const due = await AccountSettings.find({

@@ -15,7 +15,8 @@ import { resolveAiConfig } from './config.js';
 import { structured } from './openai.js';
 
 const MAX_TRADES = 300;
-const KEEP_REVIEWS = 100;
+// The coach screen lists the newest 30; older reviews are never read.
+const KEEP_REVIEWS = 30;
 
 /** API shape of a stored coach review row. */
 export function toCoachReview(row) {

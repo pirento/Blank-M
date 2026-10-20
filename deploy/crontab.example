@@ -11,9 +11,9 @@
 # Monday 02:30 UTC (08:00 IST): weekly report emails for members who opted in.
 30 2 * * 1 cd /srv/blank && set -a && . ./.env && set +a && node scripts/send-weekly-reports.js >> /var/log/blank-cron.log 2>&1
 
-# Monday–Friday 03:15 UTC (08:45 IST): pre-market plan on Telegram for members who turned on
+# Monday–Friday 02:30 UTC (08:00 IST): pre-market plan on Telegram for members who turned on
 # "Pre-market plan on Telegram" (skips NSE holidays and does nothing after 09:15 IST).
-15 3 * * 1-5 cd /srv/blank && set -a && . ./.env && set +a && node scripts/premarket-plan.js >> /var/log/blank-cron.log 2>&1
+30 2 * * 1-5 cd /srv/blank && set -a && . ./.env && set +a && node scripts/premarket-plan.js >> /var/log/blank-cron.log 2>&1
 
 # Every 5 minutes, Monday–Friday 03:45–10:00 UTC (09:15–15:30 IST): paper trade stops/targets
 # and price alerts.

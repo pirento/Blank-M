@@ -12,7 +12,7 @@ import { NAV_LINKS, ADMIN_NAV_GROUP } from '../config/nav.js';
 import { createHash } from 'node:crypto';
 import { openShareLink } from '../services/journal/share-links.js';
 import { reserveAttempts } from '../services/rate-window.js';
-import { hasFeature, membershipFor } from '../services/billing/membership.js';
+import { membershipFor } from '../services/billing/membership.js';
 import { featureLabel, loadPlan, publicPlan } from '../services/billing/plan.js';
 
 const TITLES = Object.fromEntries(
@@ -52,7 +52,8 @@ export function workspacePage(
     const userId = req.member.userId;
     const membership = await membershipFor(req.member.user);
     // A Premium page for a free member shows the upgrade page instead (billing on only).
-    if (feature && !(await hasFeature(req.member.user, feature))) {
+    // Same rule as hasFeature, from the membership already read (one Subscription read per page).
+    if (feature && !membership.premium && membership.premiumFeatures.includes(feature)) {
       const plan = await loadPlan();
       return res.status(402).renderWorkspace('pages/upgrade', {
         title: res.locals.t(TITLES[req.path] ?? 'Premium'),

@@ -5,7 +5,11 @@
 import { readJsonBody, requireMethod } from '../../services/http.js';
 import { authenticateRequest } from '../../services/auth/request-auth.js';
 import { enforceAiRateLimit, recordAiUsage } from '../../services/ai/usage-limits.js';
-import { EMBEDDING_MODEL, resolveAiConfig } from '../../services/ai/config.js';
+import {
+  EMBEDDING_DIMENSIONS,
+  EMBEDDING_MODEL,
+  resolveAiConfig,
+} from '../../services/ai/config.js';
 import { journalSearchRequestSchema } from '../../shared/ai-schemas.js';
 import { handleFailure } from './shared.js';
 import {
@@ -54,6 +58,7 @@ export async function handleJournalSearch(req, res) {
     const queryEmbedding = await providerRequest(() =>
       client.embeddings.create({
         model: EMBEDDING_MODEL,
+        dimensions: EMBEDDING_DIMENSIONS,
         input: body.query,
         encoding_format: 'float',
       }),

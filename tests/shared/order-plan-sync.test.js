@@ -371,3 +371,33 @@ describe('private cloud order-plan synchronization', () => {
     subscription.unsubscribe();
   });
 });
+
+describe('incremental cloud reads', () => {
+  it('downloads only new records after the first full read, and falls back when counts disagree', async () => {
+    const cloud = backend();
+    cloud.transport.pageAfter = vi.fn(async (account, after, limit) => {
+      const owned = cloud.rows.filter((row) => row.user_id === account);
+      return {
+        rows: clone(owned.filter((row) => row.server_revision > after).slice(0, limit)),
+        count: owned.length,
+      };
+    });
+    const owner2 = '00000000-0000-4000-8000-0000000000a2';
+    saveOrderPlan(owner2, draft());
+    await synchronizeOrderPlans(owner2, cloud.transport, () => true);
+    const fullReads = cloud.transport.page.mock.calls.length;
+
+    saveOrderPlan(owner2, draft('RELIANCE'));
+    await synchronizeOrderPlans(owner2, cloud.transport, () => true);
+    // No more full reads: only the records after the cached revision were fetched.
+    expect(cloud.transport.page.mock.calls.length).toBe(fullReads);
+    expect(cloud.transport.pageAfter).toHaveBeenCalled();
+    const rows = await readCloudOrderPlanRecords(owner2, cloud.transport, () => true);
+    expect(rows).toHaveLength(2);
+
+    // A record that appears with an older revision makes the counts disagree: full read again.
+    cloud.rows.unshift({ ...clone(cloud.rows[0]), record_key: 'late-key', server_revision: 0.5 });
+    await readCloudOrderPlanRecords(owner2, cloud.transport, () => true).catch(() => undefined);
+    expect(cloud.transport.page.mock.calls.length).toBeGreaterThan(fullReads);
+  });
+});
