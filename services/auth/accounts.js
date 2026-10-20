@@ -304,6 +304,22 @@ export async function createRecoveryLink(user) {
  * link stops working.
  */
 export async function sendActivationEmail(user, { selfSignup = false, approved = false } = {}) {
+  // Administrators have no password: they sign in with Google, then add an authenticator.
+  if (user.role === 'admin') {
+    await sendMail({
+      to: user.email,
+      subject: 'You are now a Pirento Blank administrator',
+      text: [
+        'You have been made an administrator of Pirento Blank.',
+        '',
+        `Sign in with Google: ${appOrigin()}/admin/login`,
+        `Use the Google account for ${user.email}. After signing in you add an authenticator app (Google Authenticator or Authy); its setup code is emailed to you.`,
+        '',
+        'If you were not expecting this email, tell the other administrators.',
+      ].join('\n'),
+    });
+    return;
+  }
   const token = await issueToken(user, 'activate', ACTIVATION_TTL_MS);
   const link = `${appOrigin()}/auth/link/activate#token=${token}`;
   const google = env.googleAuthEnabled

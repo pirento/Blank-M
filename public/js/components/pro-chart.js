@@ -214,9 +214,7 @@ export function createProChart({ accountId, symbol: initialSymbol, initialInterv
       symbol = next;
       void load(interval);
     },
-    stop() {
-      stopLive();
-      themeWatch.disconnect();
-    },
+    /** Stops following live prices (when the page goes away); load() starts again. */
+    stop: () => stopLive(),
   };
 }

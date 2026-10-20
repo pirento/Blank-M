@@ -10,11 +10,18 @@ import { HttpError } from '../errors.js';
 import { reserveAttempts } from '../rate-window.js';
 import { opaque } from '../auth/accounts.js';
 import { sendQuietly } from '../notifications/emails.js';
+import { quote } from '../notifications/email-layout.js';
 
 const KEEP_DECIDED_MS = 90 * 24 * 60 * 60_000;
 
 const requestSchema = z.object({
-  name: z.string().trim().min(2, 'Enter your name.').max(120),
+  // One line and no links: the name is written into emails.
+  name: z
+    .string()
+    .trim()
+    .min(2, 'Enter your name.')
+    .max(120)
+    .refine((value) => !/[\r\n]|:\/\//.test(value), 'Enter your name.'),
   email: z.string().trim().toLowerCase().email('Enter a valid email address.').max(320),
   phone: z
     .string()
@@ -56,7 +63,7 @@ async function tellAdmins(request) {
       sendQuietly(admin.email, `New access request from ${request.name}`, [
         `${request.name} (${request.email}) asked to join Pirento Blank.`,
         request.phone ? `Phone: ${request.phone}` : null,
-        request.message ? `\nTheir note:\n${request.message}` : null,
+        request.message ? `\nTheir note:\n${quote(request.message)}` : null,
         '',
         link,
       ]),
@@ -100,7 +107,8 @@ export async function submitAccessRequest(input, clientAddress) {
     if (error?.code === 11000) return;
     throw error;
   }
-  await sendQuietly(request.email, 'We received your request to join Pirento Blank', [
+  // Emails go out in the background, so a new address answers as fast as a known one.
+  void sendQuietly(request.email, 'We received your request to join Pirento Blank', [
     `Hi ${request.name},`,
     '',
     'Thank you for your interest in Pirento Blank. Your request has reached our team.',
@@ -108,7 +116,7 @@ export async function submitAccessRequest(input, clientAddress) {
     '',
     'If you did not make this request, ignore this email and nothing will happen.',
   ]);
-  await tellAdmins(request);
+  void tellAdmins(request).catch(() => undefined);
 }
 
 /** The pending requests first, then the latest decided ones. */
@@ -131,10 +139,10 @@ export async function pendingAccessRequest(id) {
 }
 
 /**
- * Records the decision (once: a second administrator deciding at the same moment gets a 409),
- * writes the audit log and, for a rejection, emails the visitor politely.
+ * Marks a pending request approved or rejected, once: a second administrator deciding at the same
+ * moment gets a 409. Call before inviting, so two approvals can never send two invitations.
  */
-export async function recordAccessDecision(request, status, actor) {
+export async function claimAccessRequest(request, status, actor) {
   const now = new Date();
   const updated = await AccessRequest.findOneAndUpdate(
     { _id: request._id, status: 'pending' },
@@ -149,6 +157,22 @@ export async function recordAccessDecision(request, status, actor) {
     { new: true },
   ).lean();
   if (!updated) throw new HttpError('Another administrator already handled this request.', 409);
+  return toRequest(updated);
+}
+
+/** Puts a request back to pending after its invitation failed, so it can be approved again. */
+export async function reopenAccessRequest(request) {
+  await AccessRequest.updateOne(
+    { _id: request._id },
+    { $set: { status: 'pending', decidedBy: null, decidedAt: null, purgeAt: null } },
+  ).catch((error) => {
+    // A new request from the same address is already pending; that one stays.
+    if (error?.code !== 11000) throw error;
+  });
+}
+
+/** Writes the audit log and, for a rejection, emails the visitor politely. */
+export async function finishAccessDecision(request, status, actor) {
   await AdminAuditLog.create({
     actorId: actor.id,
     actorEmail: actor.email,
@@ -163,5 +187,4 @@ export async function recordAccessDecision(request, status, actor) {
       'This is usually because we are admitting a limited number of members at a time. You are welcome to ask again later.',
     ]);
   }
-  return toRequest(updated);
 }

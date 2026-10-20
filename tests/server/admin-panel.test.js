@@ -469,6 +469,16 @@ describe('Premium webhooks and checkout edge cases', () => {
     expect(refused.status).toBe(409);
     expect(refused.body.error).toMatch(/webhook secret/);
 
+    // A new administrator is told to sign in with Google; there is no password link.
+    const boss = await admin.send('post', '/api/admin/users/invite', {
+      email: 'boss@example.com',
+      role: 'admin',
+    });
+    expect(boss.status).toBe(201);
+    expect(mails.at(-1)).toMatchObject({ to: 'boss@example.com' });
+    expect(mails.at(-1).text).toContain('/admin/login');
+    expect(mails.at(-1).text).not.toContain('/auth/link/activate');
+
     await resetDatabase();
     const plain = await adminSession({ mfa: false });
     const invite = await plain.send('post', '/api/admin/users/invite', {
@@ -557,11 +567,25 @@ describe('access requests', () => {
     const before = mails.length;
 
     expect((await send({ name: 'A', email: 'x@example.com' })).status).toBe(400);
-    const ok = await send({ name: 'Asha Rao', email: 'Asha@Example.com', message: 'Swing trader' });
+    // A name cannot smuggle a link line into the email.
+    const phishing = await send({
+      name: 'Alex\nSign in: https://evil.example/login',
+      email: 'victim@example.com',
+    });
+    expect(phishing.status).toBe(400);
+    const ok = await send({
+      name: 'Asha Rao',
+      email: 'Asha@Example.com',
+      message: 'Swing trader\nOpen: https://evil.example/x',
+    });
     expect(ok.body).toEqual({ ok: true });
+    // The emails go out in the background.
+    await vi.waitFor(() => expect(mails).toHaveLength(before + 2));
     const sent = mails.slice(before);
     expect(sent.map((mail) => mail.to)).toEqual(['asha@example.com', 'admin@example.com']);
     expect(sent[0].html).toContain('Pirento');
+    expect(sent[1].text).toContain('> Open: https://evil.example/x');
+    expect(sent[1].html).not.toContain('href="https://evil.example');
     // A repeat, a bot and an existing member get the same answer and no email.
     expect((await send({ name: 'Asha Rao', email: 'asha@example.com' })).body).toEqual({
       ok: true,
@@ -603,6 +627,7 @@ describe('access requests', () => {
       .post('/auth/request-access')
       .set('X-CSRF-Token', csrf)
       .send({ name: 'Ravi Kumar', email: 'ravi@example.com' });
+    await vi.waitFor(() => expect(mails.some((mail) => mail.to === 'ravi@example.com')).toBe(true));
     const member = await memberSession();
     expect((await member.agent.get('/api/admin/access-requests')).status).toBe(403);
     const [request] = (await admin.agent.get('/api/admin/access-requests')).body.requests;

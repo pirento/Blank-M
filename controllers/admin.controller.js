@@ -18,9 +18,11 @@ import { endSubscriptionNow } from '../services/billing/subscriptions.js';
 import { detachRevokedMember } from '../services/admin/delete-member.js';
 import { iso } from '../models/helpers.js';
 import {
+  claimAccessRequest,
+  finishAccessDecision,
   listAccessRequests,
   pendingAccessRequest,
-  recordAccessDecision,
+  reopenAccessRequest,
 } from '../services/admin/access-requests.js';
 import { createLogger, errorName } from '../services/logger.js';
 
@@ -353,14 +355,18 @@ export async function handleDecideAccessRequest(req, res) {
     const { decision } = decisionSchema.parse(readJsonBody(req));
     await requireAccessAdmin(admin.user.id);
     const request = await pendingAccessRequest(req.params.id);
-    if (decision === 'approve') {
-      await requestInvitation(request.email, 'member', admin.user.id, false, { approved: true });
+    const status = decision === 'approve' ? 'approved' : 'rejected';
+    const actor = { id: admin.user.id, email: admin.user.email };
+    const updated = await claimAccessRequest(request, status, actor);
+    if (status === 'approved') {
+      try {
+        await requestInvitation(request.email, 'member', admin.user.id, false, { approved: true });
+      } catch (error) {
+        await reopenAccessRequest(request);
+        throw error;
+      }
     }
-    const updated = await recordAccessDecision(
-      request,
-      decision === 'approve' ? 'approved' : 'rejected',
-      { id: admin.user.id, email: admin.user.email },
-    );
+    await finishAccessDecision(request, status, actor);
     res.status(200).json({ request: updated });
   } catch (error) {
     failure(res, error);

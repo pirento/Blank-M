@@ -26,3 +26,7 @@ form.addEventListener('submit', (event) => {
   chart.setSymbol(symbol);
 });
 window.addEventListener('pagehide', () => chart.stop());
+// Coming back from the browser's back/forward cache: follow live prices again.
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) void chart.load();
+});

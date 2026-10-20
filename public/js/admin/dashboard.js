@@ -15,6 +15,7 @@ import {
   cardContent,
   badge,
   button,
+  cn,
 } from '../core/dom.js';
 import { api, errorMessage } from '../core/api.js';
 import { openModal } from '../core/dialog.js';
@@ -23,7 +24,7 @@ import { bytes, money, when } from './shared.js';
 
 const root = $('[data-admin-dashboard]');
 const REFRESH_MS = 30_000;
-const view = { overview: null, reports: [], updatedAt: null };
+const view = { overview: null, reports: [], updatedAt: null, failed: false };
 const ACTIVITY_TONES = {
   member: 'positive',
   request: 'accent',
@@ -100,7 +101,10 @@ function activityCard(activity) {
     activity.length
       ? h(
           'ul',
-          { class: 'max-h-96 divide-y divide-line overflow-y-auto text-sm' },
+          {
+            class: 'max-h-96 divide-y divide-line overflow-y-auto text-sm',
+            'data-scroll': 'activity',
+          },
           ...activity.map((event) =>
             h(
               'li',
@@ -174,7 +178,10 @@ function reportsCard(reports) {
     reports.length
       ? h(
           'ul',
-          { class: 'max-h-96 divide-y divide-line overflow-y-auto text-sm' },
+          {
+            class: 'max-h-96 divide-y divide-line overflow-y-auto text-sm',
+            'data-scroll': 'reports',
+          },
           ...reports.map((report) =>
             h(
               'li',
@@ -212,6 +219,20 @@ function reportsCard(reports) {
 }
 
 function paint() {
+  // A refresh keeps where the lists were scrolled to.
+  const scrolled = Object.fromEntries(
+    [...root.querySelectorAll('[data-scroll]')].map((list) => [
+      list.dataset.scroll,
+      list.scrollTop,
+    ]),
+  );
+  paintOverview();
+  for (const list of root.querySelectorAll('[data-scroll]')) {
+    list.scrollTop = scrolled[list.dataset.scroll] ?? 0;
+  }
+}
+
+function paintOverview() {
   const overview = view.overview;
   const { members, billing, integrations, system } = overview;
   const disk = system.disk;
@@ -270,8 +291,10 @@ function paint() {
     ),
     h(
       'p',
-      { class: 'mt-3 text-xs text-muted', 'aria-live': 'polite' },
-      `Live · updated ${when(view.updatedAt)} · refreshes every 30 seconds`,
+      { class: cn('mt-3 text-xs', view.failed ? 'text-negative' : 'text-muted') },
+      view.failed
+        ? `Could not refresh: showing numbers from ${when(view.updatedAt)}. Retrying every 30 seconds.`
+        : `Live · updated ${when(view.updatedAt)} · refreshes every 30 seconds`,
     ),
     h(
       'div',
@@ -353,11 +376,20 @@ async function load() {
       api('/api/admin/overview'),
       api('/api/admin/reports'),
     ]);
-    Object.assign(view, { overview, reports: reports.reports, updatedAt: new Date() });
+    Object.assign(view, {
+      overview,
+      reports: reports.reports,
+      updatedAt: new Date(),
+      failed: false,
+    });
     paint();
   } catch (error) {
-    // Keep showing the last good numbers when a background refresh fails.
-    if (view.overview) return;
+    // Keep showing the last good numbers when a background refresh fails, and say so.
+    if (view.overview) {
+      view.failed = true;
+      paint();
+      return;
+    }
     render(
       root,
       statusLine(
@@ -372,7 +404,9 @@ async function load() {
 render(root, statusLine('Loading…'));
 void load();
 setInterval(() => {
-  if (document.visibilityState === 'visible' && !document.querySelector('[role="dialog"]')) {
-    void load();
-  }
+  // Not while hidden, while a dialog is open, or while a button on the page has focus.
+  const busy =
+    document.querySelector('[role="dialog"]') ||
+    (root.contains(document.activeElement) && document.activeElement !== root);
+  if (document.visibilityState === 'visible' && !busy) void load();
 }, REFRESH_MS);

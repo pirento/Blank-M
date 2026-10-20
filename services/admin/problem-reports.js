@@ -8,6 +8,7 @@ import { PROBLEM_CATEGORIES } from '../../models/ProblemReport.js';
 import { HttpError } from '../errors.js';
 import { reserveAttempts } from '../rate-window.js';
 import { sendQuietly } from '../notifications/emails.js';
+import { quote } from '../notifications/email-layout.js';
 
 const KEEP_FIXED_MS = 180 * 24 * 60 * 60_000;
 const CATEGORY_LABELS = {
@@ -65,7 +66,7 @@ export async function submitProblemReport(user, input) {
       sendQuietly(admin.email, `Problem report: ${CATEGORY_LABELS[report.category]}`, [
         `${report.email} reported a problem${report.page ? ` on ${report.page}` : ''}:`,
         '',
-        report.message,
+        quote(report.message),
         '',
         origin() ? `Open the admin overview: ${origin()}/admin` : null,
       ]),
@@ -108,9 +109,10 @@ export async function resolveProblemReport(id, input, actor) {
   });
   await sendQuietly(report.email, 'Your problem report has been resolved', [
     'Thank you for telling us about a problem with Pirento Blank. Our team has looked into it and marked it resolved.',
-    note ? `\nWhat we did:\n${note}` : null,
+    note ? `\nWhat we did:\n${quote(note)}` : null,
     '',
-    `Your report: “${report.message.slice(0, 300)}${report.message.length > 300 ? '…' : ''}”`,
+    'Your report:',
+    quote(`${report.message.slice(0, 300)}${report.message.length > 300 ? '…' : ''}`),
     '',
     'If it still happens, reply to this email or send a new report from Settings.',
   ]);

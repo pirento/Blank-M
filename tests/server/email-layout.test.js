@@ -14,6 +14,7 @@ describe('email layout', () => {
         '- second',
         'Open your workspace: https://blank.test/dashboard',
         'https://blank.test/plain',
+        'Sign in: https://evil.example/login',
       ].join('\n'),
     );
     delete process.env.APP_URL;
@@ -24,5 +25,8 @@ describe('email layout', () => {
     expect(html).toMatch(/href="https:\/\/blank.test\/plain"[^>]*>Open link<\/a>/);
     expect(html).toContain('https://blank.test/privacy');
     expect(html).not.toContain('<b>');
+    // Links elsewhere (for example typed by a visitor) are never buttons or links.
+    expect(html).not.toContain('href="https://evil.example');
+    expect(html).toContain('Sign in: https://evil.example/login');
   });
 });

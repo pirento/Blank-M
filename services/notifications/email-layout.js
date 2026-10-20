@@ -1,8 +1,9 @@
 /**
  * The branded HTML version of every email, built from its plain text so both parts always say the
  * same thing. In the text: blank lines separate paragraphs, "- " starts a list item, and a line
- * that is only a link ("https://…" or "Label: https://…") becomes a button. The footer carries the
- * business details from the admin panel and links to the legal pages.
+ * that is only a link to this site ("https://…" or "Label: https://…") becomes a button. Links
+ * elsewhere stay plain text, so text a visitor typed can never become a button or a link. The
+ * footer carries the business details from the admin panel and links to the legal pages.
  */
 const ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 const escape = (value) => String(value).replace(/[&<>"']/g, (char) => ESCAPES[char]);
@@ -25,10 +26,19 @@ function button(label, href) {
   return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 20px"><tr><td style="border-radius:8px;background:${ACCENT}"><a href="${escape(href)}" style="display:inline-block;padding:12px 22px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;${FONT}">${escape(label)}</a></td></tr></table>`;
 }
 
+/** Quotes text someone typed (each line starts with "> "), so it reads as their words. */
+export const quote = (text) =>
+  String(text)
+    .split(/\r?\n/)
+    .map((line) => `> ${line}`)
+    .join('\n');
+
+/** Only links to this site (APP_URL) are clickable. */
+const ours = (url) => Boolean(origin()) && url.startsWith(`${origin()}/`);
+
 const linkify = (escaped) =>
-  escaped.replace(
-    INLINE_LINK,
-    (url) => `<a href="${url}" style="color:${ACCENT};word-break:break-all">${url}</a>`,
+  escaped.replace(INLINE_LINK, (url) =>
+    ours(url) ? `<a href="${url}" style="color:${ACCENT};word-break:break-all">${url}</a>` : url,
   );
 
 function renderBlock(block) {
@@ -46,7 +56,7 @@ function renderBlock(block) {
   for (const raw of block.split('\n')) {
     const line = raw.trim();
     const link = LINK_LINE.exec(line);
-    if (link) {
+    if (link && ours(link[2])) {
       flush();
       out.push(button(link[1] ?? 'Open link', link[2]));
     } else if (line.startsWith('- ')) {

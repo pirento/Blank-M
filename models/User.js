@@ -48,6 +48,8 @@ userSchema.index(
   { googleSubject: 1 },
   { unique: true, partialFilterExpression: { googleSubject: { $type: 'string' } } },
 );
+// New members per day and the activity feed on the admin overview.
+userSchema.index({ createdAt: -1 });
 
 userSchema.methods.hasVerifiedFactor = function hasVerifiedFactor() {
   return this.factors.some((factor) => factor.status === 'verified');

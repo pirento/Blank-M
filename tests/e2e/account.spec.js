@@ -27,7 +27,9 @@ test('signing out other devices ends their sessions', async ({ page, browser }) 
   const other = await (await browser.newContext()).newPage();
   await signIn(other, MEMBERS.account);
   await page.goto('/settings');
+  const revoked = page.waitForResponse('**/api/account/sessions/revoke-others');
   await page.getByRole('button', { name: 'Sign out all other devices' }).click();
+  expect((await revoked).ok()).toBe(true);
   await expect(page.locator('[data-sessions]')).toContainText('This device');
   await other.goto('/dashboard');
   await expect(other).toHaveURL(/\/login/);
