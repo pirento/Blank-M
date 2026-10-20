@@ -5,7 +5,7 @@
   </head>
   <body class="bg-canvas text-fg">
     <%#
-      Public legal pages: /terms, /privacy, /refunds, /contact. Razorpay reviews these before it
+      Public legal pages: /terms, /privacy, /disclaimer, /refunds, /contact. Razorpay reviews these before it
       activates live payments. Business details come from the admin panel → Integrations →
       "Business details". This text is a sensible starting point, not legal advice: have a lawyer
       or CA review it before you sell.
@@ -26,47 +26,101 @@
         <h1 class="text-2xl font-semibold"><%= title %></h1>
 
         <% if (page === 'terms') { %>
-          <p>These terms apply to Pirento Blank (the "service"), run by <strong><%= sellerName %></strong>. By creating an account or paying for Premium you agree to them.</p>
-          <h2 class="text-lg font-semibold">1. What the service is</h2>
-          <p>Pirento Blank is a software tool for keeping a trading journal, measuring your own results, planning trades and practising with paper trades. It is <strong>not</strong> investment advice, a research report or a recommendation to buy or sell anything. <%= sellerName %> is not registered with SEBI as an investment adviser or research analyst. AI-written text in the service is a review of your own data and may be wrong. You alone decide and are responsible for every trade.</p>
-          <h2 class="text-lg font-semibold">2. Your account</h2>
-          <p>Keep your password and authenticator safe. You are responsible for what happens under your account. We may suspend accounts that abuse the service, attack it, share access or break the law.</p>
-          <h2 class="text-lg font-semibold">3. Broker connections and orders</h2>
-          <p>When you connect a broker (Zerodha, Dhan, Upstox, Fyers, Angel One) you authorise the service to read your fills and, only where you turn it on, place the orders you confirm. The broker's own terms apply. Market data, charges and P&amp;L shown in the service are estimates; your broker's contract notes are the record.</p>
-          <h2 class="text-lg font-semibold">4. Premium and payment</h2>
+          <p>These terms apply to Pirento Blank (the "service"), run by <strong><%= sellerName %></strong> ("we"). By creating an account, signing in or paying for Premium you agree to them. If you do not agree, do not use the service.</p>
+          <h2 class="text-lg font-semibold">1. What the service is, and what it is not</h2>
+          <p>Pirento Blank is software for keeping a trading journal, measuring your own results, planning trades, charting prices and practising with paper trades. It is <strong>not</strong> investment advice, a research report, a portfolio management service or a recommendation to buy or sell any security. <%= sellerName %> is not registered with SEBI as an investment adviser, research analyst or stock broker. AI-written text, shortlists and charts are tools for your own review and may be wrong or out of date. You alone decide, and are responsible for, every trade. Read the <a class="underline" href="/disclaimer">risk disclosure</a>.</p>
+          <h2 class="text-lg font-semibold">2. Who can use it</h2>
+          <p>You must be at least 18 years old and able to enter a contract under Indian law. Access is by invitation or by an approved request; we may decline or end access at our discretion. Administrators sign in only with Google and an authenticator app.</p>
+          <h2 class="text-lg font-semibold">3. Your account</h2>
+          <p>Keep your password, Google account and authenticator safe; you are responsible for activity under your account. Tell us at once if you think someone else has used it. Do not share your account, scrape the service, probe it for weaknesses without permission, upload unlawful content or use it to break any law, including SEBI and exchange rules.</p>
+          <h2 class="text-lg font-semibold">4. Broker connections and orders</h2>
+          <p>When you connect a broker (Zerodha, Dhan, Upstox, Fyers or Angel One) you authorise the service to read your fills and holdings and, only where you turn it on and confirm each order, place orders through your broker's official API. Your money and securities stay with your broker. The broker's own terms apply. Market data, charges and P&amp;L shown in the service are estimates; your broker's contract notes are the record.</p>
+          <h2 class="text-lg font-semibold">5. Premium and payment</h2>
           <% if (plan.enabled) { %>
-            <p>Premium costs <%= formatCurrency(plan.priceMonthly) %> a month<% if (plan.trialDays > 0) { %>, after a free trial of <%= plan.trialDays %> days (one per person)<% } %>. It renews every month through Razorpay until you cancel. See the <a class="underline" href="/refunds">cancellation and refund policy</a>.</p>
+            <p>Premium costs <%= formatCurrency(plan.priceMonthly) %> a month<% if (plan.trialDays > 0) { %>, after a free trial of <%= plan.trialDays %> days (one per person)<% } %>, including applicable taxes unless stated otherwise at checkout. It renews every month through Razorpay until you cancel. Free members get a limited number of Premium uses each month, shown on the Billing page. See the <a class="underline" href="/refunds">cancellation and refund policy</a>.</p>
           <% } else { %>
             <p>The service is currently free. If paid plans start, the price, trial and renewal terms will be shown before you pay, and the <a class="underline" href="/refunds">cancellation and refund policy</a> will apply.</p>
           <% } %>
-          <h2 class="text-lg font-semibold">5. Availability and liability</h2>
-          <p>We work to keep the service running and your data safe, but it is provided "as is". To the extent the law allows, <%= sellerName %> is not liable for trading losses, missed trades, broker or data-provider outages, or indirect losses, and our total liability is limited to the fees you paid in the last three months.</p>
-          <h2 class="text-lg font-semibold">6. Changes and law</h2>
-          <p>We may update these terms; the date below changes when we do, and continued use means you accept them. These terms are governed by the laws of India<% if (business.address) { %>, with courts at our registered address having jurisdiction<% } %>.</p>
+          <h2 class="text-lg font-semibold">6. Your content</h2>
+          <p>Your journal, notes and files remain yours. You give us permission to store and process them only to run the service for you, as described in the <a class="underline" href="/privacy">privacy policy</a>. You can export everything from Settings at any time.</p>
+          <h2 class="text-lg font-semibold">7. Third-party services</h2>
+          <p>Some features depend on others: Google (sign-in), Razorpay (payments), your broker, market data providers, OpenAI (AI features), Telegram and our email provider. Their availability and terms are outside our control.</p>
+          <h2 class="text-lg font-semibold">8. Availability and liability</h2>
+          <p>We work to keep the service running and your data safe, but it is provided "as is" and "as available". To the extent the law allows, <%= sellerName %> is not liable for trading losses, missed or wrong trades, broker or data-provider outages, or indirect or consequential losses, and our total liability is limited to the fees you paid in the three months before the claim.</p>
+          <h2 class="text-lg font-semibold">9. Suspension and closing your account</h2>
+          <p>You can stop using the service and ask us to delete your account at any time. We may suspend or end an account that breaks these terms, harms other members or the service, or where the law requires it; where we can, we tell you why first.</p>
+          <h2 class="text-lg font-semibold">10. Changes, law and disputes</h2>
+          <p>We may update these terms; the date below changes when we do, and we email members about important changes. Continued use means you accept them. These terms are governed by the laws of India<% if (business.address) { %>, and courts at our registered address have exclusive jurisdiction<% } %>. Please contact our grievance officer (see the <a class="underline" href="/privacy">privacy policy</a>) first; most problems are solved that way.</p>
 
         <% } else if (page === 'privacy') { %>
-          <p>This policy explains what <strong><%= sellerName %></strong> collects in Pirento Blank, why, and your choices.</p>
-          <h2 class="text-lg font-semibold">What we store</h2>
+          <p>This policy explains what personal data <strong><%= sellerName %></strong> ("we") processes in Pirento Blank, why, for how long, and your rights under India's Digital Personal Data Protection Act, 2023 and the Information Technology Act, 2000.</p>
+          <h2 class="text-lg font-semibold">What we collect</h2>
           <ul class="list-disc space-y-1 pl-5">
-            <li>Your email, password hash (never the password), authenticator secrets (encrypted) and the devices you are signed in on.</li>
-            <li>The journal you create: trades, notes, screenshots, strategies, rules, watchlist and settings.</li>
-            <li>Broker access tokens when you connect a broker, stored encrypted and used only for what you turn on.</li>
-            <li>Payment records from Razorpay (amount, date, status). Card, UPI and bank details are entered on Razorpay's page and never reach our servers.</li>
-            <li>Basic server logs (time, page, error codes) to keep the service secure. We do not use advertising trackers.</li>
+            <li><strong>Account:</strong> your email, name from Google if you sign in with it, password hash (never the password), authenticator secrets (encrypted) and the devices you are signed in on.</li>
+            <li><strong>Access requests:</strong> the name, email, optional phone and note you send from the home page.</li>
+            <li><strong>Your journal:</strong> trades, notes, screenshots, strategies, rules, watchlist, plans and settings you create.</li>
+            <li><strong>Broker connections:</strong> access tokens, stored encrypted and used only for what you turn on.</li>
+            <li><strong>Payments:</strong> amount, date and status from Razorpay. Card, UPI and bank details are entered on Razorpay's page and never reach our servers.</li>
+            <li><strong>Support:</strong> problem reports you send and our replies.</li>
+            <li><strong>Technical:</strong> basic server logs (time, page, error codes, IP address) to keep the service secure. We do not use advertising or tracking cookies.</li>
           </ul>
-          <h2 class="text-lg font-semibold">How it is used and shared</h2>
-          <p>Your data is used only to run the service for you. We do not sell it. It is shared only with the providers needed to run features you use: Razorpay (payments), your broker, OpenAI (when you use an AI feature, the relevant part of your journal is sent to it), Telegram (messages you opt in to) and our email provider. Someone you give a mentor share link to can read that shared journal.</p>
+          <h2 class="text-lg font-semibold">Why we use it (purpose and consent)</h2>
+          <p>We process your data only to provide the service you asked for: your account, journal, reports, the integrations you turn on, billing, security and support, and to meet legal obligations. By creating an account you consent to this. You can withdraw consent at any time by deleting your account; this does not affect processing already done. We do not sell your data or use it for advertising.</p>
+          <h2 class="text-lg font-semibold">Who we share it with (processors)</h2>
+          <ul class="list-disc space-y-1 pl-5">
+            <li>Our hosting and database provider, where the service runs.</li>
+            <li>Our email provider, to send account, billing and report emails.</li>
+            <li>Google, when you choose "Sign in with Google".</li>
+            <li>Razorpay, to take payments.</li>
+            <li>Your broker, when you connect one.</li>
+            <li>OpenAI, only when you use an AI feature: the relevant part of your journal is sent to it and may be processed outside India.</li>
+            <li>Telegram, only for messages you opt in to.</li>
+            <li>Market data providers (such as TrueData, Zerodha Kite or Yahoo Finance) receive only the symbols requested, never your personal data.</li>
+          </ul>
+          <p>Someone you give a mentor share link to can read that shared journal until you revoke the link. We disclose data to authorities only when the law requires it.</p>
+          <h2 class="text-lg font-semibold">How long we keep it</h2>
+          <ul class="list-disc space-y-1 pl-5">
+            <li>Your account and journal: while your account is active, and deleted when you ask us to delete it.</li>
+            <li>Sign-ups never confirmed: deleted after 7 days.</li>
+            <li>Access requests: deleted 90 days after they are decided.</li>
+            <li>Problem reports: deleted 180 days after they are resolved.</li>
+            <li>Administrator audit log: 2 years. AI usage records: limited periods for billing and abuse checks.</li>
+            <li>Payment records: as long as Indian tax and accounting laws require (generally up to 8 years).</li>
+          </ul>
+          <h2 class="text-lg font-semibold">Security</h2>
+          <p>Connections use HTTPS. Broker tokens, authenticator secrets and API keys are encrypted at rest; passwords are hashed. Administrators sign in with Google and an authenticator app, and their actions are logged. If a breach affects your data, we will inform you and the Data Protection Board of India as the law requires.</p>
           <h2 class="text-lg font-semibold">Cookies</h2>
-          <p>One sign-in cookie keeps you signed in. Your theme and language choices are kept in your browser.</p>
-          <h2 class="text-lg font-semibold">Your choices</h2>
-          <p>You can export all your data from Settings at any time. To correct or delete your account and data, write to <%= support %>; we act within 30 days, except records the law requires us to keep (such as payment records).</p>
-          <h2 class="text-lg font-semibold">Grievances</h2>
-          <p>Grievance officer: <%= business.grievanceOfficer || sellerName %><% if (business.email) { %>, <a class="underline" href="mailto:<%= business.email %>"><%= business.email %></a><% } %>. We acknowledge complaints within 24 hours and resolve them within 15 days.</p>
+          <p>One essential sign-in cookie keeps you signed in and protects forms. Your theme and language choices are kept in your browser. No advertising or third-party tracking cookies are used.</p>
+          <h2 class="text-lg font-semibold">Your rights</h2>
+          <ul class="list-disc space-y-1 pl-5">
+            <li><strong>Access:</strong> export all your data from Settings at any time, or ask us for a summary of what we process.</li>
+            <li><strong>Correction and erasure:</strong> correct data in the app, or ask us to correct or delete it.</li>
+            <li><strong>Grievance redressal:</strong> complain to our grievance officer (below).</li>
+            <li><strong>Nomination:</strong> nominate someone to exercise these rights if you die or cannot act.</li>
+          </ul>
+          <p>Write to <%= support %>. We act within 30 days, except for records the law requires us to keep. If you are not satisfied with our answer, you may complain to the Data Protection Board of India.</p>
+          <h2 class="text-lg font-semibold">Children</h2>
+          <p>The service is for adults (18 and over). We do not knowingly process children's data; if we learn of it, we delete it.</p>
+          <h2 class="text-lg font-semibold">Grievance officer</h2>
+          <p><%= business.grievanceOfficer || sellerName %><% if (business.email) { %>, <a class="underline" href="mailto:<%= business.email %>"><%= business.email %></a><% } %><% if (business.address) { %>, <%= business.address %><% } %>. We acknowledge complaints within 24 hours and resolve them within 15 days.</p>
+
+        <% } else if (page === 'disclaimer') { %>
+          <p><strong>Trading in securities, futures and options involves substantial risk of loss. Read this before you use Pirento Blank.</strong></p>
+          <h2 class="text-lg font-semibold">Not investment advice</h2>
+          <p><%= sellerName %> is not registered with the Securities and Exchange Board of India (SEBI) as an investment adviser, research analyst, portfolio manager or stock broker. Nothing in the service (charts, shortlists, AI text, backtests, calculators, reports, emails or messages) is a recommendation to buy, sell or hold any security, or a promise of any return.</p>
+          <h2 class="text-lg font-semibold">Risk of loss</h2>
+          <p>Prices can move against you quickly, and you can lose more than you expect. According to SEBI studies, a large majority of individual traders in equity futures and options lost money. Past results, backtests and paper trades do not predict future results.</p>
+          <h2 class="text-lg font-semibold">Data and AI limits</h2>
+          <p>Market data may be delayed, incomplete or wrong, and live prices may stop without warning. AI-generated text can be mistaken or invented. Estimates of charges, taxes and P&amp;L are approximations; your broker's contract notes and your tax adviser are the authority.</p>
+          <h2 class="text-lg font-semibold">Orders</h2>
+          <p>Orders are placed only through your own broker account, only when you turn live orders on and confirm each one. Check every order in your broker's app. We are not responsible for orders, fills or rejections at your broker.</p>
+          <h2 class="text-lg font-semibold">Your responsibility</h2>
+          <p>Trade only with money you can afford to lose, and consult a SEBI-registered adviser if you need advice. By using the service you accept that you alone are responsible for your trading decisions.</p>
 
         <% } else if (page === 'refunds') { %>
           <p>This policy covers Premium subscriptions to Pirento Blank, sold by <strong><%= sellerName %></strong>. Nothing physical is shipped; Premium is delivered online as soon as payment succeeds.</p>
           <h2 class="text-lg font-semibold">Cancelling</h2>
-          <p>Cancel any time in Settings → Plan &amp; billing. Renewal stops and you keep Premium until the end of the month you have paid for. If you cancel during the free trial, nothing is charged.</p>
+          <p>Cancel any time in Billing (or Settings → Plan &amp; billing). Renewal stops and you keep Premium until the end of the month you have paid for. If you cancel during the free trial, nothing is charged.</p>
           <h2 class="text-lg font-semibold">Refunds</h2>
           <ul class="list-disc space-y-1 pl-5">
             <li>Monthly fees already paid are not refunded for the remaining days after you cancel.</li>
@@ -76,16 +130,17 @@
           <p>Approved refunds are sent to the original payment method through Razorpay within 5–7 working days.</p>
 
         <% } else { %>
-          <p>Questions about your account, Premium, payments or refunds: we usually reply within one working day.</p>
+          <p>Questions about your account, Premium, payments, refunds or your data: we usually reply within one working day. Members can also use Settings → Report a problem.</p>
           <dl class="grid gap-3 rounded-card border border-line bg-surface p-5 sm:grid-cols-[10rem_1fr]">
             <dt class="text-muted">Business</dt><dd><%= sellerName %></dd>
             <% if (business.email) { %><dt class="text-muted">Email</dt><dd><a class="underline" href="mailto:<%= business.email %>"><%= business.email %></a></dd><% } %>
             <% if (business.phone) { %><dt class="text-muted">Phone</dt><dd><%= business.phone %></dd><% } %>
             <% if (business.address) { %><dt class="text-muted">Address</dt><dd class="break-words"><%= business.address %></dd><% } %>
+            <dt class="text-muted">Grievance officer</dt><dd><%= business.grievanceOfficer || sellerName %></dd>
           </dl>
         <% } %>
 
-        <p class="text-xs text-muted">Last updated 18 October 2026.</p>
+        <p class="text-xs text-muted">Last updated 20 October 2026.</p>
       </main>
     </div>
   </body>

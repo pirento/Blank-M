@@ -16,7 +16,7 @@ test('public pages render', async ({ page }) => {
   await page.goto('/login?mode=reset');
   await expect(page.locator('[data-reset-unavailable]')).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
-  for (const path of ['/terms', '/privacy', '/refunds', '/contact']) {
+  for (const path of ['/terms', '/privacy', '/disclaimer', '/refunds', '/contact']) {
     await page.goto(path);
     await expect(page.locator('h1')).toBeVisible();
     await expectNoHorizontalOverflow(page);

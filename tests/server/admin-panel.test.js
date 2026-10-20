@@ -486,7 +486,7 @@ describe('legal pages', () => {
     await admin.send('put', '/api/admin/settings', {
       changes: { BUSINESS_NAME: 'Pirento Group', SUPPORT_EMAIL: 'help@pirento.test' },
     });
-    for (const path of ['/terms', '/privacy', '/refunds', '/contact']) {
+    for (const path of ['/terms', '/privacy', '/disclaimer', '/refunds', '/contact']) {
       const page = await supertest(app).get(path);
       expect(page.status).toBe(200);
       expect(page.text).toContain('Pirento Group');

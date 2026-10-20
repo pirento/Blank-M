@@ -165,12 +165,13 @@ export async function signup(req, res) {
 const LEGAL_PAGES = {
   terms: 'Terms of service',
   privacy: 'Privacy policy',
+  disclaimer: 'Risk disclosure',
   refunds: 'Cancellation and refund policy',
   contact: 'Contact us',
 };
 
 /**
- * GET /terms, /privacy, /refunds, /contact: public legal pages (Razorpay checks them before it
+ * GET /terms, /privacy, /disclaimer, /refunds, /contact: public legal pages (Razorpay checks them before it
  * activates payments). Business details come from the admin panel → Integrations.
  */
 export async function legal(req, res) {
