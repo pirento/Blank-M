@@ -7,6 +7,13 @@ export const ADMIN = { email: 'admin@example.com', password: 'blank-local-admin'
  * Sign-in is limited to 10 attempts per account per 15 minutes, so each spec file
  * uses its own account and only tests that need administration sign in as ADMIN.
  */
+/** An administrator with a verified authenticator (E2E_MFA_ADMIN in playwright.config.js). */
+export const MFA_ADMIN = {
+  email: 'e2e-mfa-admin@example.com',
+  password: ADMIN.password,
+  secret: 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP',
+};
+
 export const MEMBERS = {
   account: { email: 'e2e-account@example.com', password: ADMIN.password },
   journal: { email: 'e2e-journal@example.com', password: ADMIN.password },
@@ -46,6 +53,19 @@ export async function signIn(page, { email, password } = ADMIN) {
   await page.fill('#password', password);
   await page.click('button[type=submit]');
   await page.waitForURL('**/dashboard');
+}
+
+/** Signs in as MFA_ADMIN and completes the authenticator check. */
+export async function signInWithAuthenticator(page) {
+  const { currentStep, totpCode } = await import('../../services/auth/totp.js');
+  await page.goto('/login');
+  await page.fill('#email', MFA_ADMIN.email);
+  await page.fill('#password', MFA_ADMIN.password);
+  await page.click('button[type=submit]');
+  await page.fill('#mfa-signin-code', totpCode(MFA_ADMIN.secret, currentStep()));
+  await page.getByRole('button', { name: 'Verify and continue' }).click();
+  // The challenge is shown at /dashboard itself; it goes away once the code is accepted.
+  await page.waitForSelector('#mfa-signin-code', { state: 'detached' });
 }
 
 /** Collect uncaught page errors and console errors (except expected HTTP 4xx noise). */

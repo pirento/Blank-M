@@ -26,13 +26,16 @@ export function requestTokenChecksum(requestToken) {
   return sha256(`${key}${requestToken}${secret}`);
 }
 
-/** When a Kite access token expires: 06:00 IST on the day after `now`. */
+/**
+ * When a Kite access token expires: the next 06:00 IST after `now` (a login at 02:00 IST expires
+ * four hours later, not the next day).
+ */
 export function nextTokenExpiry(now = new Date()) {
   const istOffset = 330 * 60_000;
   const ist = new Date(now.getTime() + istOffset);
-  return new Date(
-    Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate() + 1, 6, 0, 0) - istOffset,
-  );
+  let expiry = Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate(), 6, 0, 0);
+  if (expiry <= ist.getTime()) expiry += 24 * 60 * 60_000;
+  return new Date(expiry - istOffset);
 }
 
 /** The custom callback field follows Kite's documented redirect_params protocol. */

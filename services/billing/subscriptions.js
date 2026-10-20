@@ -78,9 +78,13 @@ export async function startCheckout(user) {
       );
     }
     const planId = await currentRazorpayPlan(plan);
-    // Do not charge during a running trial: the first charge is on the day it ends.
-    const trialEnd = membership.trialEndsAt ? new Date(membership.trialEndsAt) : null;
-    const startAt = trialEnd && trialEnd.getTime() > Date.now() + 10 * 60_000 ? trialEnd : null;
+    // Do not charge while Premium is still running (trial, admin grant or an earlier paid month):
+    // the first charge is on the day it ends.
+    const ends = [membership.trialEndsAt, membership.grantUntil, membership.paidUntil]
+      .filter(Boolean)
+      .map((date) => new Date(date).getTime());
+    const premiumEnds = ends.length ? Math.max(...ends) : 0;
+    const startAt = premiumEnds > Date.now() + 10 * 60_000 ? new Date(premiumEnds) : null;
     const created = await createSubscription({
       planId,
       userId: user._id,
@@ -112,8 +116,12 @@ export async function startCheckout(user) {
 
 /** Razorpay statuses after which a subscription never becomes live again. */
 const FINAL_STATUSES = ['cancelled', 'completed', 'expired'];
-/** Statuses whose current_end is a period that has really been paid for. */
-const PAID_STATUSES = ['active', 'cancelled', 'completed'];
+/**
+ * Statuses whose current_end is a period that has really been paid for. Not "cancelled": a
+ * subscription cancelled while a charge was failing carries the unpaid cycle; a normal
+ * cancellation's paid month was already recorded while it was active.
+ */
+const PAID_STATUSES = ['active', 'completed'];
 
 /**
  * Applies a Razorpay subscription entity (from a webhook or a fetch) to our record.
@@ -244,6 +252,19 @@ export async function cancelMembership(user) {
   return membershipFor(user);
 }
 
+/**
+ * Ends a member's live Razorpay subscription at once (the administrator revoked their access, so
+ * they could neither use nor cancel what they pay for). Returns true when one was cancelled.
+ */
+export async function endSubscriptionNow(userId) {
+  const sub = await Subscription.findById(userId).lean();
+  if (!sub?.razorpaySubscriptionId || !LIVE_STATUSES.includes(sub.razorpayStatus)) return false;
+  const entity = await cancelSubscription(sub.razorpaySubscriptionId, { immediately: true });
+  await applySubscriptionEntity(entity);
+  await Subscription.updateOne({ _id: userId }, { $set: { cancelAtPeriodEnd: true } });
+  return true;
+}
+
 /** The member's last 24 payments, newest first. */
 export async function paymentHistory(userId) {
   const rows = await Payment.find({ userId }).sort({ paidAt: -1 }).limit(24).lean();
@@ -267,6 +288,8 @@ export async function grantPremium(actor, userId, days) {
   }
   const member = await User.findById(userId).lean();
   if (!member) throw new HttpError('Member not found.', 404);
+  // Start the member's free trial first if they have never been seen, so a grant adds to it.
+  await membershipFor(member);
   const sub = await Subscription.findById(userId).lean();
   const from = Math.max(Date.now(), sub?.grantUntil ? new Date(sub.grantUntil).getTime() : 0);
   const grantUntil = days === 0 ? null : new Date(from + days * DAY_MS);

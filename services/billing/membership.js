@@ -16,6 +16,9 @@ import { HttpError } from '../errors.js';
 import { featureLabel, loadPlan } from './plan.js';
 
 const DAY_MS = 24 * 60 * 60_000;
+// Razorpay charges a renewal (and sends its webhook) some time after the paid month ends.
+// A renewing member keeps Premium this long past paidUntil so nothing stops in between.
+const RENEWAL_GRACE_MS = 2 * DAY_MS;
 const iso = (date) => (date ? new Date(date).toISOString() : null);
 const later = (date, now) => Boolean(date && new Date(date).getTime() > now);
 
@@ -80,14 +83,19 @@ export function computeMembership(plan, user, sub, now = Date.now()) {
     razorpayStatus: sub?.razorpayStatus ?? null,
     cancelAtPeriodEnd: Boolean(sub?.cancelAtPeriodEnd),
   };
+  const renewing = ['active', 'pending'].includes(sub?.razorpayStatus) && !sub?.cancelAtPeriodEnd;
+  const paidEnds =
+    sub?.paidUntil && renewing
+      ? new Date(new Date(sub.paidUntil).getTime() + RENEWAL_GRACE_MS)
+      : sub?.paidUntil;
   // The latest of the three dates is when Premium ends.
-  const ends = [sub?.grantUntil, sub?.paidUntil, sub?.trialEndsAt]
+  const ends = [sub?.grantUntil, paidEnds, sub?.trialEndsAt]
     .filter((date) => later(date, now))
     .map((date) => new Date(date).getTime());
   const endsAt = ends.length ? Math.max(...ends) : null;
   const state = later(sub?.grantUntil, now)
     ? 'granted'
-    : later(sub?.paidUntil, now)
+    : later(paidEnds, now)
       ? sub.cancelAtPeriodEnd
         ? 'cancelled'
         : 'active'

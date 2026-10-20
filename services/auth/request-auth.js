@@ -38,7 +38,7 @@ export function assertAdminStepUp(req) {
   const { user, session } = req.auth ?? {};
   if (!user?.hasVerifiedFactor?.() || session?.aal !== 'aal2') {
     throw new HttpError(
-      'Inviting an administrator needs your authenticator. Add one in Settings → Authenticator and sign in again.',
+      'This admin action needs your authenticator. Add one in Settings → Authenticator and sign in again.',
       403,
     );
   }

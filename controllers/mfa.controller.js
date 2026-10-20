@@ -166,6 +166,16 @@ export async function enroll(req, res) {
 /** Verify an enrollment or complete the sign-in challenge; either way the session becomes aal2. */
 export async function verify(req, res) {
   const user = await signedInUser(req);
+  // Finishing a new authenticator on a protected account needs aal2, like starting one: otherwise
+  // a setup someone left unfinished (e.g. with a stolen password) would pass the sign-in check.
+  const pending = user.factors.find((item) => item._id === req.body?.factorId);
+  if (
+    pending?.status === 'unverified' &&
+    user.hasVerifiedFactor() &&
+    req.auth.session.aal !== 'aal2'
+  ) {
+    throw new HttpError('Complete authenticator verification to continue.', 403);
+  }
   const factor = await checkCode(user, req.body?.factorId, req.body?.code);
   if (factor.status === 'unverified') {
     await User.updateOne(

@@ -119,7 +119,8 @@ theek hone par "OK again". Chalu karne ke liye:
 
 Admin panel member workspace se bilkul alag hai: **https://aapka-domain.com/admin/login**
 (sirf admin account se login hota hai). Pehle Settings → Authenticator mein authenticator lagaiye —
-API keys, plan aur Premium badalne ke liye ye zaroori hai.
+API keys, plan, Premium badalne, member ka reset link banane aur access band karne ke liye ye zaroori
+hai. Access band karne par us member ki Razorpay renewal bhi turant band ho jaati hai.
 
 Admin ka **pehla** authenticator lagane ke liye ek 8 ankon ka setup code chahiye (taaki sirf password
 chura lene wala authenticator na jod sake). "Email me a code" dabaiye — code email par aata hai. Email

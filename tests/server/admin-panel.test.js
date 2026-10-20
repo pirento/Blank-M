@@ -46,6 +46,9 @@ beforeEach(async () => {
     razorpay.calls.push({ path, body: options.body ? JSON.parse(options.body) : null });
     if (path === '/plans') return Response.json({ id: 'plan_test1' });
     if (path === '/plans?count=1') return Response.json({ items: [] });
+    if (path === '/subscriptions/sub_test1/cancel') {
+      return Response.json({ id: 'sub_test1', status: 'cancelled', paid_count: 1 });
+    }
     if (path === '/subscriptions') {
       return Response.json({
         id: 'sub_test1',
@@ -364,6 +367,47 @@ describe('Premium webhooks and checkout edge cases', () => {
     await signedWebhook(entity('active', 30), 'evt_e');
     const after = (await member.agent.get('/api/billing')).body.membership;
     expect(after).toMatchObject({ razorpayStatus: 'cancelled', cancelAtPeriodEnd: true });
+  });
+
+  it('keeps a renewing member through the renewal gap, and stops billing when access is revoked', async () => {
+    const { computeMembership } = await import('../../services/billing/membership.js');
+    const plan = { enabled: true, features: ['paper'] };
+    const member = { role: 'member' };
+    const ended = new Date(Date.now() - 86_400_000);
+    const renewing = { paidUntil: ended, razorpayStatus: 'active', cancelAtPeriodEnd: false };
+    expect(computeMembership(plan, member, renewing).premium).toBe(true);
+    expect(computeMembership(plan, member, { ...renewing, cancelAtPeriodEnd: true }).premium).toBe(
+      false,
+    );
+    const longAgo = new Date(Date.now() - 3 * 86_400_000);
+    expect(computeMembership(plan, member, { ...renewing, paidUntil: longAgo }).premium).toBe(
+      false,
+    );
+
+    const { admin, member: payer } = await payingMember();
+    await signedWebhook(entity('active', 30), 'evt_a');
+    const paid = await paidUntil(payer);
+    // Cancelled while a charge was failing: the unpaid cycle is not a free month.
+    await signedWebhook(entity('cancelled', 60), 'evt_b');
+    expect(await paidUntil(payer)).toBe(paid);
+
+    // Clearing the payment keys while billing is on would break every renewal.
+    const cleared = await admin.send('put', '/api/admin/settings', {
+      changes: { RAZORPAY_WEBHOOK_SECRET: '' },
+    });
+    expect(cleared.status).toBe(409);
+  });
+
+  it('cancels the Razorpay subscription of a member whose access is revoked', async () => {
+    const { admin, member } = await payingMember();
+    await signedWebhook(entity('active', 30), 'evt_a');
+    const revoked = await admin.send('post', '/api/admin/users/revoke', {
+      email: 'member@example.com',
+      userId: member.userId,
+    });
+    expect(revoked.status).toBe(200);
+    const cancel = razorpay.calls.find((call) => call.path === '/subscriptions/sub_test1/cancel');
+    expect(cancel.body).toEqual({ cancel_at_cycle_end: 0 });
   });
 
   it('needs the webhook secret to switch billing on and an authenticator to invite admins', async () => {

@@ -213,6 +213,16 @@ describe('Dhan trade book mapping', () => {
     expect(contractSymbol({ ...row, drvExpiryDate: '2026-05-12', drvOptionType: 'PUT' })).toBe(
       'NIFTY2651225000PE',
     );
+    // A monthly expiry moved a day earlier by a holiday (Tue 24 Nov 2026) is still monthly.
+    expect(contractSymbol({ ...row, drvExpiryDate: '2026-11-23' })).toBe('NIFTY26NOV25000CE');
+    // An underlying with a hyphen keeps it.
+    expect(
+      contractSymbol({
+        tradingSymbol: 'BAJAJ-AUTO-Oct2026-FUT',
+        drvExpiryDate: '2026-10-27',
+        drvOptionType: 'XX',
+      }),
+    ).toBe('BAJAJ-AUTO26OCTFUT');
     expect(fills[0]).toMatchObject({
       side: 'BUY',
       quantity: 75,

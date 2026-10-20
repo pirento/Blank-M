@@ -7,6 +7,8 @@
  * and shows the result.
  */
 
+import { segmentOfSymbol } from './segments.js';
+
 /**
  * A hand-rolled RFC 4180 reader rather than a dependency.
  *
@@ -22,6 +24,10 @@ export function parseCsv(text) {
   let field = '';
   let inQuotes = false;
   let index = 0;
+  // Source line numbers, so an error points at the right line even after blank lines or quoted
+  // fields that span lines. Each row gets `row.line` (where it starts).
+  let line = 1;
+  let rowStart = 1;
 
   const endField = () => {
     row.push(field);
@@ -30,8 +36,15 @@ export function parseCsv(text) {
   const endRow = () => {
     endField();
     // A trailing newline must not produce a phantom empty row.
-    if (row.length > 1 || row[0] !== '') rows.push(row);
+    // `line` is not enumerable, so rows still compare and serialise as plain arrays of cells.
+    if (row.length > 1 || row[0] !== '') {
+      rows.push(Object.defineProperty(row, 'line', { value: rowStart }));
+    }
     row = [];
+  };
+  const nextLine = () => {
+    line += 1;
+    rowStart = line;
   };
 
   while (index < input.length) {
@@ -48,6 +61,7 @@ export function parseCsv(text) {
         index += 1;
         continue;
       }
+      if (character === '\n' || (character === '\r' && input[index + 1] !== '\n')) line += 1;
       field += character;
       index += 1;
       continue;
@@ -67,11 +81,13 @@ export function parseCsv(text) {
       // Treat CRLF as one break, and a lone CR as a break too.
       if (input[index + 1] === '\n') index += 1;
       endRow();
+      nextLine();
       index += 1;
       continue;
     }
     if (character === '\n') {
       endRow();
+      nextLine();
       index += 1;
       continue;
     }
@@ -108,7 +124,8 @@ const FIELD_ALIASES = {
     'name',
     'ticker',
   ],
-  type: ['type', 'tradetype', 'side', 'buysell', 'transactiontype', 'direction', 'ordertype'],
+  // Not "ordertype": that column holds MARKET/LIMIT, not the trade direction.
+  type: ['type', 'tradetype', 'side', 'buysell', 'transactiontype', 'direction'],
   entryPrice: [
     'entryprice',
     'entry',
@@ -329,6 +346,9 @@ function cell(row, index) {
   return index === -1 ? '' : (row[index] ?? '');
 }
 
+/** 'FUT' or 'OPT' for an NSE F&O contract name, otherwise null. */
+const fnoSegment = (symbol) => (/\d/.test(symbol) ? segmentOfSymbol(symbol, 'NFO') : null);
+
 /**
  * Turns raw rows into importable trades, collecting a reason for every row it
  * rejects rather than failing the whole file. A broker export with three bad
@@ -339,8 +359,8 @@ export function buildCandidates(rows, mapping) {
   const errors = [];
 
   rows.forEach((row, index) => {
-    // +2 because line 1 is the header and the caller counts from 1.
-    const line = index + 2;
+    // The source line from parseCsv; otherwise +2 (line 1 is the header, counting from 1).
+    const line = row.line ?? index + 2;
     if (row.every((value) => value.trim() === '')) return;
 
     const problem = mappingProblem(mapping);
@@ -422,6 +442,10 @@ export function buildCandidates(rows, mapping) {
       exitPrice,
       quantity,
       notes: cell(row, mapping.notes).trim(),
+      // F&O contract names (NIFTY26OCT24500CE, BANKNIFTY26OCTFUT) carry their segment, which sets
+      // the charge rates and the tax head. Equity rows stay as before (no segment means equity).
+      ...(fnoSegment(symbol) === 'FUT' ? { segment: 'FUT' } : {}),
+      ...(fnoSegment(symbol) === 'OPT' ? { segment: 'OPT', optionType: symbol.slice(-2) } : {}),
     });
   });
 

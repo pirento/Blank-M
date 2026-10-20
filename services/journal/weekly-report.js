@@ -21,9 +21,13 @@ import { createLogger } from '../logger.js';
 
 const log = createLogger('weekly-report');
 
-/** The week's AI coach review as email text, or '' when off, unavailable or failed. */
-async function coachSection(userId, period, tradeCount) {
-  if (!tradeCount || !hasOpenAiKey()) return '';
+/**
+ * The week's AI coach review as email text, or '' when off, unavailable, failed, or when AI is a
+ * Premium feature the member does not have.
+ */
+async function coachSection(user, period, tradeCount) {
+  const userId = user._id;
+  if (!tradeCount || !hasOpenAiKey() || !(await hasFeature(user, 'ai'))) return '';
   const settings = await AccountSettings.findById(userId, { weeklyAiCoach: 1 }).lean();
   if (!settings?.weeklyAiCoach) return '';
   let review;
@@ -67,8 +71,10 @@ export async function buildWeeklyReport(userId, period) {
     { userId, recordKind: 'plan' },
     { 'record.createdAt': 1 },
   ).lean();
+  // instantBusinessDate wants an ISO string; the stored value may be a string or a Date.
+  const isoOf = (at) => (at instanceof Date ? at.toISOString() : String(at ?? ''));
   const plansInWeek = plans.filter((row) =>
-    inReportPeriod(instantBusinessDate(new Date(row.record?.createdAt ?? 0)), period),
+    inReportPeriod(instantBusinessDate(isoOf(row.record?.createdAt)), period),
   ).length;
   const summary = summarisePerformance(trades);
   const bySymbol = pnlBySymbol(trades);
@@ -112,7 +118,7 @@ export async function buildWeeklyReport(userId, period) {
  */
 export async function sendWeeklyReport(user, period) {
   const report = await buildWeeklyReport(user._id, period);
-  const coach = await coachSection(user._id, period, report.summary.totalTrades);
+  const coach = await coachSection(user, period, report.summary.totalTrades);
   const origin = process.env.APP_URL ? new URL(process.env.APP_URL).origin : '';
   await sendMail({
     to: user.email,
@@ -124,7 +130,7 @@ export async function sendWeeklyReport(user, period) {
 
 /**
  * Send last week's report to every member who opted in, at most once per week
- * per member. Returns counts; failures are counted and retried on the next run.
+ * per member. Returns counts; a failed send is counted and not retried that week.
  */
 export async function sendWeeklyReports({ today = todayInIst(), limit = 200 } = {}) {
   if (!isMailConfigured()) return { sent: 0, skipped: 0, failed: 0, configured: false };
@@ -139,6 +145,13 @@ export async function sendWeeklyReports({ today = todayInIst(), limit = 200 } = 
   let skipped = 0;
   let failed = 0;
   for (const settings of due) {
+    // Claim the week first: a member who is skipped or fails below does not hold a place in every
+    // later run's batch (which would starve everyone after the first `limit` members).
+    const claim = await AccountSettings.updateOne(
+      { _id: settings._id, weeklyReportSentFor: { $ne: period.start } },
+      { $set: { weeklyReportSentFor: period.start } },
+    );
+    if (!claim.modifiedCount) continue;
     const user = await User.findById(settings._id);
     if (!user || (await accessProblem(user)) || !(await hasFeature(user, 'reports'))) {
       skipped += 1;
@@ -146,10 +159,6 @@ export async function sendWeeklyReports({ today = todayInIst(), limit = 200 } = 
     }
     try {
       await sendWeeklyReport(user, period);
-      await AccountSettings.updateOne(
-        { _id: user._id },
-        { $set: { weeklyReportSentFor: period.start } },
-      );
       sent += 1;
     } catch {
       failed += 1;

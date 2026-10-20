@@ -18,15 +18,20 @@ if (secret.length < 32) {
   process.exit(1);
 }
 
-const response = await fetch(`${base}/api/maintenance/premarket-plan`, {
-  method: 'POST',
-  headers: { Authorization: `Bearer ${secret}`, Accept: 'application/json' },
-});
-const payload = await response.json().catch(() => null);
-if (!response.ok || !payload) {
-  console.error(
-    `Pre-market plan failed (${response.status}): ${payload?.error ?? 'unexpected response'}`,
-  );
-  process.exit(1);
+const MAX_BATCHES = 50;
+// Each call handles one batch of members (each claimed for the day); repeat until none remain.
+for (let batch = 1; batch <= MAX_BATCHES; batch += 1) {
+  const response = await fetch(`${base}/api/maintenance/premarket-plan`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${secret}`, Accept: 'application/json' },
+  });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok || !payload) {
+    console.error(
+      `Pre-market plan failed (${response.status}): ${payload?.error ?? 'unexpected response'}`,
+    );
+    process.exit(1);
+  }
+  console.log(`Pre-market plan: ${JSON.stringify(payload)}`);
+  if (!payload.moreMayRemain) break;
 }
-console.log(`Pre-market plan: ${JSON.stringify(payload)}`);

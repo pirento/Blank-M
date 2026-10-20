@@ -56,7 +56,7 @@ Sizes are rough figures for an active member, to plan disk and RAM, not limits.
 | `brokerconnections`       | Encrypted broker access tokens, one per member and provider                  | `userId+provider` unique                                                                                      | Kept until disconnected                             | ~0.5 KB per broker                  |
 | `brokeroauthstates`       | One-time broker login markers                                                | TTL `expiresAt`                                                                                               | **1 day after expiry**                              | tiny                                |
 | `instruments`             | NSE instrument master (shared, not per member)                               | `exchange+tradingSymbol`, `instrumentToken` unique (sparse)                                                   | Refreshed                                           | ~3 MB in total                      |
-| GridFS `statements`       | Uploaded statements/charts for AI analysis (≤ 10 MB each)                    | GridFS `filename+uploadDate`                                                                                  | Kept (see follow-ups)                               | depends on uploads                  |
+| GridFS `statements`       | Uploaded statements/charts for AI analysis (≤ 10 MB each)                    | GridFS `filename+uploadDate`                                                                                  | **7 days** (same daily job)                         | depends on uploads                  |
 | GridFS `voiceNotes`       | Temporary voice notes                                                        | GridFS `filename+uploadDate`                                                                                  | **24 hours** (`scripts/maintenance-voice-notes.js`) | tiny                                |
 | GridFS `tradeScreenshots` | One chart screenshot per trade (≤ 5 MB)                                      | GridFS `filename+uploadDate`                                                                                  | Deleted with the trade or screenshot                | ≤ 5 MB per trade                    |
 | `platformsettings`        | Admin panel API keys/switches (secrets encrypted) and the Premium plan       | `_id` = setting key                                                                                           | Kept                                                | platform-wide, a few KB             |
@@ -147,8 +147,8 @@ this size, and MongoDB 4.2+ builds do not block reads and writes for long. Thing
 - Most workspace pages load all of a member's trades (the balance and statistics need them). This
   is fine up to roughly 10,000 trades per member; beyond that, compute the balance with an
   aggregation and page the transactions list.
-- GridFS `statements` (files uploaded for AI analysis) has no retention yet; a cleanup like the
-  voice-note job would bound it. Do not add a TTL index to `statements.files`: it would leave the
-  file chunks behind.
+- GridFS `statements` (files uploaded for AI analysis) are deleted after 7 days by the daily
+  `scripts/maintenance-voice-notes.js` job. Do not add a TTL index to `statements.files`: it would
+  leave the file chunks behind.
 - `strategyevidences` (up to ~500 KB each) and `orderplanrecords` are append-only by design and
   have no per-member cap.

@@ -76,7 +76,7 @@ router.all('/kite/authorize', premium.brokers, wrap(kite.authorize));
 router.all('/kite/callback', wrap(kite.callback));
 router.all('/kite/complete', wrap(kite.complete));
 router.all('/kite/status', wrap(kite.status));
-router.all('/kite/balance', wrap(kite.balance));
+router.all('/kite/balance', premium.brokers, wrap(kite.balance));
 router.all('/kite/portfolio', premium.brokers, wrap(kite.portfolio));
 router.all('/kite/fills', premium.brokers, wrap(kite.fills));
 router.all('/kite/fills/import', premium.brokers, wrap(kite.importFillsToJournal));

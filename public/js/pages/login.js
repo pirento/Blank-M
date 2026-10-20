@@ -92,7 +92,11 @@ form?.addEventListener('submit', async (event) => {
       await api('/auth/recover', { method: 'POST', body: { email: identifier.trim() } });
       show(successBox, 'Password reset instructions have been sent if the address is eligible.');
     } else {
-      const result = await api('/auth/password', { method: 'POST', body: { password } });
+      const currentPassword = $('#current-password')?.value;
+      const result = await api('/auth/password', {
+        method: 'POST',
+        body: { password, currentPassword },
+      });
       $('#password').value = '';
       window.location.replace(result?.redirect || '/dashboard');
       return;

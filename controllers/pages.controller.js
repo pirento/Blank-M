@@ -136,6 +136,8 @@ export async function login(req, res) {
     googleEnabled: env.googleAuthEnabled,
     mailConfigured: isMailConfigured(),
     passwordUser: (mode === 'activate' || mode === 'recover') && user ? user.email : null,
+    // Changing the password of a normal signed-in session (not a recovery link) needs the old one.
+    needsCurrentPassword: mode === 'recover' && Boolean(user?.passwordHash) && !passwordRecovery,
     initialError: errors[req.query.error] ?? null,
     signupOpen: (await loadPlan()).signupOpen,
   });

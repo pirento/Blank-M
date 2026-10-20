@@ -90,6 +90,13 @@ export async function runDailyImports({ now = new Date(), limit = 200 } = {}) {
   let skipped = 0;
   let failed = 0;
   for (const settings of due) {
+    // Claim the day first: a member skipped or failing below must not hold a place in every later
+    // batch (which would starve everyone after the first `limit` members).
+    const claim = await AccountSettings.updateOne(
+      { _id: settings._id, dailyAutoImportFor: { $ne: today } },
+      { $set: { dailyAutoImportFor: today } },
+    );
+    if (!claim.modifiedCount) continue;
     const user = await User.findById(settings._id);
     // Free members on a billed platform keep the setting but are not imported for.
     if (!user || (await accessProblem(user)) || !(await hasFeature(user, 'brokers'))) {
@@ -100,7 +107,6 @@ export async function runDailyImports({ now = new Date(), limit = 200 } = {}) {
       const lines = await importForMember(user);
       const summary = await summaryFor(user._id, today, today, `Today (${today})`);
       await sendToMember(user._id, ['Daily journal', ...lines, '', summary].join('\n'));
-      await AccountSettings.updateOne({ _id: user._id }, { $set: { dailyAutoImportFor: today } });
       done += 1;
     } catch (error) {
       log.warn('daily import run failed', { error: errorName(error) });

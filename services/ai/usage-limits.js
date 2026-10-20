@@ -8,6 +8,10 @@ import { createLogger } from '../logger.js';
 const log = createLogger('ai');
 
 const WINDOW_MS = 60 * 60_000;
+// An in-flight slot covers a request until its usage event is saved. Requests that fail before
+// calling the model never save one, so slots also lapse after the longest possible model call
+// (75 s timeout, one retry) instead of blocking the member for the whole hour.
+const IN_FLIGHT_MS = 5 * 60_000;
 const DEFAULT_LIMIT = 30;
 const localWindows = new Map();
 
@@ -27,7 +31,7 @@ export async function enforceAiRateLimit(userId) {
   } catch {
     throw new HttpError('Could not verify the AI usage limit.', 503);
   }
-  const local = (localWindows.get(userId) ?? []).filter((value) => value > now - WINDOW_MS);
+  const local = (localWindows.get(userId) ?? []).filter((value) => value > now - IN_FLIGHT_MS);
   if (isRateLimitExceeded(Number(persisted ?? 0), local.length, limit)) {
     throw new HttpError('AI request limit reached. Try again after the hourly window resets.', 429);
   }

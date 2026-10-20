@@ -274,6 +274,17 @@ export async function placeLiveOrder({
     if (error?.code === 11000) throw new HttpError('An order was already sent for this plan.', 409);
     throw error;
   }
+  // Count again now that this order is recorded: two requests at once both passed the check above,
+  // and only one of them may use the last slot (if both see too many, both give way).
+  const usedNow = await LiveOrder.countDocuments({
+    userId: user._id,
+    tradingDate: record.tradingDate,
+    status: { $in: ['submitting', 'placed', 'unknown'] },
+  });
+  if (usedNow > state.dailyLimit) {
+    await LiveOrder.deleteOne({ _id: record._id, status: 'submitting' });
+    throw new HttpError(`Daily live order limit reached (${state.dailyLimit}).`, 429);
+  }
 
   try {
     const { orderId } = await placeKiteLimitOrder(user._id, {

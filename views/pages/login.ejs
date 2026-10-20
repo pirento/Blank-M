@@ -48,6 +48,12 @@ const changesPassword = mode === 'activate' || mode === 'recover';
           <% if (changesPassword && passwordUser) { %>
           <p class="break-words text-sm text-muted">Setting a password for <strong><%= passwordUser %></strong></p>
           <% } %>
+          <% if (locals.needsCurrentPassword) { %>
+          <div>
+            <label class="<%= LABEL_CLASS %>" for="current-password">Current password</label>
+            <input id="current-password" name="currentPassword" type="password" autocomplete="current-password" class="<%= FIELD_CLASS %>" />
+          </div>
+          <% } %>
           <% if (!changesPassword) { %>
           <div>
             <label class="<%= LABEL_CLASS %>" for="email"><%= mode === 'signin' ? 'Username / invited email' : 'Invited email' %></label>

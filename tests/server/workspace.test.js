@@ -110,6 +110,26 @@ describe('trades', () => {
     });
     expect(tampered.status).toBe(409);
     expect((await agent.get('/api/workspace')).body.trades).toHaveLength(1);
+
+    // An option row from a CSV import (segment and option type from the contract name).
+    const option = { ...TRADE, symbol: 'NIFTY26OCT24500CE', segment: 'OPT', optionType: 'CE' };
+    const optionEconomics = computeTradeEconomics(option, DEFAULT_CHARGES);
+    const imported = await send('post', '/api/trades/import', {
+      trade: {
+        ...option,
+        id: randomUUID(),
+        createdAt: new Date().toISOString(),
+        strategyId: null,
+        grossPnl: optionEconomics.grossPnl,
+        charges: optionEconomics.charges,
+        pnl: optionEconomics.netPnl,
+      },
+    });
+    expect(imported.body).toMatchObject({ result: 'inserted' });
+    const saved = (await agent.get('/api/workspace')).body.trades.find(
+      (trade) => trade.symbol === 'NIFTY26OCT24500CE',
+    );
+    expect(saved).toMatchObject({ segment: 'OPT', optionType: 'CE' });
   });
 });
 

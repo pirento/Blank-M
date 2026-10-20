@@ -124,3 +124,45 @@ describe('authenticator (TOTP) protection', () => {
     expect((await second.agent.get('/api/workspace')).status).toBe(200);
   });
 });
+
+describe('account takeover guards', () => {
+  it('does not let a password-only session finish an authenticator someone left unfinished', async () => {
+    const member = await createMember();
+    const post = (session, path, body) =>
+      session.agent.post(path).set('X-CSRF-Token', session.csrf).send(body);
+    // An "attacker" session starts a setup and leaves it unfinished.
+    const attacker = await signIn(app, { email: member.user.email, password: member.password });
+    const leftover = (await post(attacker, '/auth/mfa/enroll', {})).body;
+    // The owner adds and verifies their own authenticator.
+    const owner = await signIn(app, { email: member.user.email, password: member.password });
+    const own = (await post(owner, '/auth/mfa/enroll', {})).body;
+    await post(owner, '/auth/mfa/verify', {
+      factorId: own.id,
+      code: totpCode(own.secret, currentStep()),
+    });
+
+    const again = await signIn(app, { email: member.user.email, password: member.password });
+    const refused = await post(again, '/auth/mfa/verify', {
+      factorId: leftover.id,
+      code: totpCode(leftover.secret, currentStep()),
+    });
+    expect(refused.status).toBe(403);
+    expect((await again.agent.get('/api/workspace')).status).toBe(403);
+  });
+
+  it('asks for the current password to change it outside a recovery link', async () => {
+    const member = await createMember();
+    const session = await signIn(app, { email: member.user.email, password: member.password });
+    const change = (body) =>
+      session.agent.post('/auth/password').set('X-CSRF-Token', session.csrf).send(body);
+    expect((await change({ password: 'new-password-123' })).status).toBe(403);
+    expect(
+      (await change({ password: 'new-password-123', currentPassword: 'wrong-password' })).status,
+    ).toBe(403);
+    expect(
+      (await change({ password: 'new-password-123', currentPassword: member.password })).status,
+    ).toBe(200);
+    // The signed-in change form shows the extra field.
+    expect((await session.agent.get('/login?mode=reset')).text).toContain('id="current-password"');
+  });
+});
