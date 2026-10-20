@@ -80,7 +80,11 @@ function requestPrivateRevoke(invitation) {
   });
 }
 
+// What the administrator typed, kept across repaints (lists finish loading after the form shows).
+const drafts = {};
+
 function inviteForm({ idPrefix, emailLabel, roleLabel, submitLabel, busy, onSubmit }) {
+  const draft = (drafts[idPrefix] ??= { email: '', role: 'member' });
   const email = input({
     id: `${idPrefix}-email`,
     type: 'email',
@@ -88,13 +92,18 @@ function inviteForm({ idPrefix, emailLabel, roleLabel, submitLabel, busy, onSubm
     autocomplete: 'email',
     placeholder: 'member@example.com',
     disabled: busy,
+    value: draft.email,
   });
   const role = select({ id: `${idPrefix}-role`, disabled: busy }, [
-    { value: 'member', label: 'Member', selected: true },
-    { value: 'admin', label: 'Administrator' },
+    { value: 'member', label: 'Member', selected: draft.role === 'member' },
+    { value: 'admin', label: 'Administrator', selected: draft.role === 'admin' },
   ]);
-  const submit = button(submitLabel, { type: 'submit', disabled: true });
-  email.addEventListener('input', () => (submit.disabled = busy || !email.value.trim()));
+  const submit = button(submitLabel, { type: 'submit', disabled: busy || !draft.email.trim() });
+  email.addEventListener('input', () => {
+    draft.email = email.value;
+    submit.disabled = busy || !email.value.trim();
+  });
+  role.addEventListener('change', () => (draft.role = role.value));
   const form = h(
     'form',
     { class: 'admin-reference-invite-form' },
@@ -106,6 +115,7 @@ function inviteForm({ idPrefix, emailLabel, roleLabel, submitLabel, busy, onSubm
     event.preventDefault();
     const value = email.value.trim().toLowerCase();
     if (!value) return;
+    drafts[idPrefix] = { email: '', role: 'member' };
     void onSubmit(value, role.value);
   });
   return form;

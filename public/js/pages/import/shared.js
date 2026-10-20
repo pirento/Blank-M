@@ -5,6 +5,7 @@
 import { $, pageData } from '../../core/dom.js';
 import { REQUIRED_FIELDS, buildCandidates, findDuplicateLines } from '../../../../shared/csv.js';
 import { computeTradeEconomics } from '../../../../shared/pnl.js';
+import { chargesForSegment } from '../../../../shared/segments.js';
 import { readImportBatch } from '../../lib/import-ledger.js';
 
 export const FIELD_LABELS = {
@@ -24,7 +25,8 @@ export const accountId = data.accountId;
 const workspace = data.workspace;
 export const available = Boolean(accountId && workspace);
 export const trades = workspace?.trades ?? [];
-export const charges = workspace?.settings?.charges;
+/** Charge rates for a row's segment (equity, futures or options), as in the trade form. */
+export const chargesFor = (segment) => chargesForSegment(workspace?.settings ?? {}, segment);
 
 export let recoveryError = null;
 let initialBatch = null;
@@ -76,7 +78,8 @@ export function derived() {
     ? REQUIRED_FIELDS.filter((field) => state.mapping[field] === -1)
     : REQUIRED_FIELDS;
   const netTotal = toImport.reduce(
-    (sum, candidate) => sum + computeTradeEconomics(candidate, charges).netPnl,
+    (sum, candidate) =>
+      sum + computeTradeEconomics(candidate, chargesFor(candidate.segment)).netPnl,
     0,
   );
   return { candidates, errors, duplicateLines, toImport, missingRequired, netTotal };

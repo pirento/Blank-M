@@ -14,7 +14,7 @@ import {
 } from '../../lib/import-ledger.js';
 import { paint } from './paint.js';
 import { reset } from './reading.js';
-import { accountId, available, charges, derived, recoveryError, state } from './shared.js';
+import { accountId, available, chargesFor, derived, recoveryError, state } from './shared.js';
 
 let busy = false;
 
@@ -32,7 +32,7 @@ export async function runImport() {
         accountId,
         state.fileName,
         derived().toImport,
-        charges,
+        chargesFor,
         state.sourceDigest,
         state.mapping,
         state.importReference.trim(),

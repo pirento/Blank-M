@@ -111,9 +111,10 @@ export const alertReached = (alert, price) =>
 
 /**
  * Checks the given active alerts and returns those that fired. One price is read per symbol (all
- * members' alerts on it share it), a few symbols at a time.
+ * members' alerts on it share it), a few symbols at a time. `quoteUserId`: whose Zerodha session may
+ * read the price (null for the scheduled check, so one member's session never prices others').
  */
-async function checkAlerts(rows) {
+async function checkAlerts(rows, quoteUserId) {
   const fired = [];
   const groups = new Map();
   for (const row of rows) {
@@ -123,7 +124,7 @@ async function checkAlerts(rows) {
   await inBatches([...groups.values()], QUOTE_BATCH, async (group) => {
     let price;
     try {
-      price = Number((await getQuote(group[0].symbol, group[0].userId)).price);
+      price = Number((await getQuote(group[0].symbol, quoteUserId)).price);
     } catch {
       return;
     }
@@ -155,14 +156,17 @@ async function checkAlerts(rows) {
 
 /** Checks the member's active alerts now (used while the Watchlist is open). */
 export async function checkMemberAlerts(userId) {
-  const fired = await checkAlerts(await PriceAlert.find({ userId, status: 'active' }).lean());
+  const fired = await checkAlerts(
+    await PriceAlert.find({ userId, status: 'active' }).lean(),
+    userId,
+  );
   return { fired, alerts: await listAlerts(userId) };
 }
 
 /** Scheduled check of every active alert. */
 export async function checkAllAlerts() {
   const active = await PriceAlert.find({ status: 'active' }).lean();
-  const fired = await checkAlerts(active);
+  const fired = await checkAlerts(active, null);
   if (fired.length) log.info('price alerts fired', { fired: fired.length });
   return { checked: active.length, fired: fired.length };
 }

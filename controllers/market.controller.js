@@ -202,9 +202,15 @@ export async function quoteStream(req, res) {
     onEnd: () => stream.end(),
   };
   // The platform's data vendor for everyone; otherwise the member's own Zerodha feed.
-  unsubscribe =
-    (await subscribeVendorQuotes(symbols, handlers)) ??
-    (await subscribeLiveQuotes(userId, symbols, handlers));
+  try {
+    unsubscribe =
+      (await subscribeVendorQuotes(symbols, handlers)) ??
+      (await subscribeLiveQuotes(userId, symbols, handlers));
+  } catch (error) {
+    // Nothing was sent yet: stop the keep-alive so it never writes to a finished response.
+    clearInterval(keepAlive);
+    throw error;
+  }
   const headers = {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'private, no-store',

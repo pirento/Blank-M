@@ -9,7 +9,10 @@ const data = pageData();
 const form = $('[data-chart-form]');
 const field = $('#chart-symbol');
 const fromUrl = new URLSearchParams(window.location.search).get('symbol');
-const first = (fromUrl || data.workspace?.watchlist?.[0]?.symbol || 'NIFTY').trim().toUpperCase();
+// RELIANCE resolves on every price source (index names like NIFTY differ between them).
+const first = (fromUrl || data.workspace?.watchlist?.[0]?.symbol || 'RELIANCE')
+  .trim()
+  .toUpperCase();
 field.value = first;
 
 const chart = createProChart({ accountId: data.accountId, symbol: first, initialInterval: '5m' });

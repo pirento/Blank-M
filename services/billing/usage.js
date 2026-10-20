@@ -61,29 +61,29 @@ export async function takeFreeUse(userId, feature, limit, now = new Date()) {
 
 /**
  * Per-day features: true when the member already used `feature` today, or one more free day could
- * be taken for today.
+ * be taken for today. Atomic on the month's counter (the days used are listed in it), so parallel
+ * requests can never take more days than the limit.
  */
 export async function takeFreeDay(userId, feature, limit, now = new Date()) {
   if (!(limit > 0)) return false;
   const today = toIst(now).date;
-  const dayId = `${userId}:${feature}:day:${today}`;
+  const month = currentMonth(now);
+  const _id = monthKey(userId, feature, month);
+  const take = { $inc: { count: 1 }, $addToSet: { days: today } };
+  const open = { _id, days: { $ne: today }, count: { $lt: limit } };
   try {
-    // The day marker is created by the first request of the day only.
-    await UsageCounter.create({
-      _id: dayId,
-      userId,
-      feature,
-      month: today.slice(0, 7),
-      count: 0,
-      expiresAt: new Date(now.getTime() + 2 * 24 * 60 * 60_000),
-    });
+    await UsageCounter.updateOne(
+      open,
+      { ...take, $setOnInsert: { userId, feature, month, expiresAt: expiryOf(month) } },
+      { upsert: true },
+    );
+    return true;
   } catch (error) {
-    if (error?.code === 11000) return true; // already counted today
-    throw error;
+    if (error?.code !== 11000) throw error;
+    // The row exists: today is already counted, the limit is reached, or a parallel first use won.
+    if ((await UsageCounter.updateOne(open, take)).modifiedCount === 1) return true;
+    return Boolean(await UsageCounter.exists({ _id, days: today }));
   }
-  if (await takeFreeUse(userId, feature, limit, now)) return true;
-  await UsageCounter.deleteOne({ _id: dayId });
-  return false;
 }
 
 /** `{ feature: { used, limit, unit } }` for every feature with a free allowance (billing page). */

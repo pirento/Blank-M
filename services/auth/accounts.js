@@ -20,6 +20,9 @@ import { sha256Hex } from '../crypto.js';
 import { isMailConfigured, sendMail } from '../mailer.js';
 import { loadPlan } from '../billing/plan.js';
 import { env } from '../../config/env.js';
+import { createLogger, errorName } from '../logger.js';
+
+const log = createLogger('accounts');
 
 export { USERNAME_PATTERN };
 export const MIN_PASSWORD_LENGTH = 8;
@@ -278,12 +281,15 @@ export async function requestPasswordRecovery(email, address = 'unknown') {
   const user = await User.findOne({ email: normalized });
   // Administrators have no password (Google + authenticator), so there is nothing to reset.
   if (!user || user.role === 'admin' || (await accessProblem(user))) return;
-  const token = await issueToken(user, 'recover', RECOVERY_TTL_MS);
-  await sendMail({
-    to: user.email,
-    subject: 'Reset your Pirento Blank password',
-    text: `A password reset was requested for your Pirento Blank account.\n\nChoose a new password within one hour:\nReset my password: ${appOrigin()}/auth/link/recover#token=${token}\n\nIf you did not request this, ignore this email; your password stays the same.`,
-  });
+  // Sent in the background, so members and strangers get the same answer just as fast.
+  void (async () => {
+    const token = await issueToken(user, 'recover', RECOVERY_TTL_MS);
+    await sendMail({
+      to: user.email,
+      subject: 'Reset your Pirento Blank password',
+      text: `A password reset was requested for your Pirento Blank account.\n\nChoose a new password within one hour:\nReset my password: ${appOrigin()}/auth/link/recover#token=${token}\n\nIf you did not request this, ignore this email; your password stays the same.`,
+    });
+  })().catch((error) => log.warn('recovery email not sent', { error: errorName(error) }));
 }
 
 /**
@@ -392,7 +398,7 @@ export async function signUp(email, clientAddress) {
       !invitation.revokedAt &&
       account.status === 'active'
     ) {
-      await sendActivationEmail(account, { selfSignup: true });
+      sendSignupEmail(account);
     }
     return;
   }
@@ -413,7 +419,14 @@ export async function signUp(email, clientAddress) {
     if (account) await User.deleteOne({ _id: account._id, emailConfirmedAt: null });
     return;
   }
-  await sendActivationEmail(account, { selfSignup: true });
+  sendSignupEmail(account);
+}
+
+/** Sends the sign-up link in the background, so every address gets the same answer as fast. */
+function sendSignupEmail(account) {
+  void sendActivationEmail(account, { selfSignup: true }).catch((error) =>
+    log.warn('sign-up email not sent', { error: errorName(error) }),
+  );
 }
 
 /**

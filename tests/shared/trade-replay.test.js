@@ -26,8 +26,8 @@ describe('trade replay', () => {
     // Without times there is nothing to place on intraday candles; daily candles use the day.
     expect(replayMarks({ ...trade, entryTime: null, exitTime: null }, '5m').points).toEqual([]);
     expect(replayMarks(trade, '1d').points.map((point) => point.time)).toEqual([
-      Date.parse('2026-10-16T00:00:00Z'),
-      Date.parse('2026-10-16T00:00:00Z'),
+      Date.parse('2026-10-16T23:59:00+05:30'),
+      Date.parse('2026-10-16T23:59:00+05:30'),
     ]);
   });
 

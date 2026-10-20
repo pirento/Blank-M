@@ -20,6 +20,7 @@ import {
   OrderPlanRecord,
   PaperTrade,
   PriceAlert,
+  ProblemReport,
   PushSubscription,
   ResearchRun,
   ShareLink,
@@ -31,6 +32,7 @@ import {
   TelegramLinkCode,
   Trade,
   TradingRule,
+  UsageCounter,
   User,
   WatchlistItem,
 } from '../../models/index.js';
@@ -64,6 +66,8 @@ const MEMBER_COLLECTIONS = [
   TelegramLinkCode,
   AuthToken,
   LoginUsername,
+  ProblemReport,
+  UsageCounter,
 ];
 
 /**

@@ -7,6 +7,7 @@
 import '../config/env.js';
 import { connectDatabase, disconnectDatabase } from '../config/database.js';
 import { deleteMember } from '../services/admin/delete-member.js';
+import { applyPlatformSettings } from '../services/platform/settings.js';
 
 const [email, confirm] = process.argv.slice(2);
 if (!email || email !== confirm) {
@@ -15,6 +16,8 @@ if (!email || email !== confirm) {
 }
 
 await connectDatabase();
+// Razorpay keys saved in the admin panel are needed to cancel the member's renewals.
+await applyPlatformSettings();
 try {
   const result = await deleteMember(email);
   console.log(`Deleted ${result.email}: ${result.rows} records, ${result.files} files.`);

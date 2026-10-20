@@ -69,7 +69,7 @@ export async function sendToMember(userId, text) {
   if (!link) return false;
   // Telegram is a Premium feature when the administrator bills for it, also after linking.
   const user = await User.findById(userId).lean();
-  if (!user || !(await hasFeature(user, 'telegram'))) return false;
+  if (!user || !(await hasFeature(user, 'telegram', { startTrial: false }))) return false;
   try {
     await sendTelegramMessage(link.chatId, text);
     return true;

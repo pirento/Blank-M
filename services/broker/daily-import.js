@@ -100,7 +100,11 @@ export async function runDailyImports({ now = new Date(), limit = 25 } = {}) {
     if (!claim.modifiedCount) continue;
     const user = await User.findById(settings._id);
     // Free members on a billed platform keep the setting but are not imported for.
-    if (!user || (await accessProblem(user)) || !(await hasFeature(user, 'brokers'))) {
+    if (
+      !user ||
+      (await accessProblem(user)) ||
+      !(await hasFeature(user, 'brokers', { startTrial: false }))
+    ) {
       skipped += 1;
       continue;
     }
