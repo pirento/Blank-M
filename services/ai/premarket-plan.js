@@ -206,7 +206,7 @@ export async function runPremarketPlans({ now = new Date(), limit = 10 } = {}) {
         !user ||
         (await accessProblem(user)) ||
         // A Premium feature when the administrator bills for AI.
-        !(await hasFeature(user, 'ai')) ||
+        !(await hasFeature(user, 'ai', { startTrial: false })) ||
         !(await TelegramLink.exists({ userId: user._id }))
       ) {
         skipped += 1;

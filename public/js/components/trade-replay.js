@@ -22,8 +22,9 @@ export function replayMarks(trade, interval) {
     { price: trade.exitPrice, label: 'Exit', kind: 'exit' },
   ];
   if (trade.stopLoss) lines.push({ price: trade.stopLoss, label: 'Stop', kind: 'stop' });
-  const day = Date.parse(`${trade.date}T00:00:00Z`);
-  // Daily candles: both points sit on the trade day's candle.
+  // Daily candles: both points sit on the trade day's candle, which starts at 00:00 IST (Zerodha)
+  // or 09:15 IST (Yahoo); the end of the IST day is after either and before the next day's.
+  const day = Date.parse(`${trade.date}T23:59:00+05:30`);
   const entryAt = interval === '1d' ? day : istTime(trade.date, trade.entryTime);
   const exitAt = interval === '1d' ? day : istTime(trade.date, trade.exitTime);
   const points = [];

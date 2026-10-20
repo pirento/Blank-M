@@ -182,7 +182,8 @@ export function exitTriggered(row, price) {
  * Reads one price per symbol for the given open trades, records it, and closes
  * trades whose stop or target it crossed. Returns how many closed.
  */
-async function checkTrades(rows) {
+/** `quoteUserId`: whose Zerodha session may price the trades (null: never another member's). */
+async function checkTrades(rows, quoteUserId) {
   let closedCount = 0;
   const bySymbol = new Map();
   for (const row of rows) {
@@ -193,7 +194,7 @@ async function checkTrades(rows) {
   await inBatches([...bySymbol], 8, async ([symbol, group]) => {
     let price;
     try {
-      price = await livePrice(symbol, group[0].userId);
+      price = await livePrice(symbol, quoteUserId);
     } catch {
       return; // Leave the trade open; the next check retries.
     }
@@ -215,14 +216,14 @@ async function checkTrades(rows) {
 /** Checks the member's open paper trades now. */
 export async function refreshPaperTrades(userId) {
   const open = await PaperTrade.find({ userId, status: 'open' }).lean();
-  const closedNow = await checkTrades(open);
+  const closedNow = await checkTrades(open, userId);
   return { ...(await listPaperTrades(userId)), closedNow };
 }
 
 /** Scheduled check of every member's open paper trades (one price per symbol for all of them). */
 export async function checkAllPaperTrades() {
   const open = await PaperTrade.find({ status: 'open' }).lean();
-  const closed = await checkTrades(open);
+  const closed = await checkTrades(open, null);
   if (closed) log.info('paper trades closed by price check', { closed });
   return { checked: open.length, closed };
 }

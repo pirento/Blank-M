@@ -3,6 +3,7 @@
  * Premium or free members. Sent in the background in batches; members who
  * turned announcements off (Settings → Email reports) are skipped.
  */
+import { siteOrigin } from '../notifications/email-layout.js';
 import { z } from 'zod';
 import {
   AccountSettings,
@@ -120,7 +121,7 @@ function inAudience(audience, membership) {
 
 async function sendAnnouncement(row) {
   const plan = await loadPlan();
-  const origin = process.env.APP_URL ? new URL(process.env.APP_URL).origin : '';
+  const origin = siteOrigin();
   let lastId = row.lastUserId ?? '';
   for (;;) {
     const users = await User.find(

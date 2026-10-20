@@ -75,7 +75,7 @@ export async function createImportBatch(
   ownerId,
   fileName,
   candidates,
-  charges,
+  chargesFor,
   sourceDigest,
   mapping,
   reference = '',
@@ -113,7 +113,7 @@ export async function createImportBatch(
           ((parseInt(digest[16], 16) & 3) | 8).toString(16) +
           digest.slice(17, 32);
         const id = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-        const economics = computeTradeEconomics(input, charges);
+        const economics = computeTradeEconomics(input, chargesFor(input.segment));
         return {
           line,
           status: 'pending',

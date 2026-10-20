@@ -21,6 +21,7 @@ import {
 import { HttpError } from '../services/errors.js';
 import { env } from '../config/env.js';
 import { clientAddress } from '../services/http.js';
+import { reserveAttempts } from '../services/rate-window.js';
 import { loadPlan } from '../services/billing/plan.js';
 import { isMailConfigured } from '../services/mailer.js';
 import { welcomeMember } from '../services/notifications/emails.js';
@@ -135,9 +136,29 @@ export async function setPassword(req, res) {
   // cookie) must not be enough to take the account over: ask for the current password.
   const recovering = Boolean(req.session.auth?.passwordRecovery || req.session.auth?.activation);
   if (!recovering && user.passwordHash) {
+    // Limited like sign-in, so a live session cannot be used to guess the current password.
+    const quota = await reserveAttempts(
+      [{ key: `password-change:${user._id}`, limit: 5 }],
+      15 * 60_000,
+    );
+    if (!quota.allowed) {
+      throw new HttpError('Too many attempts. Try again in 15 minutes.', 429);
+    }
     const current = String(req.body?.currentPassword ?? '');
     if (!current || current.length > 128 || !(await bcrypt.compare(current, user.passwordHash))) {
       throw new HttpError('Your current password is not correct.', 403);
+    }
+  } else if (!recovering) {
+    // A Google-only account adds a password only right after signing in with Google (or with an
+    // authenticator), never from an old session alone.
+    const signIn = req.session.auth;
+    const fresh =
+      signIn?.method === 'oauth' && Date.now() - (signIn.authenticatedAt ?? 0) < 10 * 60_000;
+    if (!fresh && signIn?.aal !== 'aal2') {
+      throw new HttpError(
+        'Sign in with Google again (or use "Forgot password") to add a password.',
+        403,
+      );
     }
   }
   const activating = Boolean(req.session.auth?.activation) && !user.emailConfirmedAt;

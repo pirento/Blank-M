@@ -1,6 +1,7 @@
 /**
  * Weekly report emails: last week's trading summary for members who opted in.
  */
+import { siteOrigin } from '../notifications/email-layout.js';
 import { AccountSettings, OrderPlanRecord, Trade, User } from '../../models/index.js';
 import { formatCurrency } from '../../middleware/view-helpers.js';
 import { pnlBySymbol, summarisePerformance } from '../../shared/pnl.js';
@@ -27,7 +28,8 @@ const log = createLogger('weekly-report');
  */
 async function coachSection(user, period, tradeCount) {
   const userId = user._id;
-  if (!tradeCount || !hasOpenAiKey() || !(await hasFeature(user, 'ai'))) return '';
+  if (!tradeCount || !hasOpenAiKey() || !(await hasFeature(user, 'ai', { startTrial: false })))
+    return '';
   const settings = await AccountSettings.findById(userId, { weeklyAiCoach: 1 }).lean();
   if (!settings?.weeklyAiCoach) return '';
   let review;
@@ -119,7 +121,7 @@ export async function buildWeeklyReport(userId, period) {
 export async function sendWeeklyReport(user, period) {
   const report = await buildWeeklyReport(user._id, period);
   const coach = await coachSection(user, period, report.summary.totalTrades);
-  const origin = process.env.APP_URL ? new URL(process.env.APP_URL).origin : '';
+  const origin = siteOrigin();
   await sendMail({
     to: user.email,
     subject: report.subject,
@@ -154,7 +156,11 @@ export async function sendWeeklyReports({ today = todayInIst(), limit = 15 } = {
     );
     if (!claim.modifiedCount) continue;
     const user = await User.findById(settings._id);
-    if (!user || (await accessProblem(user)) || !(await hasFeature(user, 'reports'))) {
+    if (
+      !user ||
+      (await accessProblem(user)) ||
+      !(await hasFeature(user, 'reports', { startTrial: false }))
+    ) {
       skipped += 1;
       continue;
     }

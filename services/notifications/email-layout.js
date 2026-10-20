@@ -14,7 +14,8 @@ const FONT = "font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-s
 const TEXT = `margin:0 0 16px;font-size:15px;line-height:1.6;color:#1b2424;${FONT}`;
 const ACCENT = '#167256';
 
-const origin = () => {
+/** This site's origin from APP_URL, or '' when it is unset or not a valid URL. */
+export const siteOrigin = () => {
   try {
     return new URL(process.env.APP_URL || '').origin;
   } catch {
@@ -34,7 +35,7 @@ export const quote = (text) =>
     .join('\n');
 
 /** Only links to this site (APP_URL) are clickable. */
-const ours = (url) => Boolean(origin()) && url.startsWith(`${origin()}/`);
+const ours = (url) => Boolean(siteOrigin()) && url.startsWith(`${siteOrigin()}/`);
 
 const linkify = (escaped) =>
   escaped.replace(INLINE_LINK, (url) =>
@@ -72,7 +73,7 @@ function renderBlock(block) {
 }
 
 function footer() {
-  const site = origin();
+  const site = siteOrigin();
   const name = process.env.BUSINESS_NAME?.trim() || 'Pirento Blank';
   const address = process.env.BUSINESS_ADDRESS?.trim();
   const support = process.env.SUPPORT_EMAIL?.trim();

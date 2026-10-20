@@ -285,6 +285,20 @@ describe('Premium', () => {
       paper: { used: 1, limit: 1, unit: 'days' },
       ai: { used: 2, limit: 2, unit: 'uses' },
     });
+    // Parallel requests on a new day cannot slip past a used-up allowance, and many requests on
+    // one day count once.
+    const { takeFreeDay } = await import('../../services/billing/usage.js');
+    const tomorrow = new Date(Date.now() + 86_400_000);
+    const late = await Promise.all(
+      Array.from({ length: 5 }, () => takeFreeDay(member.userId, 'paper', 1, tomorrow)),
+    );
+    expect(late.some(Boolean)).toBe(tomorrow.getMonth() !== new Date().getMonth());
+    const burst = await Promise.all(
+      Array.from({ length: 5 }, () => takeFreeDay('someone', 'options', 2)),
+    );
+    expect(burst).toEqual([true, true, true, true, true]);
+    const { usedThisMonth } = await import('../../services/billing/usage.js');
+    expect(await usedThisMonth('someone', 'options')).toBe(1);
     // Invalid allowances are refused.
     const bad = await admin.send('put', '/api/admin/billing', { freeQuota: { paper: -1 } });
     expect(bad.status).toBe(400);
@@ -304,6 +318,13 @@ describe('Premium', () => {
       states.push((await session.agent.get('/api/billing')).body.membership.state);
     }
     expect(states).toEqual(['trial', 'free', 'trial']);
+
+    // Background jobs (weekly report, daily import) never start a dormant member's trial.
+    const { hasFeature } = await import('../../services/billing/membership.js');
+    const { Subscription } = await import('../../models/index.js');
+    const dormant = await createMember({ email: 'dormant@example.com' });
+    expect(await hasFeature(dormant.user, 'ai', { startTrial: false })).toBe(true);
+    expect(await Subscription.exists({ _id: dormant.user._id })).toBeNull();
   });
 
   it('starts checkout on Razorpay and activates Premium from a signed webhook', async () => {
@@ -529,6 +550,8 @@ describe('sign-up', () => {
     const user = await User.findOne({ email: 'new@example.com' }).lean();
     expect(user).toMatchObject({ role: 'member', emailConfirmedAt: null });
     expect(await AllowedUser.exists({ _id: 'new@example.com' })).toBeTruthy();
+    // The email goes out in the background, so the answer is as fast for known addresses.
+    await vi.waitFor(() => expect(mails.at(-1)?.to).toBe('new@example.com'));
     expect(mails.at(-1)).toMatchObject({
       to: 'new@example.com',
       subject: 'Confirm your Pirento Blank account',
@@ -735,6 +758,54 @@ describe('Google sign-in', () => {
         '/auth/google?for=admin',
       ),
     ).toBe('/admin');
+  });
+
+  it('lets a Google-only member add a password only right after a Google sign-in', async () => {
+    const admin = await adminSession();
+    await admin.send('put', '/api/admin/billing', { signupOpen: true });
+    forgetPlanCache();
+    const visitor = supertest.agent(app);
+    expect(await googleRoundTrip(visitor, { email: 'google.only@gmail.com' })).toBe('/dashboard');
+    const csrf = (await visitor.get('/terms')).text.match(/name="csrf-token" content="([^"]+)"/)[1];
+    const setPassword = () =>
+      visitor
+        .post('/auth/password')
+        .set('X-CSRF-Token', csrf)
+        .send({ password: 'a-new-password-123' });
+    // Ten minutes after the Google sign-in, the old session alone is not enough.
+    const later = Date.now() + 11 * 60_000;
+    const realNow = Date.now;
+    Date.now = () => later;
+    try {
+      expect((await setPassword()).status).toBe(403);
+    } finally {
+      Date.now = realNow;
+    }
+    expect((await setPassword()).status).toBe(200);
+  });
+});
+
+describe('password safety', () => {
+  it('emails a reset link only to members, and limits guesses of the current password', async () => {
+    const member = await memberSession();
+    const visitor = supertest.agent(app);
+    const csrf = (await visitor.get('/login')).text.match(/name="csrf-token" content="([^"]+)"/)[1];
+    const recover = (email) =>
+      visitor.post('/auth/recover').set('X-CSRF-Token', csrf).send({ email });
+    const before = mails.length;
+    expect((await recover('nobody@example.com')).body).toEqual({ ok: true });
+    expect((await recover('member@example.com')).body).toEqual({ ok: true });
+    await vi.waitFor(() => expect(mails).toHaveLength(before + 1));
+    expect(mails.at(-1).to).toBe('member@example.com');
+    expect(mails.at(-1).text).toContain('/auth/link/recover#token=');
+
+    const change = () =>
+      member.send('post', '/auth/password', {
+        currentPassword: 'wrong-password-1',
+        password: 'a-new-password-123',
+      });
+    for (let attempt = 0; attempt < 5; attempt += 1) expect((await change()).status).toBe(403);
+    expect((await change()).status).toBe(429);
   });
 });
 

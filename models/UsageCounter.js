@@ -12,6 +12,8 @@ const usageCounterSchema = new mongoose.Schema(
     feature: { type: String, required: true },
     month: { type: String, required: true },
     count: { type: Number, default: 0 },
+    /** Per-day features: the IST dates (YYYY-MM-DD) already counted this month. */
+    days: { type: [String], default: undefined },
     expiresAt: { type: Date, required: true },
   },
   { versionKey: false },

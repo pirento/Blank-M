@@ -58,28 +58,28 @@ router.all('/maintenance/daily-import', wrap(account.runDailyImports));
 router.all('/maintenance/premarket-plan', wrap(account.runPremarketPlans));
 
 /* ------------------------------------- AI ------------------------------------ */
-router.post('/ai/chat', premium.ai, wrap(ai.handleChat));
-router.post('/ai/analyze', premium.ai, wrap(ai.handleAnalyze));
-router.post('/ai/briefing', premium.ai, wrap(ai.handleBriefing));
-router.post('/ai/picks', premium.ai, wrap(ai.handlePicks));
-router.post('/ai/review', premium.ai, wrap(ai.handleReview));
-router.post('/ai/transcribe', premium.ai, wrap(ai.handleTranscribe));
-router.post('/ai/journal-search', premium.ai, wrap(ai.handleJournalSearch));
-router.post('/ai/symbol', premium.ai, wrap(ai.handleSymbol));
-router.post('/ai/rule', premium.ai, wrap(ai.handleRule));
-router.post('/ai/insights', premium.ai, wrap(ai.handleInsights));
-router.post('/ai/coach-review', premium.ai, wrap(ai.handleCoachReview));
-router.get('/ai/coach-reviews', premium.ai, wrap(ai.handleCoachReviews));
+router.post('/ai/chat', requireApiAuth, premium.ai, wrap(ai.handleChat));
+router.post('/ai/analyze', requireApiAuth, premium.ai, wrap(ai.handleAnalyze));
+router.post('/ai/briefing', requireApiAuth, premium.ai, wrap(ai.handleBriefing));
+router.post('/ai/picks', requireApiAuth, premium.ai, wrap(ai.handlePicks));
+router.post('/ai/review', requireApiAuth, premium.ai, wrap(ai.handleReview));
+router.post('/ai/transcribe', requireApiAuth, premium.ai, wrap(ai.handleTranscribe));
+router.post('/ai/journal-search', requireApiAuth, premium.ai, wrap(ai.handleJournalSearch));
+router.post('/ai/symbol', requireApiAuth, premium.ai, wrap(ai.handleSymbol));
+router.post('/ai/rule', requireApiAuth, premium.ai, wrap(ai.handleRule));
+router.post('/ai/insights', requireApiAuth, premium.ai, wrap(ai.handleInsights));
+router.post('/ai/coach-review', requireApiAuth, premium.ai, wrap(ai.handleCoachReview));
+router.get('/ai/coach-reviews', requireApiAuth, premium.ai, wrap(ai.handleCoachReviews));
 
 /* --------------------------------- Zerodha Kite ------------------------------- */
-router.all('/kite/authorize', premium.brokers, wrap(kite.authorize));
+router.all('/kite/authorize', requireApiAuth, premium.brokers, wrap(kite.authorize));
 router.all('/kite/callback', wrap(kite.callback));
 router.all('/kite/complete', wrap(kite.complete));
 router.all('/kite/status', wrap(kite.status));
-router.all('/kite/balance', premium.brokers, wrap(kite.balance));
-router.all('/kite/portfolio', premium.brokers, wrap(kite.portfolio));
-router.all('/kite/fills', premium.brokers, wrap(kite.fills));
-router.all('/kite/fills/import', premium.brokers, wrap(kite.importFillsToJournal));
+router.all('/kite/balance', requireApiAuth, premium.brokers, wrap(kite.balance));
+router.all('/kite/portfolio', requireApiAuth, premium.brokers, wrap(kite.portfolio));
+router.all('/kite/fills', requireApiAuth, premium.brokers, wrap(kite.fills));
+router.all('/kite/fills/import', requireApiAuth, premium.brokers, wrap(kite.importFillsToJournal));
 router.all('/kite/disconnect', wrap(kite.disconnect));
 router.get('/dhan', requireApiAuth, wrap(dhan.status));
 router.post('/dhan/connect', requireApiAuth, premium.brokers, wrap(dhan.connect));

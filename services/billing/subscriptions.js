@@ -29,6 +29,8 @@ const log = createLogger('billing');
 const DAY_MS = 24 * 60 * 60_000;
 /** Statuses where the Razorpay subscription is still alive (paying or about to). */
 const LIVE_STATUSES = ['created', 'authenticated', 'active', 'pending'];
+// Renewals that failed (halted/paused) can still charge when an old invoice is paid; cancel those too.
+const CANCELLABLE_STATUSES = [...LIVE_STATUSES, 'halted', 'paused'];
 
 /** The Razorpay plan for the current price, created on first use or after a price change. */
 async function currentRazorpayPlan(plan) {
@@ -74,8 +76,12 @@ export async function startCheckout(user) {
     // A halted subscription can come back to life when an old invoice is paid;
     // end it before starting a new one so the member is never charged twice.
     if (claimed.razorpaySubscriptionId && ['halted', 'paused'].includes(claimed.razorpayStatus)) {
+      // If it cannot be cancelled and is still alive, stop: a second one could charge twice.
       await cancelSubscription(claimed.razorpaySubscriptionId, { immediately: true }).catch(
-        (error) => log.warn('old subscription not cancelled', { error: error.message }),
+        async (error) => {
+          const old = await fetchSubscription(claimed.razorpaySubscriptionId);
+          if (CANCELLABLE_STATUSES.includes(old?.status)) throw error;
+        },
       );
     }
     const planId = await currentRazorpayPlan(plan);
@@ -208,11 +214,24 @@ async function applyWebhookEvent(event) {
   const record = await applySubscriptionEntity(subscription);
   const payment = event.payload?.payment?.entity;
   if (payment?.id && Number.isFinite(payment.amount)) {
+    // payment.failed carries only the payment: find the member through its subscription id.
+    const owner =
+      record?._id ??
+      subscription?.notes?.userId ??
+      (payment.subscription_id
+        ? (
+            await Subscription.findOne(
+              { razorpaySubscriptionId: payment.subscription_id },
+              { _id: 1 },
+            ).lean()
+          )?._id
+        : null) ??
+      null;
     await Payment.updateOne(
       { _id: payment.id },
       {
         $set: {
-          userId: record?._id ?? subscription?.notes?.userId ?? null,
+          userId: owner,
           razorpaySubscriptionId: subscription?.id ?? payment.subscription_id ?? null,
           amount: payment.amount / 100,
           currency: payment.currency ?? 'INR',
@@ -245,13 +264,13 @@ export async function refreshFromRazorpay(user) {
 /** The member cancels: no more renewals, Premium stays until the paid month ends. */
 export async function cancelMembership(user) {
   const sub = await Subscription.findById(user._id).lean();
-  if (!sub?.razorpaySubscriptionId || !LIVE_STATUSES.includes(sub.razorpayStatus)) {
+  if (!sub?.razorpaySubscriptionId || !CANCELLABLE_STATUSES.includes(sub.razorpayStatus)) {
     throw new HttpError('There is no active subscription to cancel.', 409);
   }
-  // Before the first charge (checkout not finished, or still in the trial) there is no
-  // paid month to run out, so the subscription is cancelled at once.
+  // Before the first charge (checkout not finished, or still in the trial), or when renewals
+  // already failed (halted/paused), there is no paid month to run out: cancel at once.
   const entity = await cancelSubscription(sub.razorpaySubscriptionId, {
-    immediately: ['created', 'authenticated'].includes(sub.razorpayStatus),
+    immediately: ['created', 'authenticated', 'halted', 'paused'].includes(sub.razorpayStatus),
   });
   await applySubscriptionEntity(entity);
   await Subscription.updateOne({ _id: user._id }, { $set: { cancelAtPeriodEnd: true } });
@@ -264,7 +283,9 @@ export async function cancelMembership(user) {
  */
 export async function endSubscriptionNow(userId) {
   const sub = await Subscription.findById(userId).lean();
-  if (!sub?.razorpaySubscriptionId || !LIVE_STATUSES.includes(sub.razorpayStatus)) return false;
+  if (!sub?.razorpaySubscriptionId || !CANCELLABLE_STATUSES.includes(sub.razorpayStatus)) {
+    return false;
+  }
   const entity = await cancelSubscription(sub.razorpaySubscriptionId, { immediately: true });
   await applySubscriptionEntity(entity);
   await Subscription.updateOne({ _id: userId }, { $set: { cancelAtPeriodEnd: true } });

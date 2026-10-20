@@ -120,17 +120,27 @@ export function computeMembership(plan, user, sub, now = Date.now()) {
  * `{ billingEnabled, premium, state, trialEndsAt, paidUntil, grantUntil, daysLeft, premiumFeatures }`.
  * The first time a member is seen with billing on, their free trial starts.
  */
-export async function membershipFor(user, now = Date.now()) {
+export async function membershipFor(user, now = Date.now(), { startTrial = true } = {}) {
   const plan = await loadPlan();
   if (!plan.enabled || user.role === 'admin') return computeMembership(plan, user, null, now);
+  if (!startTrial) {
+    // Background jobs never start a trial: a member not seen yet counts as about to start one.
+    const existing = await Subscription.findById(user._id).lean();
+    const pending =
+      plan.trialDays > 0 ? { trialEndsAt: new Date(now + plan.trialDays * DAY_MS) } : null;
+    return computeMembership(plan, user, existing ?? pending, now);
+  }
   return computeMembership(plan, user, await subscriptionFor(user, plan, now), now);
 }
 
-/** Whether the member may use a feature now (free features and billing-off always may). */
-export async function hasFeature(user, feature) {
+/**
+ * Whether the member may use a feature now (free features and billing-off always may). Background
+ * jobs pass `{ startTrial: false }` so a dormant member's trial is not started by an email.
+ */
+export async function hasFeature(user, feature, { startTrial = true } = {}) {
   const plan = await loadPlan();
   if (!plan.enabled || !plan.features.includes(feature)) return true;
-  return (await membershipFor(user)).premium;
+  return (await membershipFor(user, Date.now(), { startTrial })).premium;
 }
 
 /**

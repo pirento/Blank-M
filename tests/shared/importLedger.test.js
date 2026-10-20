@@ -19,7 +19,7 @@ const create = async (owner = 'owner-a', reference = '', content = csv) =>
     owner,
     'trades.csv',
     candidates,
-    DEFAULT_CHARGES,
+    () => DEFAULT_CHARGES,
     await hashImportSource(content),
     mapping,
     reference,
@@ -54,7 +54,7 @@ describe('recoverable import identities and frozen checkpoint', () => {
       'owner-a',
       'trades.csv',
       candidates,
-      DEFAULT_CHARGES,
+      () => DEFAULT_CHARGES,
       await hashImportSource(csv),
       { ...mapping, priceBasis: 'buy-sell' },
     );
@@ -71,7 +71,7 @@ describe('recoverable import identities and frozen checkpoint', () => {
       'owner-a',
       'trades.csv',
       candidates,
-      { ...DEFAULT_CHARGES, enabled: false },
+      () => ({ ...DEFAULT_CHARGES, enabled: false }),
       await hashImportSource(csv),
       mapping,
     );

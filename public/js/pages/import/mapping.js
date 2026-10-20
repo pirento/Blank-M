@@ -29,7 +29,7 @@ import {
   FIELD_LABELS,
   PREVIEW_ROWS,
   available,
-  charges,
+  chargesFor,
   derived,
   reading,
   recoveryError,
@@ -374,7 +374,10 @@ export function mappingSection() {
                   'tbody',
                   {},
                   candidates.slice(0, PREVIEW_ROWS).map((candidate) => {
-                    const economics = computeTradeEconomics(candidate, charges);
+                    const economics = computeTradeEconomics(
+                      candidate,
+                      chargesFor(candidate.segment),
+                    );
                     const isDuplicate = duplicateLines.has(candidate.line);
                     return h(
                       'tr',
