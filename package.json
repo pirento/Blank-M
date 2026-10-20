@@ -1,7 +1,7 @@
 {
   "name": "blank-trading-journal",
   "private": true,
-  "version": "0.3.0",
+  "version": "1.0.0",
   "description": "Pirento Blank — invite-only planning and trading journal (Express MVC, MongoDB, EJS).",
   "type": "module",
   "main": "server.js",
