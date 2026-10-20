@@ -57,16 +57,37 @@ export async function signIn(page, { email, password } = ADMIN) {
   await page.waitForURL('**/dashboard');
 }
 
-/** Signs in as MFA_ADMIN and completes the authenticator check. */
+/**
+ * Signs in "with Google" as `email` (Google's page is faked here; scripts/dev-memory.js fakes its
+ * API), starting from `start` (the admin or member sign-in).
+ */
+export async function signInWithGoogle(page, email, start = '/admin/login') {
+  // Our /auth/google answers with a redirect to Google; send the browser straight back to the
+  // callback instead, as Google would after the person chose their account.
+  await page.route('**/auth/google?**', async (route) => {
+    const response = await route.fetch({ maxRedirects: 0 });
+    const asked = new URL(response.headers().location);
+    const back = new URL(asked.searchParams.get('redirect_uri'));
+    back.searchParams.set('state', asked.searchParams.get('state'));
+    back.searchParams.set('code', email);
+    await route.fulfill({ status: 302, headers: { location: back.toString() } });
+  });
+  await page.goto(start);
+  await page.getByRole('link', { name: /with Google/ }).click();
+}
+
+let lastUsedStep = 0;
+
+/** Signs in as MFA_ADMIN the administrators' way: Google, then the authenticator code. */
 export async function signInWithAuthenticator(page) {
   const { currentStep, totpCode } = await import('../../services/auth/totp.js');
-  await page.goto('/login');
-  await page.fill('#email', MFA_ADMIN.email);
-  await page.fill('#password', MFA_ADMIN.password);
-  await page.click('button[type=submit]');
-  await page.fill('#mfa-signin-code', totpCode(MFA_ADMIN.secret, currentStep()));
+  await signInWithGoogle(page, MFA_ADMIN.email);
+  // A code is accepted once: when an earlier test used this 30-second step, wait for the next one.
+  while (currentStep() <= lastUsedStep) await page.waitForTimeout(1000);
+  lastUsedStep = currentStep();
+  await page.fill('#mfa-signin-code', totpCode(MFA_ADMIN.secret, lastUsedStep));
   await page.getByRole('button', { name: 'Verify and continue' }).click();
-  // The challenge is shown at /dashboard itself; it goes away once the code is accepted.
+  // The challenge is shown in place; it goes away once the code is accepted.
   await page.waitForSelector('#mfa-signin-code', { state: 'detached' });
 }
 

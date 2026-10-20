@@ -3,6 +3,7 @@
  */
 import nodemailer from 'nodemailer';
 import { HttpError } from './errors.js';
+import { emailHtml } from './notifications/email-layout.js';
 
 let transport = null;
 
@@ -45,12 +46,14 @@ export function setMailTransport(value) {
 }
 
 /**
- * Sends a plain-text email from SMTP_FROM. Throws HttpError 503 when mail is not configured, 429
- * when the provider rate-limits (421/450), otherwise 502; provider diagnostics are never passed on.
+ * Sends an email from SMTP_FROM: the plain text plus the branded HTML built from it. Throws
+ * HttpError 503 when mail is not configured, 429 when the provider rate-limits (421/450),
+ * otherwise 502; provider diagnostics are never passed on.
  */
 export async function sendMail({ to, subject, text }) {
   try {
-    await mailer().sendMail({ from: process.env.SMTP_FROM, to, subject, text });
+    const html = emailHtml(subject, text);
+    await mailer().sendMail({ from: process.env.SMTP_FROM, to, subject, text, html });
   } catch (error) {
     if (error instanceof HttpError) throw error;
     // Provider diagnostics can contain account details; never forward them.

@@ -17,7 +17,7 @@ router.get('/', pages.landing);
 router.get('/login', wrap(pages.login));
 router.get('/signup', wrap(pages.signup));
 router.get('/invite', pages.invite);
-router.get('/:page(terms|privacy|refunds|contact)', wrap(pages.legal));
+router.get('/:page(terms|privacy|disclaimer|refunds|contact)', wrap(pages.legal));
 router.get('/auth/link/:purpose(activate|recover)', pages.authLink);
 router.get('/share/:token', wrap(pages.sharedJournal));
 
@@ -44,7 +44,7 @@ const WORKSPACE_PAGES = [
   ['/analytics', 'analytics', ['trades', 'strategies', 'rules', 'chatMessages'], [], 'ai'],
   ['/settings', 'settings', ['settings']],
   ['/billing', 'billing', []],
-  ['/chart', 'chart', []],
+  ['/chart', 'chart', [], ['lightweight-charts.js']],
   ['/journal', 'journal', ['trades', 'strategies', 'rules', 'settings']],
   ['/import', 'import', ['trades', 'settings']],
   ['/backtest', 'backtest', ['trades', 'strategies', 'rules', 'settings'], CHARTS, 'backtest'],

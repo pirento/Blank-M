@@ -1,9 +1,9 @@
 /**
- * Live chart page: candles for one symbol (from ?symbol=, else the first
- * watchlist symbol) that follow live prices, with a symbol box to switch.
+ * Live chart page: a TradingView-style chart for one symbol (from ?symbol=, else the first
+ * watchlist symbol) that follows live prices, with a symbol box to switch.
  */
 import { $, pageData } from '../core/dom.js';
-import { createMarketHistoryChart } from '../components/market-history-chart.js';
+import { createProChart } from '../components/pro-chart.js';
 
 const data = pageData();
 const form = $('[data-chart-form]');
@@ -12,12 +12,7 @@ const fromUrl = new URLSearchParams(window.location.search).get('symbol');
 const first = (fromUrl || data.workspace?.watchlist?.[0]?.symbol || 'NIFTY').trim().toUpperCase();
 field.value = first;
 
-const chart = createMarketHistoryChart({
-  accountId: data.accountId,
-  symbol: first,
-  live: true,
-  initialInterval: '5m',
-});
+const chart = createProChart({ accountId: data.accountId, symbol: first, initialInterval: '5m' });
 $('[data-chart]').append(chart.element);
 void chart.load();
 
@@ -31,3 +26,7 @@ form.addEventListener('submit', (event) => {
   chart.setSymbol(symbol);
 });
 window.addEventListener('pagehide', () => chart.stop());
+// Coming back from the browser's back/forward cache: follow live prices again.
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) void chart.load();
+});

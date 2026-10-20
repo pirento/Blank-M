@@ -33,6 +33,7 @@ import {
   setLiveTrading,
 } from '../services/broker/live-orders.js';
 import { HttpError } from '../services/errors.js';
+import { submitProblemReport } from '../services/admin/problem-reports.js';
 import { todayInIst } from '../shared/market.js';
 
 const MAX_BACKUP_BYTES = 25 * 1024 * 1024;
@@ -274,4 +275,9 @@ export async function createShareLink(req, res) {
 /** POST /api/share-links/:id/revoke: revokes one of the member's share links (404 when not theirs). */
 export async function revokeShareLink(req, res) {
   res.json({ link: await shareLinks.revokeShareLink(req.member.userId, req.params.id) });
+}
+
+/** POST /api/account/problem-report { category, message, page? }: tells the administrators. */
+export async function reportProblem(req, res) {
+  res.status(201).json({ report: await submitProblemReport(req.member.user, req.body) });
 }

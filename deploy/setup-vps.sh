@@ -110,7 +110,7 @@ rm -f "$CRON_FILE"
 echo
 echo "Done. Next steps:"
 echo "  1. Create the first administrator:"
-echo "     cd /srv/blank && ADMIN_EMAIL=${EMAIL} ADMIN_PASSWORD='a long password' node scripts/create-admin.js"
+echo "     cd /srv/blank && ADMIN_EMAIL=<your Google email> node scripts/create-admin.js  (then sign in with Google at /admin/login)"
 echo "  2. Fill in KITE_API_KEY and KITE_API_SECRET in /srv/blank/.env, then: pm2 reload pirento-blank"
 echo "  3. Whitelist this server's IP in the Kite developer profile: $(curl -fsS https://api.ipify.org || echo '<server IP>')"
 echo "  4. Open https://${DOMAIN}/api/health — it should say \"ok\"."

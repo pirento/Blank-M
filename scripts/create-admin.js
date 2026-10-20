@@ -1,18 +1,18 @@
 /**
- * Bootstrap the first administrator.
- * Usage: ADMIN_EMAIL=you@example.com ADMIN_PASSWORD='long secret' node scripts/create-admin.js
+ * Bootstrap the first administrator. Administrators have no password: they sign in at
+ * /admin/login with the Google account of this email, then add an authenticator app
+ * (the code it asks for comes by email, or from scripts/admin-setup-code.js).
+ * Usage: ADMIN_EMAIL=you@gmail.com node scripts/create-admin.js
  */
 import '../config/env.js';
 import { connectDatabase, disconnectDatabase } from '../config/database.js';
 import { AllowedUser, User } from '../models/index.js';
-import { hashPassword } from '../services/auth/accounts.js';
 
 const email = String(process.env.ADMIN_EMAIL || '')
   .trim()
   .toLowerCase();
-const password = String(process.env.ADMIN_PASSWORD || '');
-if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 12) {
-  console.error('Set ADMIN_EMAIL and an ADMIN_PASSWORD of at least 12 characters.');
+if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  console.error('Set ADMIN_EMAIL to the Google account the administrator will sign in with.');
   process.exit(1);
 }
 
@@ -26,9 +26,10 @@ try {
     process.exitCode = 1;
   } else {
     user ??= await User.create({ email, role: 'admin', status: 'active' });
-    user.passwordHash = await hashPassword(password);
     user.emailConfirmedAt ??= new Date();
     user.status = 'active';
+    // A password is never used for administrators.
+    user.passwordHash = null;
     await user.save();
     await AllowedUser.updateOne(
       { _id: email },
@@ -38,7 +39,7 @@ try {
       },
       { upsert: true },
     );
-    console.log(`Administrator ready: ${email}`);
+    console.log(`Administrator ready: ${email}. Sign in with Google at /admin/login.`);
   }
 } finally {
   await disconnectDatabase();

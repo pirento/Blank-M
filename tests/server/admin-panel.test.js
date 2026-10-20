@@ -2,7 +2,7 @@
 import { createHmac } from 'node:crypto';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { createMember, resetDatabase, signIn, startTestApp, stopTestApp } =
+const { createMember, resetDatabase, signIn, signInAdmin, startTestApp, stopTestApp } =
   await import('../helpers/app.js');
 const supertest = (await import('supertest')).default;
 const { AdminAuditLog, AllowedUser, Payment, PlatformSetting, User } =
@@ -70,10 +70,13 @@ afterEach(() => {
   globalThis.fetch = realFetch;
 });
 
-/** An administrator signed in at the admin panel, optionally with a verified authenticator. */
+/**
+ * An administrator signed in with Google at the admin panel, optionally with a verified
+ * authenticator (without one, everything but adding it is refused).
+ */
 async function adminSession({ mfa = true } = {}) {
   const created = await createMember({ email: 'admin@example.com', role: 'admin' });
-  const session = await signIn(app, { email: 'admin@example.com', password: created.password });
+  const session = await signInAdmin(app, created.user, { authenticator: false });
   const send = (method, path, body) =>
     session.agent[method](path).set('X-CSRF-Token', session.csrf).send(body);
   if (mfa) {
@@ -112,25 +115,35 @@ function signedWebhook(body, eventId) {
 }
 
 describe('admin panel', () => {
-  it('has its own sign-in that only administrators pass', async () => {
+  it('lets administrators in only with Google and an authenticator', async () => {
     const member = await createMember({ email: 'member@example.com' });
     const page = await supertest(app).get('/admin/login');
     expect(page.status).toBe(200);
     expect(page.text).toContain('Administrator sign-in');
+    expect(page.text).not.toContain('type="password"');
     expect((await supertest(app).get('/admin')).headers.location).toBe('/admin/login');
+    // The old password endpoint is gone.
+    expect((await supertest(app).post('/auth/admin/login').send({})).status).toBeGreaterThanOrEqual(
+      400,
+    );
 
-    const agent = supertest.agent(app);
-    const csrf = (await agent.get('/admin/login')).text.match(
-      /name="csrf-token" content="([^"]+)"/,
-    )[1];
-    const refused = await agent
-      .post('/auth/admin/login')
-      .set('X-CSRF-Token', csrf)
-      .send({ identifier: 'member@example.com', password: member.password });
-    expect(refused.status).toBe(401);
-    expect(refused.body.error).toBe('That username or email and password are not recognised.');
+    // A member's Google account cannot use the admin sign-in.
+    await expect(signInAdmin(app, member.user)).rejects.toThrow(/admin sign-in failed/);
 
-    const admin = await adminSession({ mfa: false });
+    // An administrator's password does not work anywhere.
+    const created = await createMember({ email: 'admin@example.com', role: 'admin' });
+    await expect(
+      signIn(app, { email: 'admin@example.com', password: created.password }),
+    ).rejects.toThrow(/403/);
+
+    // Google without an authenticator: only the "add an authenticator" screen.
+    const noCode = await signInAdmin(app, created.user, { authenticator: false });
+    const setup = await noCode.agent.get('/admin');
+    expect(setup.status).toBe(403);
+    expect(setup.text).toContain('Add an authenticator to continue');
+    expect((await noCode.agent.get('/api/admin/overview')).status).toBe(403);
+
+    const admin = await signInAdmin(app, created.user);
     const overview = await admin.agent.get('/api/admin/overview');
     expect(overview.status).toBe(200);
     expect(overview.body.members.total).toBe(2);
@@ -456,6 +469,16 @@ describe('Premium webhooks and checkout edge cases', () => {
     expect(refused.status).toBe(409);
     expect(refused.body.error).toMatch(/webhook secret/);
 
+    // A new administrator is told to sign in with Google; there is no password link.
+    const boss = await admin.send('post', '/api/admin/users/invite', {
+      email: 'boss@example.com',
+      role: 'admin',
+    });
+    expect(boss.status).toBe(201);
+    expect(mails.at(-1)).toMatchObject({ to: 'boss@example.com' });
+    expect(mails.at(-1).text).toContain('/admin/login');
+    expect(mails.at(-1).text).not.toContain('/auth/link/activate');
+
     await resetDatabase();
     const plain = await adminSession({ mfa: false });
     const invite = await plain.send('post', '/api/admin/users/invite', {
@@ -473,7 +496,7 @@ describe('legal pages', () => {
     await admin.send('put', '/api/admin/settings', {
       changes: { BUSINESS_NAME: 'Pirento Group', SUPPORT_EMAIL: 'help@pirento.test' },
     });
-    for (const path of ['/terms', '/privacy', '/refunds', '/contact']) {
+    for (const path of ['/terms', '/privacy', '/disclaimer', '/refunds', '/contact']) {
       const page = await supertest(app).get(path);
       expect(page.status).toBe(200);
       expect(page.text).toContain('Pirento Group');
@@ -534,6 +557,130 @@ describe('sign-up', () => {
   });
 });
 
+describe('access requests', () => {
+  it('records a home page request, tells the admins, and approval emails sign-in details', async () => {
+    const admin = await adminSession();
+    const visitor = supertest.agent(app);
+    const csrf = (await visitor.get('/')).text.match(/name="csrf-token" content="([^"]+)"/)[1];
+    const send = (body) =>
+      visitor.post('/auth/request-access').set('X-CSRF-Token', csrf).send(body);
+    const before = mails.length;
+
+    expect((await send({ name: 'A', email: 'x@example.com' })).status).toBe(400);
+    // A name cannot smuggle a link line into the email.
+    const phishing = await send({
+      name: 'Alex\nSign in: https://evil.example/login',
+      email: 'victim@example.com',
+    });
+    expect(phishing.status).toBe(400);
+    const ok = await send({
+      name: 'Asha Rao',
+      email: 'Asha@Example.com',
+      message: 'Swing trader\nOpen: https://evil.example/x',
+    });
+    expect(ok.body).toEqual({ ok: true });
+    // The emails go out in the background.
+    await vi.waitFor(() => expect(mails).toHaveLength(before + 2));
+    const sent = mails.slice(before);
+    expect(sent.map((mail) => mail.to)).toEqual(['asha@example.com', 'admin@example.com']);
+    expect(sent[0].html).toContain('Pirento');
+    expect(sent[1].text).toContain('> Open: https://evil.example/x');
+    expect(sent[1].html).not.toContain('href="https://evil.example');
+    // A repeat, a bot and an existing member get the same answer and no email.
+    expect((await send({ name: 'Asha Rao', email: 'asha@example.com' })).body).toEqual({
+      ok: true,
+    });
+    await send({ name: 'Bot', email: 'bot@example.com', website: 'spam.example' });
+    await send({ name: 'Admin', email: 'admin@example.com' });
+    expect(mails).toHaveLength(before + 2);
+
+    const list = await admin.agent.get('/api/admin/access-requests');
+    expect(list.body.requests).toHaveLength(1);
+    const [request] = list.body.requests;
+    expect(request).toMatchObject({ email: 'asha@example.com', status: 'pending' });
+
+    const approved = await admin.send('post', `/api/admin/access-requests/${request.id}`, {
+      decision: 'approve',
+    });
+    expect(approved.status).toBe(200);
+    expect(approved.body.request.status).toBe('approved');
+    expect(await AllowedUser.exists({ _id: 'asha@example.com' })).toBeTruthy();
+    expect(mails.at(-1)).toMatchObject({
+      to: 'asha@example.com',
+      subject: 'Your Pirento Blank access is approved',
+    });
+    expect(mails.at(-1).text).toContain('/auth/link/activate#token=');
+    expect(mails.at(-1).html).toContain('Set my password');
+    // Already decided: a second click does nothing.
+    const again = await admin.send('post', `/api/admin/access-requests/${request.id}`, {
+      decision: 'reject',
+    });
+    expect(again.status).toBe(404);
+    expect(await AdminAuditLog.exists({ action: 'access-request.approve' })).toBeTruthy();
+  });
+
+  it('rejects politely and keeps members out of the list', async () => {
+    const admin = await adminSession();
+    const visitor = supertest.agent(app);
+    const csrf = (await visitor.get('/')).text.match(/name="csrf-token" content="([^"]+)"/)[1];
+    await visitor
+      .post('/auth/request-access')
+      .set('X-CSRF-Token', csrf)
+      .send({ name: 'Ravi Kumar', email: 'ravi@example.com' });
+    await vi.waitFor(() => expect(mails.some((mail) => mail.to === 'ravi@example.com')).toBe(true));
+    const member = await memberSession();
+    expect((await member.agent.get('/api/admin/access-requests')).status).toBe(403);
+    const [request] = (await admin.agent.get('/api/admin/access-requests')).body.requests;
+    const rejected = await admin.send('post', `/api/admin/access-requests/${request.id}`, {
+      decision: 'reject',
+    });
+    expect(rejected.body.request.status).toBe('rejected');
+    expect(mails.at(-1)).toMatchObject({
+      to: 'ravi@example.com',
+      subject: 'About your request to join Pirento Blank',
+    });
+    expect(await AllowedUser.exists({ _id: 'ravi@example.com' })).toBeNull();
+  });
+});
+
+describe('problem reports and the overview report', () => {
+  it('lets a member report a problem that an admin marks fixed, and shows it on the overview', async () => {
+    const admin = await adminSession();
+    const member = await memberSession();
+    expect(
+      (await member.send('post', '/api/account/problem-report', { category: 'bug', message: 'x' }))
+        .status,
+    ).toBe(400);
+    const sent = await member.send('post', '/api/account/problem-report', {
+      category: 'data',
+      message: 'The weekly P&L does not match my contract note.',
+      page: '/reports',
+    });
+    expect(sent.status).toBe(201);
+    expect(mails.at(-1)).toMatchObject({ to: 'admin@example.com' });
+    expect((await member.agent.get('/api/admin/reports')).status).toBe(403);
+
+    const overview = (await admin.agent.get('/api/admin/overview')).body;
+    expect(overview.openReports).toBe(1);
+    expect(overview.series).toHaveLength(30);
+    expect(overview.series.at(-1).signups).toBeGreaterThanOrEqual(2);
+    expect(overview.activity.some((event) => event.kind === 'report')).toBe(true);
+
+    const [report] = (await admin.agent.get('/api/admin/reports')).body.reports;
+    expect(report).toMatchObject({ status: 'open', page: '/reports' });
+    const fixed = await admin.send('post', `/api/admin/reports/${report.id}/fix`, {
+      note: 'Brokerage on F&O was off; fixed.',
+    });
+    expect(fixed.body.report.status).toBe('fixed');
+    expect(mails.at(-1)).toMatchObject({
+      to: 'member@example.com',
+      subject: 'Your problem report has been resolved',
+    });
+    expect(mails.at(-1).text).toContain('Brokerage on F&O was off');
+    expect((await admin.send('post', `/api/admin/reports/${report.id}/fix`, {})).status).toBe(404);
+  });
+});
+
 describe('Google sign-in', () => {
   /** Runs the Google redirect round trip for `profile`; returns the final redirect. */
   async function googleRoundTrip(agent, profile, start = '/auth/google') {
@@ -580,7 +727,11 @@ describe('Google sign-in', () => {
     expect(
       await googleRoundTrip(
         supertest.agent(app),
-        { email: 'admin@example.com' },
+        // The same Google account the administrator signed in with before.
+        {
+          email: 'admin@example.com',
+          sub: `sub-${(await User.findOne({ email: 'admin@example.com' }))._id}`,
+        },
         '/auth/google?for=admin',
       ),
     ).toBe('/admin');

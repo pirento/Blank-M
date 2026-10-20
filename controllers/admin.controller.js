@@ -17,6 +17,13 @@ import { reserveAttempts } from '../services/rate-window.js';
 import { endSubscriptionNow } from '../services/billing/subscriptions.js';
 import { detachRevokedMember } from '../services/admin/delete-member.js';
 import { iso } from '../models/helpers.js';
+import {
+  claimAccessRequest,
+  finishAccessDecision,
+  listAccessRequests,
+  pendingAccessRequest,
+  reopenAccessRequest,
+} from '../services/admin/access-requests.js';
 import { createLogger, errorName } from '../services/logger.js';
 
 const log = createLogger('admin');
@@ -36,6 +43,7 @@ const revokeSchema = z.object({
   userId: z.string().uuid().nullable().optional(),
   email: emailSchema,
 });
+const decisionSchema = z.object({ decision: z.enum(['approve', 'reject']) });
 const FAR_FUTURE = new Date('2126-01-01T00:00:00.000Z');
 
 function failure(res, error) {
@@ -133,7 +141,7 @@ export async function handleListUsers(req, res) {
  * Create the allowlist row and an unconfirmed account, or re-send an existing
  * unconfirmed invitation. The emailed link lets the invitee choose a password.
  */
-async function requestInvitation(email, role, actorId, isResend) {
+async function requestInvitation(email, role, actorId, isResend, emailOptions = {}) {
   if (!process.env.APP_URL) throw new AdminContractError('APP_URL is not configured.');
   await requireAccessAdmin(actorId);
   if (await ManualInvitation.exists({ email })) {
@@ -186,7 +194,7 @@ async function requestInvitation(email, role, actorId, isResend) {
       await invitation.save();
     }
   }
-  await sendActivationEmail(account);
+  await sendActivationEmail(account, emailOptions);
 }
 
 /**
@@ -243,7 +251,13 @@ export async function handleCreateResetLink(req, res) {
       throw new AdminContractError('Too many reset links requested. Try again later.', 400);
     }
     const user = await User.findOne({ email: body.email });
-    if (!user || !user.emailConfirmedAt || !user.passwordHash || (await accessProblem(user))) {
+    if (
+      !user ||
+      user.role === 'admin' ||
+      !user.emailConfirmedAt ||
+      !user.passwordHash ||
+      (await accessProblem(user))
+    ) {
       throw new AdminContractError(
         'Reset links are available only for members with active, activated access.',
         409,
@@ -311,6 +325,49 @@ export async function handleRevokeUser(req, res) {
       workspaceAccessRevoked: true,
       authBanStatus: invitation.authUserId ? 'complete' : 'not_required',
     });
+  } catch (error) {
+    failure(res, error);
+  }
+}
+
+/** GET /api/admin/access-requests: requests from the home page form, pending ones first. */
+export async function handleListAccessRequests(req, res) {
+  if (!requireMethod(req, res, 'GET')) return;
+  try {
+    const admin = await requireAdmin(req);
+    await requireAccessAdmin(admin.user.id);
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.status(200).json({ requests: await listAccessRequests() });
+  } catch (error) {
+    failure(res, error);
+  }
+}
+
+/**
+ * POST /api/admin/access-requests/:id { decision: approve | reject }. Approving invites the
+ * visitor as a member: the email has a link to choose a password and says they can sign in
+ * with Google. Rejecting sends a polite email.
+ */
+export async function handleDecideAccessRequest(req, res) {
+  if (!requireMethod(req, res, 'POST')) return;
+  try {
+    const admin = await requireAdmin(req);
+    const { decision } = decisionSchema.parse(readJsonBody(req));
+    await requireAccessAdmin(admin.user.id);
+    const request = await pendingAccessRequest(req.params.id);
+    const status = decision === 'approve' ? 'approved' : 'rejected';
+    const actor = { id: admin.user.id, email: admin.user.email };
+    const updated = await claimAccessRequest(request, status, actor);
+    if (status === 'approved') {
+      try {
+        await requestInvitation(request.email, 'member', admin.user.id, false, { approved: true });
+      } catch (error) {
+        await reopenAccessRequest(request);
+        throw error;
+      }
+    }
+    await finishAccessDecision(request, status, actor);
+    res.status(200).json({ request: updated });
   } catch (error) {
     failure(res, error);
   }

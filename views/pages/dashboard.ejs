@@ -63,22 +63,24 @@
           <h2><%= t('Trading account') %></h2>
           <%- icon('link-2', { size: 15, className: 'text-muted' }) %>
         </div>
-        <div class="reference-broker-name">
-          <span class="reference-broker-initial" aria-hidden="true">Z</span>
-          <div>
-            <p class="text-sm font-medium">Zerodha</p>
-            <p class="mt-1 text-[11px] text-muted" aria-live="polite" data-broker-status><%= t('Checking connection…') %></p>
-          </div>
-        </div>
-        <dl class="reference-broker-summary">
-          <div class="flex justify-between gap-3"><dt class="text-muted"><%= t('Available margin') %></dt><dd><%= t('Unavailable') %></dd></div>
-          <div class="flex justify-between gap-3"><dt class="text-muted"><%= t('Used margin') %></dt><dd><%= t('Unavailable') %></dd></div>
-          <div class="flex justify-between gap-3"><dt class="text-muted"><%= t('Order submission') %></dt><dd><%= t('Disabled') %></dd></div>
-        </dl>
-        <p class="my-4 text-[11px] leading-5 text-muted">
-          Your journal balance is not a broker-confirmed balance. Linking an account does not enable order submission.
+        <p class="mt-1 text-[11px] leading-5 text-muted"><%= t('Link your broker to bring your fills into the journal automatically.') %></p>
+        <ul class="mt-3 divide-y divide-line" aria-live="polite" data-broker-list>
+          <% for (const [key, name] of [['zerodha', 'Zerodha'], ['dhan', 'Dhan'], ['upstox', 'Upstox'], ['fyers', 'Fyers'], ['angel', 'Angel One']]) { %>
+          <li class="flex items-center justify-between gap-3 py-2.5" data-broker-row="<%= key %>">
+            <div class="flex min-w-0 items-center gap-3">
+              <span class="reference-broker-initial" aria-hidden="true"><%= name[0] %></span>
+              <div class="min-w-0">
+                <p class="text-sm font-medium"><%= name %></p>
+                <p class="text-[11px] text-muted" data-broker-state><%= t('Checking…') %></p>
+              </div>
+            </div>
+            <a href="/settings#broker-<%= key %>" class="<%= buttonClass('outline', 'sm') %>" data-broker-action><%= t('Connect') %></a>
+          </li>
+          <% } %>
+        </ul>
+        <p class="mt-3 text-[11px] leading-5 text-muted">
+          <%= t('Connections are read-only unless you turn on live orders in Settings. Your funds stay with your broker.') %>
         </p>
-        <a href="/settings" class="<%= buttonClass('primary', 'sm', 'w-full') %>">Connect account <%- icon('arrow-right', { size: 13, className: 'ml-2' }) %></a>
       </section>
       <section class="reference-strategy-card">
         <p class="reference-eyebrow"><%= t('Your playbook') %></p>

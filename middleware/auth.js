@@ -18,13 +18,17 @@ export async function loadAuth(req, res, next) {
       session: null,
       profile: null,
       mfaRequired: false,
+      /** An administrator who has no authenticator yet: must add one before anything else. */
+      mfaSetupRequired: false,
       passwordRecovery: false,
       accessError: null,
     };
     const session = req.session?.auth;
     if (session?.userId) {
       const user = await User.findById(session.userId);
-      if (!user) {
+      // Administrators sign in only with Google (then their authenticator). A session an
+      // administrator got any other way (password, reset or activation link) is not accepted.
+      if (!user || (user.role === 'admin' && session.method !== 'oauth')) {
         delete req.session.auth;
       } else {
         const problem = await accessProblem(user);
@@ -32,6 +36,7 @@ export async function loadAuth(req, res, next) {
         req.auth.session = session;
         req.auth.accessError = problem;
         req.auth.mfaRequired = user.hasVerifiedFactor() && session.aal !== 'aal2';
+        req.auth.mfaSetupRequired = user.role === 'admin' && !user.hasVerifiedFactor();
         req.auth.passwordRecovery = Boolean(session.passwordRecovery || session.activation);
         if (!problem) {
           req.auth.profile = {
@@ -58,12 +63,21 @@ export async function loadAuth(req, res, next) {
   }
 }
 
+/** The "add your authenticator" screen an administrator sees until they have one. */
+export function renderMfaSetup(res) {
+  return res.status(403).render('pages/mfa-setup', { title: 'Add an authenticator' });
+}
+
 /** API equivalent of the original bearer-token check, with the same messages. */
 export function authenticatedApi(req) {
-  const { user, session, accessError, mfaRequired, passwordRecovery } = req.auth ?? {};
+  const { user, session, accessError, mfaRequired, mfaSetupRequired, passwordRecovery } =
+    req.auth ?? {};
   if (!user || !session) throw new HttpError('Sign in to continue.', 401);
   if (accessError) throw new HttpError(accessError, accessError.startsWith('Confirm') ? 401 : 403);
   if (mfaRequired) throw new HttpError('Complete authenticator verification to continue.', 403);
+  if (mfaSetupRequired) {
+    throw new HttpError('Administrators must add an authenticator before continuing.', 403);
+  }
   if (passwordRecovery) throw new HttpError('Set a new password before using the workspace.', 403);
   // A queued browser action is bound to the login session that rendered it.
   const expected = req.get('x-blank-session');
@@ -91,6 +105,7 @@ export function requirePageAuth(req, res, next) {
   const { user, accessError, mfaRequired, passwordRecovery } = req.auth;
   if (!user) return res.redirect('/login');
   if (mfaRequired) return res.status(403).render('pages/mfa-challenge', { title: 'Verify' });
+  if (req.auth.mfaSetupRequired) return renderMfaSetup(res);
   if (passwordRecovery) {
     return res.redirect(
       req.session.auth.activation ? '/login?mode=activate' : '/login?mode=recover',
@@ -114,6 +129,7 @@ export function requireAdminPage(req, res, next) {
   const { user, accessError, mfaRequired, passwordRecovery } = req.auth;
   if (!user || accessError) return res.redirect('/admin/login');
   if (mfaRequired) return res.status(403).render('pages/mfa-challenge', { title: 'Verify' });
+  if (req.auth.mfaSetupRequired) return renderMfaSetup(res);
   if (passwordRecovery) return res.redirect('/login?mode=recover');
   if (user.role !== 'admin') {
     return res.status(404).render('pages/error', {

@@ -123,7 +123,7 @@ export async function sendWeeklyReport(user, period) {
   await sendMail({
     to: user.email,
     subject: report.subject,
-    text: `${report.text}${coach}${origin ? `\n\nOpen your reports: ${origin}/reports` : ''}\n\nTurn these emails off in Settings → Email reports.`,
+    text: `${report.text}${coach}${origin ? `\n\nOpen your reports: ${origin}/reports` : ''}\n\nYou get this report because weekly emails are on. Turn them off in Settings → Email reports.`,
   });
   return report;
 }

@@ -16,7 +16,7 @@ test('public pages render', async ({ page }) => {
   await page.goto('/login?mode=reset');
   await expect(page.locator('[data-reset-unavailable]')).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
-  for (const path of ['/terms', '/privacy', '/refunds', '/contact']) {
+  for (const path of ['/terms', '/privacy', '/disclaimer', '/refunds', '/contact']) {
     await page.goto(path);
     await expect(page.locator('h1')).toBeVisible();
     await expectNoHorizontalOverflow(page);
@@ -31,7 +31,7 @@ test('signed-out visitors are sent to the login page', async ({ page }) => {
 
 test('every workspace page loads without errors on desktop and phone', async ({ page }) => {
   const errors = trackErrors(page);
-  await signIn(page);
+  await signIn(page, MEMBERS.smoke);
   for (const path of WORKSPACE_PAGES) {
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto(path);
@@ -46,8 +46,8 @@ test('every workspace page loads without errors on desktop and phone', async ({ 
 });
 
 test('topbar shows initials and market status; command palette opens', async ({ page }) => {
-  await signIn(page);
-  await expect(page.locator('.workspace-avatar')).toHaveText('AD');
+  await signIn(page, MEMBERS.smoke);
+  await expect(page.locator('.workspace-avatar')).toHaveText('EE');
   await expect(page.locator('[data-market-status] b')).toHaveText(/open|closed|weekend|holiday/);
   await page.keyboard.press('Control+k');
   await expect(page.getByRole('dialog', { name: 'Command palette' })).toBeVisible();
@@ -63,4 +63,36 @@ test('wrong password shows an error and sign out ends the session', async ({ pag
   await page.click('[data-open-menu]');
   await page.locator('[data-sign-out]').first().click();
   await expect(page).toHaveURL(/\/login/);
+});
+
+test('the live chart draws candles with a legend and intervals', async ({ page }) => {
+  const errors = trackErrors(page);
+  const start = Date.UTC(2026, 9, 19, 3, 45);
+  // Fixed candles, so the test does not depend on a market data provider.
+  await page.route('**/api/history?**', (route) => {
+    const symbol = new URL(route.request().url()).searchParams.get('symbol');
+    const candles = Array.from({ length: 60 }, (_, index) => {
+      const open = 1400 + Math.sin(index / 4) * 12;
+      const close = open + Math.cos(index / 3) * 6;
+      return {
+        time: start + index * 5 * 60_000,
+        open,
+        close,
+        high: Math.max(open, close) + 3,
+        low: Math.min(open, close) - 3,
+        volume: 1000 + index * 10,
+      };
+    });
+    return route.fulfill({ json: { symbol, source: 'yahoo', currency: 'INR', candles } });
+  });
+  await signIn(page, MEMBERS.smoke);
+  await page.goto('/chart?symbol=RELIANCE');
+  await expect(page.locator('.pro-chart canvas').first()).toBeVisible();
+  await expect(page.locator('.pro-chart-legend')).toContainText('RELIANCE');
+  await expect(page.getByRole('status').filter({ hasText: 'times in IST' })).toBeVisible();
+  await page.getByRole('button', { name: '1H' }).click();
+  await expect(page.getByRole('button', { name: '1H' })).toHaveAttribute('aria-pressed', 'true');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expectNoHorizontalOverflow(page);
+  expect(errors).toEqual([]);
 });

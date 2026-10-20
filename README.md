@@ -18,13 +18,19 @@ pnpm install
 cp .env.example .env
 pnpm run build:css
 
-# Option A — no MongoDB installed: in-memory database with a seeded admin
-pnpm run dev:memory          # http://localhost:3000, admin@example.com / blank-local-admin
+# Option A — no MongoDB installed: in-memory database with seeded accounts
+pnpm run dev:memory          # http://localhost:3000
 
 # Option B — your own MongoDB (local or Atlas) in MONGODB_URI
-ADMIN_EMAIL=you@example.com ADMIN_PASSWORD='a long password' pnpm run seed:admin
+ADMIN_EMAIL=you@gmail.com pnpm run seed:admin
 pnpm run dev
 ```
+
+Administrators have no password: they sign in at `/admin/login` with Google and then an
+authenticator app. Put `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and `GOOGLE_AUTH_ENABLED=true`
+in `.env` first (Google redirect URI: `<APP_URL>/auth/google/callback`). The first
+authenticator needs a setup code from email or `node scripts/admin-setup-code.js <email>`.
+See [START-HERE.md](START-HERE.md) for the whole flow.
 
 Run `pnpm run watch:css` alongside `pnpm run dev` while editing templates or client scripts.
 

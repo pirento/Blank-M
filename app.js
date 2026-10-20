@@ -54,6 +54,10 @@ export function createApp({ sessionStore } = {}) {
     'html-to-image.js': path.join(packageDirectory('html-to-image'), 'dist/html-to-image.js'),
     'marked.esm.js': path.join(packageDirectory('marked'), 'lib/marked.esm.js'),
     'purify.es.mjs': path.join(packageDirectory('dompurify'), 'dist/purify.es.mjs'),
+    'lightweight-charts.js': path.join(
+      packageDirectory('lightweight-charts'),
+      'dist/lightweight-charts.standalone.production.js',
+    ),
   };
   app.get('/vendor/:file', (req, res, next) => {
     const file = vendorFiles[req.params.file];

@@ -19,6 +19,7 @@ import { reserveAttempts } from '../rate-window.js';
 import { sha256Hex } from '../crypto.js';
 import { isMailConfigured, sendMail } from '../mailer.js';
 import { loadPlan } from '../billing/plan.js';
+import { env } from '../../config/env.js';
 
 export { USERNAME_PATTERN };
 export const MIN_PASSWORD_LENGTH = 8;
@@ -42,7 +43,7 @@ function quotaSecret() {
   return process.env.SESSION_SECRET || 'blank-development-quota-key';
 }
 
-function opaque(namespace, value) {
+export function opaque(namespace, value) {
   return createHmac('sha256', quotaSecret())
     .update(`blank-login:${namespace}\0${value}`)
     .digest('hex');
@@ -275,12 +276,13 @@ export async function requestPasswordRecovery(email, address = 'unknown') {
     );
   }
   const user = await User.findOne({ email: normalized });
-  if (!user || (await accessProblem(user))) return;
+  // Administrators have no password (Google + authenticator), so there is nothing to reset.
+  if (!user || user.role === 'admin' || (await accessProblem(user))) return;
   const token = await issueToken(user, 'recover', RECOVERY_TTL_MS);
   await sendMail({
     to: user.email,
     subject: 'Reset your Pirento Blank password',
-    text: `A password reset was requested for your Pirento Blank account.\n\nOpen this link within one hour to choose a new password:\n${appOrigin()}/auth/link/recover#token=${token}\n\nIf you did not request this, you can ignore this email.`,
+    text: `A password reset was requested for your Pirento Blank account.\n\nChoose a new password within one hour:\nReset my password: ${appOrigin()}/auth/link/recover#token=${token}\n\nIf you did not request this, ignore this email; your password stays the same.`,
   });
 }
 
@@ -301,15 +303,59 @@ export async function createRecoveryLink(user) {
  * Emails a 24-hour, single-use activation link to an invited member; any earlier unused activation
  * link stops working.
  */
-export async function sendActivationEmail(user, { selfSignup = false } = {}) {
+export async function sendActivationEmail(user, { selfSignup = false, approved = false } = {}) {
+  // Administrators have no password: they sign in with Google, then add an authenticator.
+  if (user.role === 'admin') {
+    await sendMail({
+      to: user.email,
+      subject: 'You are now a Pirento Blank administrator',
+      text: [
+        'You have been made an administrator of Pirento Blank.',
+        '',
+        `Sign in with Google: ${appOrigin()}/admin/login`,
+        `Use the Google account for ${user.email}. After signing in you add an authenticator app (Google Authenticator or Authy); its setup code is emailed to you.`,
+        '',
+        'If you were not expecting this email, tell the other administrators.',
+      ].join('\n'),
+    });
+    return;
+  }
   const token = await issueToken(user, 'activate', ACTIVATION_TTL_MS);
   const link = `${appOrigin()}/auth/link/activate#token=${token}`;
+  const google = env.googleAuthEnabled
+    ? [
+        '',
+        `Sign in with Google: ${appOrigin()}/login`,
+        `Use the Google account for ${user.email}. No password needed.`,
+      ]
+    : [];
+  const [subject, intro] = selfSignup
+    ? ['Confirm your Pirento Blank account', 'Welcome to Pirento Blank.']
+    : approved
+      ? [
+          'Your Pirento Blank access is approved',
+          'Good news: your request to join Pirento Blank has been approved.',
+        ]
+      : [
+          'Your Pirento Blank invitation',
+          'You have been invited to a private Pirento Blank workspace.',
+        ];
   await sendMail({
     to: user.email,
-    subject: selfSignup ? 'Confirm your Pirento Blank account' : 'Your Pirento Blank invitation',
-    text: selfSignup
-      ? `Welcome to Pirento Blank.\n\nOpen this link within 24 hours to confirm your email and choose your password:\n${link}\n\nIf you did not sign up, ignore this email and no account will be created.`
-      : `You have been invited to a private Pirento Blank workspace.\n\nOpen this link within 24 hours to choose your password:\n${link}\n\nThe workspace is invite-only; ignore this email if you were not expecting it.`,
+    subject,
+    text: [
+      intro,
+      '',
+      selfSignup
+        ? 'Confirm your email and choose your password within 24 hours:'
+        : 'Choose your password within 24 hours to activate your account:',
+      `${selfSignup ? 'Confirm my account' : 'Set my password'}: ${link}`,
+      ...(selfSignup ? [] : google),
+      '',
+      selfSignup
+        ? 'If you did not sign up, ignore this email and no account will be created.'
+        : 'If you were not expecting this email, you can ignore it.',
+    ].join('\n'),
   });
 }
 
@@ -437,7 +483,7 @@ export async function emailAdminSetupCode(user) {
   await sendMail({
     to: user.email,
     subject: 'Your Pirento Blank authenticator setup code',
-    text: `Someone signed in to your administrator account and wants to add an authenticator.\n\nSetup code (valid 15 minutes): ${code}\n\nIf this was not you, change your password now: someone knows it.`,
+    text: `Someone signed in to your administrator account with Google and wants to add an authenticator.\n\nSetup code (valid 15 minutes): ${code}\n\nIf this was not you, secure your Google account now and tell the other administrators.`,
   });
 }
 

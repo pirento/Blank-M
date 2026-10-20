@@ -24,6 +24,7 @@ import { clientAddress } from '../services/http.js';
 import { loadPlan } from '../services/billing/plan.js';
 import { isMailConfigured } from '../services/mailer.js';
 import { welcomeMember } from '../services/notifications/emails.js';
+import { submitAccessRequest } from '../services/admin/access-requests.js';
 
 /** Password sign-in with an invited email or a claimed username. */
 export async function login(req, res) {
@@ -32,24 +33,9 @@ export async function login(req, res) {
     { identifier: req.body?.identifier, password: req.body?.password },
     clientAddress(req),
   );
-  await establishSession(req, user, { method: 'password' });
-  await recordSignIn(user);
-  res.json({ ok: true, mfaRequired: user.hasVerifiedFactor(), csrfToken: req.session.csrfToken });
-}
-
-/**
- * POST /auth/admin/login: the admin panel's sign-in. Same checks and rate limits as
- * member sign-in, but only administrator accounts get a session; anyone else sees the
- * same "not recognised" answer, so the page does not reveal who is an administrator.
- */
-export async function adminLogin(req, res) {
-  res.setHeader('Cache-Control', 'private, no-store');
-  const user = await verifyPasswordSignIn(
-    { identifier: req.body?.identifier, password: req.body?.password },
-    clientAddress(req),
-  );
-  if (user.role !== 'admin') {
-    throw new HttpError('That username or email and password are not recognised.', 401);
+  // Only reached with the right password, so this reveals nothing to a guesser.
+  if (user.role === 'admin') {
+    throw new HttpError('Administrators sign in with Google on the admin sign-in page.', 403);
   }
   await establishSession(req, user, { method: 'password' });
   await recordSignIn(user);
@@ -84,6 +70,17 @@ export async function signup(req, res) {
   res.json({ ok: true });
 }
 
+/**
+ * POST /auth/request-access { name, email, phone?, message? }: the home page's "Request access"
+ * form. An administrator approves or rejects it in the admin panel → Members. Same answer for
+ * every address.
+ */
+export async function requestAccess(req, res) {
+  res.setHeader('Cache-Control', 'private, no-store');
+  await submitAccessRequest(req.body, clientAddress(req));
+  res.json({ ok: true });
+}
+
 /** Same response whether or not the address is eligible. */
 export async function recover(req, res) {
   await requestPasswordRecovery(req.body?.email, clientAddress(req));
@@ -98,6 +95,9 @@ export async function recover(req, res) {
 export async function exchangeLink(req, res) {
   const purpose = req.body?.purpose === 'activate' ? 'activate' : 'recover';
   const user = await consumeLinkToken(req.body?.token, purpose);
+  if (user.role === 'admin') {
+    throw new HttpError('Administrators sign in with Google on the admin sign-in page.', 403);
+  }
   await establishSession(req, user, { method: 'password', recovery: purpose === 'recover' });
   if (purpose === 'activate') {
     req.session.auth.activation = true;

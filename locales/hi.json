@@ -281,5 +281,17 @@
   "Live chart": "लाइव चार्ट",
   "Candles for any NSE symbol, moving with live prices. No need to open another site.": "किसी भी NSE सिंबल की कैंडल, लाइव प्राइस के साथ चलती हुई। किसी दूसरी साइट पर जाने की ज़रूरत नहीं।",
   "Show chart": "चार्ट दिखाएं",
-  "Every feature is free right now. Nothing to pay.": "अभी हर फ़ीचर फ्री है। कुछ भी भुगतान नहीं करना है।"
+  "Every feature is free right now. Nothing to pay.": "अभी हर फ़ीचर फ्री है। कुछ भी भुगतान नहीं करना है।",
+  "Link your broker to bring your fills into the journal automatically.": "अपना ब्रोकर जोड़ें, ताकि आपके सौदे अपने-आप जर्नल में आ जाएँ।",
+  "Checking…": "जाँच हो रही है…",
+  "Connect": "जोड़ें",
+  "Manage": "प्रबंधित करें",
+  "Linked": "जुड़ा है",
+  "Not linked": "नहीं जुड़ा",
+  "Session expired: connect again": "सत्र समाप्त: फिर से जोड़ें",
+  "Not available yet": "अभी उपलब्ध नहीं",
+  "Status unavailable": "स्थिति उपलब्ध नहीं",
+  "Connections are read-only unless you turn on live orders in Settings. Your funds stay with your broker.": "जब तक आप सेटिंग्स में लाइव ऑर्डर चालू नहीं करते, कनेक्शन केवल पढ़ने के लिए हैं। आपका पैसा आपके ब्रोकर के पास ही रहता है।",
+  "Report a problem": "समस्या बताएँ",
+  "Charts by TradingView Lightweight Charts. Prices are for research and may be delayed; this is not investment advice.": "चार्ट: TradingView Lightweight Charts। कीमतें केवल शोध के लिए हैं और देर से आ सकती हैं; यह निवेश सलाह नहीं है।"
 }

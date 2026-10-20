@@ -9,8 +9,8 @@ import * as mfa from '../controllers/mfa.controller.js';
 const router = Router();
 
 router.post('/login', wrap(auth.login));
-router.post('/admin/login', wrap(auth.adminLogin));
 router.post('/signup', wrap(auth.signup));
+router.post('/request-access', wrap(auth.requestAccess));
 router.post('/logout', wrap(auth.logout));
 router.post('/recover', wrap(auth.recover));
 router.post('/link', wrap(auth.exchangeLink));

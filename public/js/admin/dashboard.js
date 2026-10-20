@@ -1,6 +1,7 @@
 /**
- * Admin overview: members, Premium and revenue numbers, which integrations are
- * set up, and the server's health (database size, disk, last backup).
+ * Admin overview: members, Premium and revenue numbers, 30-day charts of new members and revenue,
+ * a live activity feed, member problem reports, which integrations are set up, and the server's
+ * health (database size, disk, last backup). Refreshes itself every 30 seconds.
  */
 import {
   $,
@@ -13,11 +14,25 @@ import {
   cardTitle,
   cardContent,
   badge,
+  button,
+  cn,
 } from '../core/dom.js';
 import { api, errorMessage } from '../core/api.js';
+import { openModal } from '../core/dialog.js';
+import { notify, notifyError } from '../core/toast.js';
 import { bytes, money, when } from './shared.js';
 
 const root = $('[data-admin-dashboard]');
+const REFRESH_MS = 30_000;
+const view = { overview: null, reports: [], updatedAt: null, failed: false };
+const ACTIVITY_TONES = {
+  member: 'positive',
+  request: 'accent',
+  payment: 'positive',
+  'failed-payment': 'negative',
+  report: 'caution',
+  admin: 'neutral',
+};
 
 const INTEGRATIONS = [
   ['openai', 'OpenAI (AI features)'],
@@ -44,7 +59,181 @@ function row(label, value) {
   );
 }
 
-function paint(overview) {
+/** A 30-day bar chart; each bar's title gives the day and value. */
+function barChart(title, series, key, format) {
+  const max = Math.max(1, ...series.map((day) => day[key]));
+  const total = series.reduce((sum, day) => sum + day[key], 0);
+  return section(
+    title,
+    h(
+      'p',
+      { class: 'tnum text-2xl font-semibold' },
+      format(total),
+      h('span', { class: 'ml-2 text-xs font-normal text-muted' }, 'last 30 days'),
+    ),
+    h(
+      'div',
+      {
+        class: 'flex h-28 items-end gap-[3px]',
+        role: 'img',
+        'aria-label': `${title}: ${format(total)} in the last 30 days`,
+      },
+      ...series.map((day) =>
+        h('div', {
+          class: 'flex-1 rounded-t-sm bg-accent/80 hover:bg-accent',
+          style: `height:${Math.max(2, (day[key] / max) * 100)}%`,
+          title: `${day.date}: ${format(day[key])}`,
+        }),
+      ),
+    ),
+    h(
+      'div',
+      { class: 'flex justify-between text-[11px] text-muted' },
+      h('span', {}, series[0]?.date ?? ''),
+      h('span', {}, series.at(-1)?.date ?? ''),
+    ),
+  );
+}
+
+function activityCard(activity) {
+  return section(
+    'Live activity',
+    activity.length
+      ? h(
+          'ul',
+          {
+            class: 'max-h-96 divide-y divide-line overflow-y-auto text-sm',
+            'data-scroll': 'activity',
+          },
+          ...activity.map((event) =>
+            h(
+              'li',
+              { class: 'flex items-start justify-between gap-3 py-2' },
+              h(
+                'span',
+                { class: 'flex min-w-0 items-start gap-2' },
+                badge(event.kind.replace('-', ' '), ACTIVITY_TONES[event.kind]),
+                h('span', { class: 'break-words' }, event.text),
+              ),
+              h(
+                'time',
+                { class: 'shrink-0 text-xs text-muted', datetime: event.at },
+                when(event.at),
+              ),
+            ),
+          ),
+        )
+      : statusLine('Nothing has happened yet.'),
+  );
+}
+
+function fixReport(report) {
+  openModal({
+    title: 'Mark this problem fixed',
+    description: `${report.email} is emailed that it is resolved, with your note.`,
+    content: (close) => {
+      const note = h('textarea', {
+        id: 'report-note',
+        rows: 4,
+        maxlength: '1000',
+        class:
+          'w-full rounded-control border border-line bg-surface px-3 py-2 text-sm text-fg focus-ring',
+      });
+      const save = button('Mark fixed', {
+        onclick: async () => {
+          save.disabled = true;
+          try {
+            await api(`/api/admin/reports/${encodeURIComponent(report.id)}/fix`, {
+              method: 'POST',
+              body: { note: note.value },
+            });
+            notify('Marked fixed. The member was emailed.', 'success');
+            close();
+            await load();
+          } catch (error) {
+            notifyError(error, 'The report could not be updated.');
+            save.disabled = false;
+          }
+        },
+      });
+      return h(
+        'div',
+        { class: 'space-y-3' },
+        h('label', { for: 'report-note', class: 'block text-sm' }, 'What did you do? (optional)'),
+        note,
+        h(
+          'div',
+          { class: 'flex gap-2' },
+          button('Cancel', { variant: 'outline', onclick: close }),
+          save,
+        ),
+      );
+    },
+  });
+}
+
+function reportsCard(reports) {
+  return section(
+    'Problem reports',
+    reports.length
+      ? h(
+          'ul',
+          {
+            class: 'max-h-96 divide-y divide-line overflow-y-auto text-sm',
+            'data-scroll': 'reports',
+          },
+          ...reports.map((report) =>
+            h(
+              'li',
+              { class: 'space-y-1 py-3' },
+              h(
+                'div',
+                { class: 'flex flex-wrap items-center gap-2' },
+                badge(
+                  report.status === 'open' ? 'Open' : 'Fixed',
+                  report.status === 'open' ? 'caution' : 'positive',
+                ),
+                h('span', { class: 'font-medium' }, report.categoryLabel),
+                h('span', { class: 'break-all text-muted' }, report.email),
+              ),
+              h('p', { class: 'whitespace-pre-line break-words' }, report.message),
+              h(
+                'p',
+                { class: 'text-xs text-muted' },
+                `${when(report.createdAt)}${report.page ? ` · on ${report.page}` : ''}${
+                  report.adminNote ? ` · note: ${report.adminNote}` : ''
+                }`,
+              ),
+              report.status === 'open'
+                ? button('Mark fixed', {
+                    size: 'sm',
+                    variant: 'outline',
+                    onclick: () => fixReport(report),
+                  })
+                : null,
+            ),
+          ),
+        )
+      : statusLine('No problem reports. Members send them from Settings → Report a problem.'),
+  );
+}
+
+function paint() {
+  // A refresh keeps where the lists were scrolled to.
+  const scrolled = Object.fromEntries(
+    [...root.querySelectorAll('[data-scroll]')].map((list) => [
+      list.dataset.scroll,
+      list.scrollTop,
+    ]),
+  );
+  paintOverview();
+  for (const list of root.querySelectorAll('[data-scroll]')) {
+    list.scrollTop = scrolled[list.dataset.scroll] ?? 0;
+  }
+}
+
+function paintOverview() {
+  const overview = view.overview;
   const { members, billing, integrations, system } = overview;
   const disk = system.disk;
   const diskLow = disk && disk.freeBytes < 1024 ** 3;
@@ -77,6 +266,47 @@ function paint(overview) {
         hint: `${billing.payments30d} payments · ${billing.failedPayments30d} failed`,
         tone: billing.revenue30d > 0 ? 'positive' : 'neutral',
       }),
+      statCard({
+        label: 'Access requests',
+        value: String(overview.pendingRequests),
+        hint: 'waiting for approval · Members page',
+        tone: overview.pendingRequests ? 'caution' : 'neutral',
+      }),
+      statCard({
+        label: 'Open problem reports',
+        value: String(overview.openReports),
+        hint: 'from members',
+        tone: overview.openReports ? 'caution' : 'neutral',
+      }),
+      statCard({
+        label: 'Free Premium grants',
+        value: String(billing.granted),
+        hint: `${billing.cancelling} paid, not renewing`,
+      }),
+      statCard({
+        label: 'Journal trades',
+        value: overview.trades.toLocaleString('en-IN'),
+        hint: 'stored for all members',
+      }),
+    ),
+    h(
+      'p',
+      { class: cn('mt-3 text-xs', view.failed ? 'text-negative' : 'text-muted') },
+      view.failed
+        ? `Could not refresh: showing numbers from ${when(view.updatedAt)}. Retrying every 30 seconds.`
+        : `Live · updated ${when(view.updatedAt)} · refreshes every 30 seconds`,
+    ),
+    h(
+      'div',
+      { class: 'mt-4 grid gap-4 lg:grid-cols-2' },
+      barChart('New members', overview.series, 'signups', (value) => String(value)),
+      barChart('Revenue', overview.series, 'revenue', money),
+    ),
+    h(
+      'div',
+      { class: 'mt-4 grid gap-4 lg:grid-cols-2' },
+      activityCard(overview.activity),
+      reportsCard(view.reports),
     ),
     h(
       'div',
@@ -123,7 +353,6 @@ function paint(overview) {
             : '—',
         ),
         row('Last backup', when(system.lastBackupAt)),
-        row('Journal trades stored', overview.trades.toLocaleString('en-IN')),
         row(
           'Up for',
           `${Math.floor(system.uptimeSeconds / 3600)} h ${Math.floor((system.uptimeSeconds % 3600) / 60)} min`,
@@ -142,10 +371,25 @@ function paint(overview) {
 }
 
 async function load() {
-  render(root, statusLine('Loading…'));
   try {
-    paint(await api('/api/admin/overview'));
+    const [overview, reports] = await Promise.all([
+      api('/api/admin/overview'),
+      api('/api/admin/reports'),
+    ]);
+    Object.assign(view, {
+      overview,
+      reports: reports.reports,
+      updatedAt: new Date(),
+      failed: false,
+    });
+    paint();
   } catch (error) {
+    // Keep showing the last good numbers when a background refresh fails, and say so.
+    if (view.overview) {
+      view.failed = true;
+      paint();
+      return;
+    }
     render(
       root,
       statusLine(
@@ -157,4 +401,12 @@ async function load() {
   }
 }
 
+render(root, statusLine('Loading…'));
 void load();
+setInterval(() => {
+  // Not while hidden, while a dialog is open, or while a button on the page has focus.
+  const busy =
+    document.querySelector('[role="dialog"]') ||
+    (root.contains(document.activeElement) && document.activeElement !== root);
+  if (document.visibilityState === 'visible' && !busy) void load();
+}, REFRESH_MS);

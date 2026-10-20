@@ -85,7 +85,7 @@ pnpm install --frozen-lockfile --prod
 pnpm run build
 
 # 3. First administrator (once)
-ADMIN_EMAIL=you@example.com ADMIN_PASSWORD='a long password' node scripts/create-admin.js
+ADMIN_EMAIL=you@gmail.com node scripts/create-admin.js
 
 # 4. Run and keep running after reboots
 pm2 start ecosystem.config.cjs
@@ -114,7 +114,7 @@ docs/DATABASE.md), and the backup is the only way back.
 git clone https://github.com/pirento/Blank-2.0.git && cd Blank-2.0
 cp .env.example .env && nano .env        # APP_URL, SESSION_SECRET, CRON_SECRET, …
 docker compose up -d --build
-docker compose exec -e ADMIN_EMAIL=you@example.com -e ADMIN_PASSWORD='a long password' app node scripts/create-admin.js
+docker compose exec -e ADMIN_EMAIL=you@example.com app node scripts/create-admin.js
 ```
 
 The app listens on `127.0.0.1:3000`; put Nginx with HTTPS in front of it (step A5). MongoDB data is
@@ -130,7 +130,7 @@ is overridden. Back it up with `docker compose exec mongo mongodump --archive > 
    `TRUST_PROXY=true`).
 4. Deploy, attach your domain and enable SSL.
 5. Create the first administrator from the panel's terminal:
-   `ADMIN_EMAIL=you@example.com ADMIN_PASSWORD='a long password' node scripts/create-admin.js`.
+   `ADMIN_EMAIL=you@gmail.com node scripts/create-admin.js`.
 
 Panel names change from time to time; the build command, entry file and variables above are what
 matter.

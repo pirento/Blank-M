@@ -216,6 +216,8 @@ export async function connectionStatus(userId) {
   return {
     configured: isKiteConfigured(),
     connected: Boolean(connection && connection.expiresAt.getTime() > Date.now()),
+    // Kite sessions end every morning; the dashboard then asks to connect again.
+    expired: Boolean(connection && connection.expiresAt.getTime() <= Date.now()),
     expiresAt: connection?.expiresAt.toISOString() || null,
     instruments: await instrumentCount(),
     provider: 'kite',

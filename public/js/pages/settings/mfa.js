@@ -41,7 +41,7 @@ function codeField(id, disabled, onInput) {
  * Mounts the authenticator (MFA) card: lists factors and handles enrolment with QR code,
  * verification, discarding unfinished setup, and removal with a code (/auth/mfa/*).
  */
-export function mountMfa() {
+export function mountMfa({ onEnabled } = {}) {
   const state = {
     factors: [],
     loading: true,
@@ -243,6 +243,7 @@ export function mountMfa() {
           state.enrollment = null;
           await load();
           notify('Authenticator enabled.', 'success');
+          onEnabled?.();
         }, 'The code could not be verified. Use the latest code from your authenticator and try again.');
       });
       body.push(form);

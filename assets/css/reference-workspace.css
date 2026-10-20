@@ -964,3 +964,33 @@
 .reference-candles svg text.reference-mark-stop {
   fill: var(--color-negative);
 }
+
+/* Live chart page (public/js/components/pro-chart.js) */
+.pro-chart {
+  overflow: hidden;
+}
+.pro-chart-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-line);
+}
+.pro-chart-legend {
+  font-size: 12px;
+  color: var(--color-muted);
+}
+.pro-chart-legend strong {
+  color: var(--color-fg);
+  margin-right: 8px;
+}
+.pro-chart-canvas {
+  height: min(70vh, 620px);
+  min-height: 340px;
+}
+.pro-chart-footer {
+  padding: 8px 12px;
+  border-top: 1px solid var(--color-line);
+}
