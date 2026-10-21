@@ -7,7 +7,8 @@
 
 export const MAX_LEGS = 6;
 export const STRIKE_STEP = 50;
-export const DEFAULT_LOT_SIZE = 75;
+// NIFTY lot size from the January 2026 expiries.
+export const DEFAULT_LOT_SIZE = 65;
 export const DEFAULT_RATE = 6.5;
 const DAYS_PER_YEAR = 365;
 
@@ -196,8 +197,12 @@ export const PRESETS = {
  * values rounded to the 5-paise tick, so the preset starts at a fair price.
  */
 export function presetLegs(name, market, lotSize = DEFAULT_LOT_SIZE) {
-  const atm = roundStrike(market.spot);
-  const wing = Math.max(STRIKE_STEP, roundStrike(market.spot * 0.01));
+  // Strike spacing grows with the price (NIFTY 50, a ₹1,500 stock 10, a ₹60 stock 1), so wings
+  // never fall to zero or below for cheap underlyings.
+  const step =
+    market.spot >= 5000 ? STRIKE_STEP : market.spot >= 1000 ? 10 : market.spot >= 100 ? 5 : 1;
+  const atm = roundStrike(market.spot, step);
+  const wing = Math.max(step, roundStrike(market.spot * 0.01, step));
   const leg = (side, kind, strike) => ({
     side,
     kind,

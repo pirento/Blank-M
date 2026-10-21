@@ -26,7 +26,8 @@ export const DEFAULT_FO_CHARGES = {
     enabled: true,
     brokeragePercent: 0.03,
     brokerageMaxPerOrder: 20,
-    sttPercent: 0.02,
+    // STT on the sell side; 0.05% for futures and 0.15% of the premium for options from 1 April 2026.
+    sttPercent: 0.05,
     exchangeTxnPercent: 0.00173,
     sebiPercent: 0.0001,
     gstPercent: 18,
@@ -36,7 +37,7 @@ export const DEFAULT_FO_CHARGES = {
     enabled: true,
     brokeragePercent: 100,
     brokerageMaxPerOrder: 20,
-    sttPercent: 0.1,
+    sttPercent: 0.15,
     exchangeTxnPercent: 0.03503,
     sebiPercent: 0.0001,
     gstPercent: 18,

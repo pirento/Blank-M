@@ -183,7 +183,7 @@ describe('presets and validation', () => {
 
   it('builds presets on 50-point strikes with fair premiums', () => {
     expect(presetLegs('long-call', market)).toEqual([
-      expect.objectContaining({ side: 'buy', kind: 'call', strike: 24000, lots: 1, lotSize: 75 }),
+      expect.objectContaining({ side: 'buy', kind: 'call', strike: 24000, lots: 1, lotSize: 65 }),
     ]);
     const condor = presetLegs('iron-condor', market);
     expect(condor.map((row) => `${row.side} ${row.kind} ${row.strike}`)).toEqual([
@@ -198,6 +198,10 @@ describe('presets and validation', () => {
     }
     expect(presetLegs('short-straddle', market)).toHaveLength(2);
     expect(presetLegs('bull-call-spread', market)[1].strike).toBe(24250);
+    // A cheap underlying gets small strike steps: positive strikes and real premiums.
+    const cheap = presetLegs('iron-condor', { ...market, spot: 20 });
+    expect(cheap.map((row) => row.strike)).toEqual([18, 19, 21, 22]);
+    for (const row of cheap) expect(Number.isFinite(row.premium)).toBe(true);
   });
 
   it('parses valid input and explains each problem', () => {

@@ -48,9 +48,14 @@ const ROUND_TRIP_HINTS = ['entry', 'exit', 'buyprice', 'sellprice', 'buyavg', 's
 
 /** HH:MM:SS from a time or timestamp cell, '00:00:00' when there is none. */
 function timeOf(value) {
-  const match = /(\d{1,2}):(\d{2})(?::(\d{2}))?/.exec(value);
+  const match = /(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([AaPp][Mm])?/.exec(value);
   if (!match) return '00:00:00';
-  return [match[1], match[2], match[3] ?? '00'].map((part) => part.padStart(2, '0')).join(':');
+  let hour = Number(match[1]);
+  // 12-hour exports: "01:15:00 PM" is 13:15, "12:05 AM" is 00:05.
+  const meridiem = match[4]?.toUpperCase();
+  if (meridiem === 'PM' && hour < 12) hour += 12;
+  if (meridiem === 'AM' && hour === 12) hour = 0;
+  return [String(hour), match[2], match[3] ?? '00'].map((part) => part.padStart(2, '0')).join(':');
 }
 
 function find(squashed, aliases, taken) {

@@ -97,6 +97,21 @@ describe('tradebook to round trips', () => {
     ]);
   });
 
+  it('orders 12-hour times correctly (1:15 PM is after 10:05 AM)', () => {
+    const headers = ['Trade Date', 'Time', 'Symbol', 'Exchange', 'Buy/Sell', 'Qty', 'Trade Price'];
+    const row = (time, side, price) => ['2026-05-04', time, 'INFY', 'NSE', side, '10', price];
+    const result = tradebookToRoundTrips(headers, [
+      row('01:15:00 PM', 'sell', '1520'),
+      row('10:05:00 AM', 'buy', '1500'),
+      row('03:00:00 PM', 'sell', '1490'),
+      row('02:00:00 PM', 'buy', '1510'),
+    ]);
+    expect(result.rows.map((trip) => trip.slice(1, 5))).toEqual([
+      ['INFY', 'Long', '1500', '1520'],
+      ['INFY', 'Long', '1510', '1490'],
+    ]);
+  });
+
   it('does not pair across days and reports positions left open', () => {
     const result = tradebookToRoundTrips(ZERODHA, [
       zerodhaRow('SBIN', '2026-05-04', 'buy', 10, 800, 1, '09:20:00'),

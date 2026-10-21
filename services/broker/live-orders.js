@@ -312,13 +312,27 @@ const GTT_MIN_DISTANCE_PERCENT = 0.25;
 /** The stop leg's limit price sits this far (percent) below its trigger, to help it fill. */
 const STOP_LIMIT_BUFFER_PERCENT = 0.5;
 /**
- * Rounds a price to the ₹0.05 tick. Works in whole paise: dividing rupees by
- * 0.05 is inexact (100.05 / 0.05 = 2000.9999…) and would drop a tick.
+ * NSE cash-market tick in paise for a price (price bands from April 2025): ₹0.05 up to ₹1,000
+ * (also valid for the ₹0.01 band below ₹250), ₹0.10 to ₹5,000, ₹0.50 to ₹10,000, ₹1 to ₹20,000,
+ * then ₹5. NSE reviews ticks monthly, so Kite stays the final check.
+ */
+function tickPaise(price) {
+  if (price <= 1000) return 5;
+  if (price <= 5000) return 10;
+  if (price <= 10000) return 50;
+  if (price <= 20000) return 100;
+  return 500;
+}
+
+/**
+ * Rounds a price to its NSE tick. Works in whole paise: dividing rupees by 0.05 is inexact
+ * (100.05 / 0.05 = 2000.9999…) and would drop a tick.
  */
 export function toTick(value, roundUp) {
   const paise = Math.round(value * 100);
-  const ticks = roundUp ? Math.ceil(paise / 5) : Math.floor(paise / 5);
-  return (ticks * 5) / 100;
+  const tick = tickPaise(value);
+  const ticks = roundUp ? Math.ceil(paise / tick) : Math.floor(paise / tick);
+  return (ticks * tick) / 100;
 }
 
 /**

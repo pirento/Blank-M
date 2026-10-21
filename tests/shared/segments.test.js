@@ -26,8 +26,8 @@ describe('segments', () => {
       DEFAULT_FO_CHARGES.options,
     );
     expect(charges.brokerage).toBe(40);
-    // STT 0.1% on the ₹9,000 sell premium.
-    expect(charges.stt).toBe(9);
+    // STT 0.15% (from 1 April 2026) on the ₹9,000 sell premium.
+    expect(charges.stt).toBe(13.5);
   });
 
   it('validates contract details and whole lots', () => {
