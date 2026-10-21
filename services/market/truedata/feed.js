@@ -99,7 +99,7 @@ export function startTrueDataFeed({ WebSocketImpl = globalThis.WebSocket } = {})
         ready = true;
         retryMs = 2000;
         subscribed.clear();
-        void syncSymbols();
+        syncSymbols().catch((error) => log.warn('sync failed', { error: errorName(error) }));
       }
       for (const tick of readFeedMessage(message, ids)) pending.set(tick.symbol, tick);
     };

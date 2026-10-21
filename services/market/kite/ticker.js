@@ -49,15 +49,19 @@ function subscribe(feed, tokens) {
 
 function endFeed(userId, feed) {
   feed.closing = true;
-  feeds.delete(userId);
+  // A newer feed for the member may already be in the map; never drop that one.
+  if (feeds.get(userId) === feed) feeds.delete(userId);
   feed.socket?.close();
   for (const listener of feed.listeners) listener.onEnd();
   feed.listeners.clear();
 }
 
 async function connect(userId, feed) {
+  // A reconnect timer can fire after the feed was ended.
+  if (feed.closing) return;
   const connection = await activeConnection(userId);
-  if (!connection?.accessToken || feed.closing) return endFeed(userId, feed);
+  if (feed.closing) return;
+  if (!connection?.accessToken) return endFeed(userId, feed);
   const params = new URLSearchParams({
     api_key: process.env.KITE_API_KEY ?? '',
     access_token: connection.accessToken,

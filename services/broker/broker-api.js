@@ -72,7 +72,10 @@ export async function brokerRequest(
     throw new HttpError(`${label} returned an invalid response.`, 502);
   }
   if (!response.ok) {
-    throw new HttpError(`${label} returned ${response.status}.`, 502, { body: payload });
+    throw new HttpError(`${label} returned ${response.status}.`, 502, {
+      body: payload,
+      httpStatus: response.status,
+    });
   }
   return payload;
 }
@@ -100,18 +103,30 @@ export function nextIstTime(hour, minute, now = new Date()) {
   return new Date(next - offset);
 }
 
+/**
+ * Decrypts a stored broker token. After an encryption-key change it cannot be read: the member is
+ * asked to reconnect (409) instead of seeing a server error.
+ */
+export function decryptBrokerToken(row) {
+  try {
+    return decryptSecret({
+      ciphertext: row.accessTokenCiphertext,
+      iv: row.accessTokenIv,
+      tag: row.accessTokenTag,
+    });
+  } catch {
+    throw new HttpError(
+      'The saved broker login cannot be read any more. Disconnect and connect again in Settings.',
+      409,
+    );
+  }
+}
+
 /** The member's row and decrypted token for `provider`, or null when none is usable. */
 export async function loadBrokerToken(userId, provider) {
   const row = await BrokerConnection.findOne({ userId, provider }).lean();
   if (!row?.accessTokenCiphertext || row.expiresAt.getTime() <= Date.now()) return null;
-  return {
-    row,
-    token: decryptSecret({
-      ciphertext: row.accessTokenCiphertext,
-      iv: row.accessTokenIv,
-      tag: row.accessTokenTag,
-    }),
-  };
+  return { row, token: decryptBrokerToken(row) };
 }
 
 /** Connection state for the settings card; never includes the token. */

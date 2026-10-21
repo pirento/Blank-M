@@ -32,6 +32,9 @@ function mailer() {
     auth: process.env.SMTP_USER
       ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD || '' }
       : undefined,
+    // Reuse a couple of connections: announcements and weekly reports send many emails at once.
+    pool: true,
+    maxConnections: 2,
     // Nodemailer waits up to 10 minutes by default; fail fast instead.
     connectionTimeout: 15_000,
     greetingTimeout: 15_000,

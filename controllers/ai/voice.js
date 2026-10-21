@@ -42,9 +42,10 @@ export async function handleTranscribe(req, res) {
   let userId = '';
   try {
     const { user } = await authenticateRequest(req);
-    userId = user.id;
-    await enforceAiRateLimit(user.id);
+    // Invalid or limited requests do no AI work, so they are not recorded as usage.
     const body = transcribeRequestSchema.parse(readJsonBody(req));
+    await enforceAiRateLimit(user.id);
+    userId = user.id;
     assertAttachmentOwnership(body.audioPath, user.id);
     let transcript;
     try {
@@ -57,11 +58,10 @@ export async function handleTranscribe(req, res) {
       const client = openAiClient();
       const file = await toFile(bytes, body.filename, { type: body.mime });
       try {
-        transcript = await client.audio.transcriptions.create({
-          file,
-          model: TRANSCRIPTION_MODEL,
-          response_format: 'json',
-        });
+        transcript = await client.audio.transcriptions.create(
+          { file, model: TRANSCRIPTION_MODEL, response_format: 'json' },
+          { maxRetries: 0 },
+        );
       } catch {
         // SDK 4xx diagnostics can contain request/provider data. Keep the
         // intentional local validation errors, but never echo upstream text.

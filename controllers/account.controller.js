@@ -97,6 +97,12 @@ export async function exportBackup(req, res) {
  */
 export async function importBackup(req, res) {
   if (!req.file) throw new HttpError('Choose a backup file to restore.', 400);
+  // A restore parses up to 25 MB and writes many rows: a few an hour is plenty.
+  const quota = await reserveAttempts(
+    [{ key: `restore:${req.member.userId}`, limit: 3 }],
+    60 * 60_000,
+  );
+  if (!quota.allowed) throw new HttpError('Too many restores. Try again in an hour.', 429);
   let raw;
   try {
     raw = JSON.parse(req.file.buffer.toString('utf8'));

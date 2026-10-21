@@ -10,6 +10,7 @@ import { readJsonBody, requireMethod } from '../services/http.js';
 import { enforceAiRateLimit, recordAiUsage } from '../services/ai/usage-limits.js';
 import { requireAdmin } from '../services/auth/request-auth.js';
 import { createLogger } from '../services/logger.js';
+import { recordAdminAction } from '../services/admin/audit.js';
 
 const log = createLogger('admin-ai');
 
@@ -49,6 +50,7 @@ export async function handleUpdateAiConfig(req, res) {
     const admin = await requireAdmin(req);
     const config = aiModelConfigSchema.parse(readJsonBody(req));
     await saveAiConfig(config, admin.user.id);
+    await recordAdminAction(admin, 'ai.config', 'models', config);
     res.status(200).json(publicAiConfig(config));
   } catch (error) {
     failure(res, error);

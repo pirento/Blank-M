@@ -32,12 +32,22 @@ const LIVE_STATUSES = ['created', 'authenticated', 'active', 'pending'];
 // Renewals that failed (halted/paused) can still charge when an old invoice is paid; cancel those too.
 const CANCELLABLE_STATUSES = [...LIVE_STATUSES, 'halted', 'paused'];
 
-/** The Razorpay plan for the current price, created on first use or after a price change. */
+/**
+ * The Razorpay plan for the current price, created on first use, after a price change or after
+ * the Razorpay keys change account (test → live).
+ */
 async function currentRazorpayPlan(plan) {
-  if (plan.razorpayPlanId && plan.razorpayPlanPrice === plan.priceMonthly)
+  const keyId = process.env.RAZORPAY_KEY_ID ?? null;
+  if (
+    plan.razorpayPlanId &&
+    plan.razorpayPlanPrice === plan.priceMonthly &&
+    // Plans saved before the key was recorded are kept; a different key (test → live) is not.
+    (plan.razorpayPlanKeyId ?? keyId) === keyId
+  ) {
     return plan.razorpayPlanId;
+  }
   const id = await createMonthlyPlan(plan);
-  await rememberRazorpayPlan(id, plan.priceMonthly);
+  await rememberRazorpayPlan(id, plan.priceMonthly, keyId);
   return id;
 }
 

@@ -167,6 +167,11 @@ function planCard() {
       ),
       button('Save plan', {
         onclick: async () => {
+          // Empty boxes would be saved as 0 (a free plan or no trial).
+          if (!price.value.trim() || !trial.value.trim()) {
+            notify('Fill in the monthly price and the trial days (0 for no trial).', 'error');
+            return;
+          }
           try {
             await api('/api/admin/billing', {
               method: 'PUT',

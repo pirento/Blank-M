@@ -376,7 +376,7 @@ export function buildCandidates(rows, mapping) {
     }
 
     const symbol = cell(row, mapping.symbol).trim().toUpperCase();
-    if (!/^[A-Z0-9][A-Z0-9._-]{0,24}$/.test(symbol)) {
+    if (!/^[A-Z0-9][A-Z0-9.&_-]{0,24}$/.test(symbol)) {
       errors.push({
         line,
         reason: symbol

@@ -15,11 +15,12 @@ const pad = (value) => String(value).padStart(2, '0');
 
 /** Equity symbol as the journal stores it: upper case, no exchange prefix, no -EQ series. */
 export function equitySymbol(value) {
-  return String(value ?? '')
+  const text = String(value ?? '')
     .trim()
-    .toUpperCase()
-    .replace(/^(NSE|BSE):/, '')
-    .replace(/-EQ$/, '');
+    .toUpperCase();
+  // BSE cash symbols carry a group suffix (Fyers "BSE:RELIANCE-A"); NSE ones end in -EQ.
+  const symbol = text.replace(/^(NSE|BSE):/, '').replace(/-EQ$/, '');
+  return text.startsWith('BSE:') ? symbol.replace(/-[A-Z]{1,2}$/, '') : symbol;
 }
 
 /** Already a Kite-style contract: NIFTY26OCTFUT, NIFTY26OCT25000CE or weekly NIFTY2610625000CE. */

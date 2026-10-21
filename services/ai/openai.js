@@ -86,12 +86,13 @@ export async function* providerStream(stream) {
   }
 }
 
-/** Creates a Responses API request, with provider errors masked as AiResponseFailure. */
+/**
+ * Creates a Responses API request, with provider errors masked as AiResponseFailure. Never
+ * retried: a request that timed out on our side may already have been run (and billed).
+ */
 export async function createResponse(params, options) {
   const client = openAiClient();
-  return providerRequest(() =>
-    options ? client.responses.create(params, options) : client.responses.create(params),
-  );
+  return providerRequest(() => client.responses.create(params, { ...options, maxRetries: 0 }));
 }
 
 /**
@@ -157,22 +158,19 @@ function extractSources(value) {
 export async function structured(options) {
   let response;
   try {
-    response = await createResponse(
-      {
-        model: options.model,
-        store: false,
-        instructions: options.system,
-        input: options.input,
-        ...(options.webSearch
-          ? {
-              tools: [{ type: 'web_search' }],
-              include: ['web_search_call.action.sources'],
-            }
-          : {}),
-        text: { format: jsonSchema(options.schemaName, options.schema) },
-      },
-      options.feature === 'picks' ? { maxRetries: 0 } : undefined,
-    );
+    response = await createResponse({
+      model: options.model,
+      store: false,
+      instructions: options.system,
+      input: options.input,
+      ...(options.webSearch
+        ? {
+            tools: [{ type: 'web_search' }],
+            include: ['web_search_call.action.sources'],
+          }
+        : {}),
+      text: { format: jsonSchema(options.schemaName, options.schema) },
+    });
     const text = completedResponseText(response);
     let data;
     try {

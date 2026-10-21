@@ -390,9 +390,13 @@ form.addEventListener('submit', async (event) => {
     if (history.some((candle) => !candle || !Number.isFinite(candle.time))) {
       throw new BacktestError('Price history contains invalid candle timestamps.');
     }
-    const start = Date.parse(`${from}T00:00:00Z`);
-    const end = Date.parse(`${to}T00:00:00Z`);
-    const candles = history.filter((candle) => candle.time >= start && candle.time < end);
+    // Compare IST trading days: providers stamp daily candles at 00:00 IST (18:30 UTC the day
+    // before) or 09:15 IST, so raw UTC instants would move a day in or out of the range.
+    const istDay = (time) => new Date(time + 330 * 60_000).toISOString().slice(0, 10);
+    const candles = history.filter((candle) => {
+      const day = istDay(candle.time);
+      return day >= from && day < to;
+    });
     state.barsUsed = candles.length;
     const params = {
       ...DEFAULT_STRATEGY_PARAMS,

@@ -52,6 +52,7 @@ beforeEach(async () => {
     ],
     positions: [],
     holdings: [],
+    holdingsDown: false,
     status: 200,
     calls: [],
   };
@@ -65,6 +66,7 @@ beforeEach(async () => {
     }
     if (String(url).endsWith('/positions')) return Response.json(dhan.positions);
     if (String(url).endsWith('/holdings')) {
+      if (dhan.holdingsDown) return new Response('busy', { status: 503 });
       // Dhan answers an empty demat with an error.
       return dhan.holdings.length
         ? Response.json(dhan.holdings)
@@ -110,6 +112,11 @@ describe('Dhan fills', () => {
       added: [],
       skipped: 1,
     });
+
+    // Holdings that cannot be read are an error, never "no holdings" (that could invent a short).
+    dhan.holdingsDown = true;
+    expect((await session.agent.get('/api/dhan/fills')).status).toBe(502);
+    dhan.holdingsDown = false;
 
     // A revoked token marks the connection expired.
     dhan.status = 401;

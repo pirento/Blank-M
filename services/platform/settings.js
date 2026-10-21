@@ -13,6 +13,7 @@ import { decryptSecret, encryptSecret } from '../crypto.js';
 import { HttpError } from '../errors.js';
 import { createLogger, errorName } from '../logger.js';
 import { loadPlan } from '../billing/plan.js';
+import { env } from '../../config/env.js';
 import { resetMailer } from '../mailer.js';
 import { PLATFORM_SETTINGS, settingDefinition } from './settings-registry.js';
 
@@ -135,6 +136,7 @@ export function normalizeSettingValue(definition, raw) {
       const number = Number(raw);
       if (
         !Number.isFinite(number) ||
+        (definition.integer && !Number.isInteger(number)) ||
         (definition.min !== undefined && number < definition.min) ||
         (definition.max !== undefined && number > definition.max)
       ) {
@@ -154,6 +156,9 @@ export function normalizeSettingValue(definition, raw) {
       }
       if (!['https:', 'http:'].includes(url.protocol)) {
         throw new HttpError(`${label} must start with https://.`, 400);
+      }
+      if (definition.pattern && !definition.pattern.test(url.toString())) {
+        throw new HttpError(`${label} does not look right. ${definition.help ?? ''}`.trim(), 400);
       }
       return url.toString();
     }
@@ -197,6 +202,23 @@ export async function savePlatformSettings(actor, changes) {
   });
   if (leavesPaymentsBroken && (await loadPlan()).enabled) {
     throw new HttpError('Switch billing off before removing the Razorpay keys.', 409);
+  }
+  // Administrators sign in only with Google: never save a change that turns it off.
+  const after = (key) => {
+    const change = cleaned.find(({ definition }) => definition.key === key);
+    if (!change) return process.env[key];
+    return change.value ?? (fromPanel.has(key) ? envValues.get(key) : process.env[key]);
+  };
+  const googleStaysOn =
+    /^(1|true)$/i.test(String(after('GOOGLE_AUTH_ENABLED') ?? '').trim()) &&
+    Boolean(after('GOOGLE_CLIENT_ID')?.trim()) &&
+    Boolean(after('GOOGLE_CLIENT_SECRET')?.trim());
+  const touchesGoogle = cleaned.some(({ definition }) => definition.key.startsWith('GOOGLE_'));
+  if (touchesGoogle && env.googleAuthEnabled && !googleStaysOn) {
+    throw new HttpError(
+      'Google sign-in is the only way administrators sign in, so it cannot be switched off or left without a client ID and secret.',
+      409,
+    );
   }
   for (const { definition, value } of cleaned) {
     const key = definition.key;

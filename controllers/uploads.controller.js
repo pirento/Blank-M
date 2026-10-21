@@ -8,6 +8,7 @@ import readXlsxFile from 'read-excel-file/node';
 import { normalizeSheet } from '../shared/spreadsheet-data.js';
 import {
   downloadObject,
+  ownerBytes,
   removeObjects,
   statementPath,
   uploadObject,
@@ -22,6 +23,8 @@ import { isSafeOwnerStoragePath } from '../services/storage-path.js';
 import { HttpError } from '../services/errors.js';
 
 const MAX_BYTES = 10 * 1024 * 1024;
+/** Per member, across the statements kept for 7 days. */
+const MAX_STATEMENT_BYTES = 200 * 1024 * 1024;
 
 /** In-memory single-file parser; files never touch the server's disk. */
 export const singleFile = multer({
@@ -43,6 +46,13 @@ async function requireFile(req) {
 /** Uploads an attachment for AI analysis into the owner's private `statements` folder. */
 export async function uploadStatement(req, res) {
   const file = await requireFile(req);
+  // Statements are kept 7 days; this cap stops one member filling the database disk.
+  if ((await ownerBytes('statements', req.member.userId)) + file.size > MAX_STATEMENT_BYTES) {
+    throw new HttpError(
+      'You have uploaded a lot of files this week. Older ones are removed after 7 days.',
+      429,
+    );
+  }
   const path = statementPath(req.member.userId, file.originalname);
   await uploadObject('statements', path, req.member.userId, file);
   res.status(201).json({ path });
@@ -72,6 +82,43 @@ export async function removeVoiceNote(req, res) {
   res.json({ ok: true });
 }
 
+/** Unpacked workbook limit: a small, highly compressed file must not expand to gigabytes. */
+const MAX_UNZIPPED_BYTES = 100 * 1024 * 1024;
+
+/**
+ * Reads the sizes an .xlsx (zip) declares in its central directory, before anything is unpacked,
+ * and refuses workbooks that would unpack beyond MAX_UNZIPPED_BYTES (or ZIP64 / malformed ones).
+ */
+export function assertWorkbookSize(buffer) {
+  const refuse = () => {
+    throw new HttpError('This workbook is too large to read. Save it as CSV and import that.', 422);
+  };
+  // End of central directory record: within the last 64 KB + 22 bytes.
+  let end = -1;
+  for (let at = buffer.length - 22; at >= Math.max(0, buffer.length - 65_557); at -= 1) {
+    if (buffer.readUInt32LE(at) === 0x06054b50) {
+      end = at;
+      break;
+    }
+  }
+  if (end < 0) return; // Not a zip: the reader rejects it on its own.
+  const entries = buffer.readUInt16LE(end + 10);
+  let at = buffer.readUInt32LE(end + 16);
+  let total = 0;
+  for (let index = 0; index < entries; index += 1) {
+    if (at + 46 > buffer.length || buffer.readUInt32LE(at) !== 0x02014b50) refuse();
+    const size = buffer.readUInt32LE(at + 24);
+    if (size === 0xffffffff) refuse();
+    total += size;
+    if (total > MAX_UNZIPPED_BYTES) refuse();
+    at +=
+      46 +
+      buffer.readUInt16LE(at + 28) +
+      buffer.readUInt16LE(at + 30) +
+      buffer.readUInt16LE(at + 32);
+  }
+}
+
 /** Reads an .xlsx workbook into normalized sheets. Nothing is stored. */
 export async function parseWorkbook(req, res) {
   const file = await requireFile(req);
@@ -81,6 +128,7 @@ export async function parseWorkbook(req, res) {
       415,
     );
   }
+  assertWorkbookSize(file.buffer);
   let result;
   try {
     result = await readXlsxFile(file.buffer, { parseNumber: (value) => value });

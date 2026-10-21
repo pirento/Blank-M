@@ -5,7 +5,8 @@
 import mongoose from 'mongoose';
 import { timestamps, uuidId } from './helpers.js';
 
-export const TRADE_SYMBOL_RE = /^[A-Z0-9][A-Z0-9._-]{0,24}$/;
+// "&" is part of NSE names such as M&M and J&KBANK.
+export const TRADE_SYMBOL_RE = /^[A-Z0-9][A-Z0-9.&_-]{0,24}$/;
 
 const tradeSchema = new mongoose.Schema(
   {

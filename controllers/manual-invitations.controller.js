@@ -22,6 +22,7 @@ import {
 import { AdminContractError } from '../services/admin/contracts.js';
 import { manualInvitationSchema } from '../shared/manual-invitations.js';
 import { welcomeMember } from '../services/notifications/emails.js';
+import { recordAdminAction } from '../services/admin/audit.js';
 
 const email = z
   .string()
@@ -168,6 +169,7 @@ export async function handleCreateManualInvitation(req, res) {
     }
     const url = new URL('/invite', origin);
     url.hash = `token=${token}`;
+    await recordAdminAction(admin, 'member.private-link', input.email, { role: input.role });
     res
       .status(201)
       .json({ invitation: publicInvitation(created), url: url.toString(), emailSent: false });
@@ -209,6 +211,7 @@ export async function handleRevokeManualInvitation(req, res) {
     const result = await run(() => revokeManualInvitation({ actorId: admin.user.id, id }));
     if (result.id !== id)
       throw new AdminContractError('The invitation revocation could not be verified.');
+    await recordAdminAction(admin, 'member.private-link-revoke', id);
     res.status(200).json({ ok: true });
   } catch (error) {
     failure(res, error);

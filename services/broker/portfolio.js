@@ -65,6 +65,18 @@ function exchangeTime(value, tradingDate) {
   return date.toISOString();
 }
 
+/**
+ * True for a row stamped on another IST day. Between midnight and Kite clearing its books the
+ * previous session's orders and trades are still listed; they are skipped, not treated as bad data.
+ */
+function fromOtherDay(value, tradingDate) {
+  return (
+    typeof value === 'string' &&
+    /^\d{4}-\d{2}-\d{2} /.test(value) &&
+    value.slice(0, 10) !== tradingDate
+  );
+}
+
 /** Provider GETs only. A failed section rejects the entire read, never an empty success. */
 export async function readBrokerPortfolio(userId, assertAccess) {
   if (activeReads.has(userId)) {
@@ -108,46 +120,50 @@ export async function readBrokerPortfolio(userId, assertAccess) {
     const net = parsePositions(positions.net);
     const day = parsePositions(positions.day);
     const orders = unique(
-      rows(envelope(await reader.read('/orders'))).map((item) => {
-        const order = checked(brokerOrderSchema, {
-          ...instrument(item),
-          orderId: item.order_id,
-          product: item.product,
-          side: item.transaction_type,
-          status: item.status,
-          orderType: item.order_type,
-          quantity: item.quantity,
-          filledQuantity: item.filled_quantity,
-          pendingQuantity: item.pending_quantity,
-          cancelledQuantity: item.cancelled_quantity,
-          price: item.price,
-          averagePrice: item.average_price,
-          placedAt: exchangeTime(item.order_timestamp, tradingDate),
-        });
-        if (
-          BigInt(order.filledQuantity) +
-            BigInt(order.pendingQuantity) +
-            BigInt(order.cancelledQuantity) >
-          BigInt(order.quantity)
-        )
-          throw badPayload();
-        return order;
-      }),
+      rows(envelope(await reader.read('/orders')))
+        .filter((item) => !fromOtherDay(item.order_timestamp, tradingDate))
+        .map((item) => {
+          const order = checked(brokerOrderSchema, {
+            ...instrument(item),
+            orderId: item.order_id,
+            product: item.product,
+            side: item.transaction_type,
+            status: item.status,
+            orderType: item.order_type,
+            quantity: item.quantity,
+            filledQuantity: item.filled_quantity,
+            pendingQuantity: item.pending_quantity,
+            cancelledQuantity: item.cancelled_quantity,
+            price: item.price,
+            averagePrice: item.average_price,
+            placedAt: exchangeTime(item.order_timestamp, tradingDate),
+          });
+          if (
+            BigInt(order.filledQuantity) +
+              BigInt(order.pendingQuantity) +
+              BigInt(order.cancelledQuantity) >
+            BigInt(order.quantity)
+          )
+            throw badPayload();
+          return order;
+        }),
       (item) => item.orderId,
     );
     const trades = unique(
-      rows(envelope(await reader.read('/trades'))).map((item) =>
-        checked(brokerTradeSchema, {
-          ...instrument(item),
-          tradeId: item.trade_id,
-          orderId: item.order_id,
-          product: item.product,
-          side: item.transaction_type,
-          quantity: item.quantity,
-          averagePrice: item.average_price,
-          filledAt: exchangeTime(item.exchange_timestamp, tradingDate),
-        }),
-      ),
+      rows(envelope(await reader.read('/trades')))
+        .filter((item) => !fromOtherDay(item.exchange_timestamp, tradingDate))
+        .map((item) =>
+          checked(brokerTradeSchema, {
+            ...instrument(item),
+            tradeId: item.trade_id,
+            orderId: item.order_id,
+            product: item.product,
+            side: item.transaction_type,
+            quantity: item.quantity,
+            averagePrice: item.average_price,
+            filledAt: exchangeTime(item.exchange_timestamp, tradingDate),
+          }),
+        ),
       (item) => `${item.exchange}:${item.orderId}:${item.tradeId}`,
     );
     await reader.assertUnchanged();

@@ -12,12 +12,15 @@ const DISMISS_AFTER_MS = 5000;
 let region = null;
 
 function ensureRegion() {
-  if (!region || !region.isConnected) {
+  // Created once and moved between the page and dialogs, so toasts survive a dialog closing.
+  if (!region) {
     region = h('div', {
       class:
         'pointer-events-none fixed right-4 z-[100] flex max-h-[50dvh] w-[calc(100%-2rem)] max-w-sm flex-col gap-2 overflow-y-auto',
       role: 'region',
       'aria-label': 'Notifications',
+      // A live region that already exists is announced reliably when a toast is added to it.
+      'aria-live': 'polite',
     });
     document.body.append(region);
   }
@@ -32,6 +35,9 @@ function ensureRegion() {
 document.addEventListener('blank:dialogs-changed', () => {
   if (region?.childElementCount) ensureRegion();
 });
+// Exists before the first toast, so screen readers announce it.
+if (document.body) ensureRegion();
+else document.addEventListener('DOMContentLoaded', ensureRegion, { once: true });
 
 /** Show a toast; tone is 'info', 'success' or 'error'. Errors stay until dismissed, others go after 5s. */
 export function notify(message, tone = 'info') {

@@ -449,5 +449,10 @@ describe('price ticks', () => {
     expect(toTick(99.93, false)).toBe(99.9);
     expect(toTick(99.93, true)).toBe(99.95);
     expect(toTick(1393.035, false)).toBe(1393);
+    // Higher price bands use larger NSE ticks.
+    expect(toTick(1393.07, true)).toBe(1393.1);
+    expect(toTick(7512.3, false)).toBe(7512);
+    expect(toTick(7512.3, true)).toBe(7512.5);
+    expect(toTick(25001.2, true)).toBe(25005);
   });
 });

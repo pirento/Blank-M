@@ -273,9 +273,16 @@ describe('Premium', () => {
     for (let use = 0; use < 3; use += 1) {
       expect((await member.send('post', '/api/paper/refresh', {})).status).not.toBe(402);
     }
-    // Per request: each AI request uses one; reading results does not.
+    // Per request: a request that fails (here: no AI key) gives its free use back...
+    const failed = await member.send('post', '/api/ai/rule', {});
+    expect(failed.status).not.toBe(402);
+    await vi.waitFor(async () =>
+      expect((await member.agent.get('/api/billing')).body.freeUsage.ai.used).toBe(0),
+    );
+    // ...and each AI request that does work uses one; reading results does not.
+    const { takeFreeUse } = await import('../../services/billing/usage.js');
     for (let use = 0; use < 2; use += 1) {
-      expect((await member.send('post', '/api/ai/rule', {})).status).not.toBe(402);
+      expect(await takeFreeUse(member.userId, 'ai', 2)).toBe(true);
     }
     expect((await member.agent.get('/api/ai/coach-reviews')).status).toBe(402);
     const third = await member.send('post', '/api/ai/rule', {});
@@ -479,6 +486,16 @@ describe('Premium webhooks and checkout edge cases', () => {
     expect(revoked.status).toBe(200);
     const cancel = razorpay.calls.find((call) => call.path === '/subscriptions/sub_test1/cancel');
     expect(cancel.body).toEqual({ cancel_at_cycle_end: 0 });
+  });
+
+  it('keeps billing on while members have live subscriptions', async () => {
+    const { admin } = await payingMember();
+    await signedWebhook(entity('active', 30), 'evt_a');
+    const refused = await admin.send('put', '/api/admin/billing', { enabled: false });
+    expect(refused.status).toBe(409);
+    expect(refused.body.error).toMatch(/live subscription/);
+    await signedWebhook(entity('cancelled', 30), 'evt_b');
+    expect((await admin.send('put', '/api/admin/billing', { enabled: false })).status).toBe(200);
   });
 
   it('needs the webhook secret to switch billing on and an authenticator to invite admins', async () => {
@@ -758,6 +775,24 @@ describe('Google sign-in', () => {
         '/auth/google?for=admin',
       ),
     ).toBe('/admin');
+  });
+
+  it('never saves settings that would switch off Google sign-in', async () => {
+    const admin = await adminSession();
+    const refused = await admin.send('put', '/api/admin/settings', {
+      changes: { GOOGLE_AUTH_ENABLED: false },
+    });
+    expect(refused.status).toBe(409);
+    expect(refused.body.error).toMatch(/only way administrators sign in/);
+    // Clearing the panel value falls back to the .env one, and a new client ID is fine.
+    expect(
+      (await admin.send('put', '/api/admin/settings', { changes: { GOOGLE_CLIENT_ID: '' } }))
+        .status,
+    ).toBe(200);
+    expect(
+      (await admin.send('put', '/api/admin/settings', { changes: { GOOGLE_CLIENT_ID: 'new-id' } }))
+        .status,
+    ).toBe(200);
   });
 
   it('lets a Google-only member add a password only right after a Google sign-in', async () => {

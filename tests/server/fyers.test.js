@@ -172,6 +172,13 @@ describe('Fyers fills', () => {
 });
 
 describe('Fyers mapping', () => {
+  it('drops the BSE group suffix from cash symbols', async () => {
+    const { equitySymbol } = await import('../../services/broker/fill-mapping.js');
+    expect(equitySymbol('BSE:RELIANCE-A')).toBe('RELIANCE');
+    expect(equitySymbol('NSE:RELIANCE-EQ')).toBe('RELIANCE');
+    expect(equitySymbol('NSE:BAJAJ-AUTO-EQ')).toBe('BAJAJ-AUTO');
+  });
+
   it('maps symbols, sides and products and lists unreadable rows', () => {
     const at = '12-Oct-2026 10:15:00';
     const { fills, skipped } = fyersTradesToFills(

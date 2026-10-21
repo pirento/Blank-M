@@ -52,6 +52,14 @@ describe('getMarketStatus', () => {
     expect(getMarketStatus(utc('2026-08-10T10:00:00Z'))).toBe('open');
   });
 
+  it('follows the 2026 NSE holiday list', () => {
+    // 9 Nov 2026 is a trading day; 10 Nov (Diwali Balipratipada) and 26 Mar (Ram Navami) are not.
+    expect(getMarketStatus(utc('2026-11-09T05:00:00Z'))).toBe('open');
+    expect(getMarketStatus(utc('2026-11-10T05:00:00Z'))).toBe('closed-holiday');
+    expect(getMarketStatus(utc('2026-03-26T05:00:00Z'))).toBe('closed-holiday');
+    expect(getMarketStatus(utc('2026-03-04T05:00:00Z'))).toBe('open');
+  });
+
   it('is closed at the weekend', () => {
     // 2026-08-08 is a Saturday, 2026-08-09 a Sunday.
     expect(getMarketStatus(utc('2026-08-08T05:00:00Z'))).toBe('closed-weekend');

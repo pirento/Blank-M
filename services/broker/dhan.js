@@ -5,10 +5,10 @@
  * is never sent back to the browser.
  */
 import { BrokerConnection } from '../../models/index.js';
-import { decryptSecret, encryptSecret } from '../crypto.js';
+import { encryptSecret } from '../crypto.js';
 import { HttpError } from '../errors.js';
 import { createLogger, errorName } from '../logger.js';
-import { MAX_ROWS, brokerRequest } from './broker-api.js';
+import { MAX_ROWS, brokerRequest, decryptBrokerToken } from './broker-api.js';
 import { brokerTradingDate } from './portfolio.js';
 import { NSE_HOLIDAYS } from '../../shared/market.js';
 
@@ -49,14 +49,7 @@ function dhanGet(path, token) {
 async function loadToken(userId) {
   const row = await BrokerConnection.findOne({ userId, provider: 'dhan' }).lean();
   if (!row?.accessTokenCiphertext || row.expiresAt.getTime() <= Date.now()) return null;
-  return {
-    row,
-    token: decryptSecret({
-      ciphertext: row.accessTokenCiphertext,
-      iv: row.accessTokenIv,
-      tag: row.accessTokenTag,
-    }),
-  };
+  return { row, token: decryptBrokerToken(row) };
 }
 
 /**
@@ -250,10 +243,16 @@ export async function readDhanFills(userId) {
     [payload, positions, holdings] = await Promise.all([
       dhanGet('/trades', connection.token),
       dhanGet('/positions', connection.token),
-      // Dhan answers an empty demat with an error, so a failure here means no holdings.
+      // Dhan answers an empty demat with its own error reply. Only that means "no holdings":
+      // a timeout, rate limit or outage must not turn today's delivery sale into a short.
       dhanGet('/holdings', connection.token).catch((error) => {
-        if (error.tokenRejected) throw error;
-        log.info('dhan holdings unavailable', { error: errorName(error) });
+        const emptyDemat =
+          error.body &&
+          (error.body.errorCode === 'DH-1111' ||
+            error.httpStatus < 500 ||
+            /holding/i.test(JSON.stringify(error.body)));
+        if (error.tokenRejected || !emptyDemat) throw error;
+        log.info('dhan holdings empty', { error: errorName(error) });
         return [];
       }),
     ]);

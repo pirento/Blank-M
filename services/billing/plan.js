@@ -7,7 +7,7 @@
  * With billing off (the default) every member has every feature, exactly as
  * before, so turning billing on is a deliberate step.
  */
-import { AdminAuditLog, PlatformSetting } from '../../models/index.js';
+import { AdminAuditLog, PlatformSetting, Subscription } from '../../models/index.js';
 import { HttpError } from '../errors.js';
 
 const PLAN_KEY = 'billing.plan';
@@ -48,6 +48,7 @@ export const DEFAULT_PLAN = Object.freeze({
   /** Razorpay plan created for the current price (Razorpay plans cannot change price). */
   razorpayPlanId: null,
   razorpayPlanPrice: null,
+  razorpayPlanKeyId: null,
 });
 
 let cache = null;
@@ -92,6 +93,20 @@ export async function savePlan(actor, changes) {
   const current = await loadPlan();
   const next = { ...current };
   if (changes.enabled !== undefined) next.enabled = changes.enabled === true;
+  // Switching billing off would hide members' Cancel button while Razorpay keeps charging them.
+  if (current.enabled && !next.enabled) {
+    const paying = await Subscription.countDocuments({
+      razorpayStatus: {
+        $in: ['created', 'authenticated', 'active', 'pending', 'halted', 'paused'],
+      },
+    });
+    if (paying) {
+      throw new HttpError(
+        `${paying} member${paying === 1 ? ' has' : 's have'} a live subscription. Cancel them (Members → revoke, or ask them to cancel) before switching billing off.`,
+        409,
+      );
+    }
+  }
   if (changes.signupOpen !== undefined) next.signupOpen = changes.signupOpen === true;
   if (changes.name !== undefined) {
     const name = String(changes.name).trim();
@@ -158,13 +173,20 @@ export async function savePlan(actor, changes) {
 }
 
 /**
- * Remembers the Razorpay plan created for the current price. Only these two fields
- * are written, so a stale cached plan on another process cannot undo an admin change.
+ * Remembers the Razorpay plan created for the current price and Razorpay account (key ID: a plan
+ * made with test keys does not exist for live keys). Only these fields are written, so a stale
+ * cached plan on another process cannot undo an admin change.
  */
-export async function rememberRazorpayPlan(planId, price) {
+export async function rememberRazorpayPlan(planId, price, keyId) {
   await PlatformSetting.updateOne(
     { _id: PLAN_KEY },
-    { $set: { 'value.razorpayPlanId': planId, 'value.razorpayPlanPrice': price } },
+    {
+      $set: {
+        'value.razorpayPlanId': planId,
+        'value.razorpayPlanPrice': price,
+        'value.razorpayPlanKeyId': keyId,
+      },
+    },
     { upsert: true },
   );
   forgetPlanCache();
