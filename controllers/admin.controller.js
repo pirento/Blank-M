@@ -17,6 +17,7 @@ import { reserveAttempts } from '../services/rate-window.js';
 import { endSubscriptionNow } from '../services/billing/subscriptions.js';
 import { detachRevokedMember } from '../services/admin/delete-member.js';
 import { iso } from '../models/helpers.js';
+import { recordAdminAction } from '../services/admin/audit.js';
 import {
   claimAccessRequest,
   finishAccessDecision,
@@ -208,6 +209,7 @@ export async function handleInviteUser(req, res) {
     const body = inviteSchema.parse(readJsonBody(req));
     if (body.role === 'admin') assertAdminStepUp(req);
     await requestInvitation(body.email, body.role, admin.user.id, false);
+    await recordAdminAction(admin, 'member.invite', body.email, { role: body.role });
     res.status(201).json({ ok: true, invitationStatus: 'requested', deliveryConfirmed: false });
   } catch (error) {
     failure(res, error);
@@ -224,6 +226,7 @@ export async function handleResendInvite(req, res) {
     const admin = await requireAdmin(req);
     const body = emailBodySchema.parse(readJsonBody(req));
     await requestInvitation(body.email, null, admin.user.id, true);
+    await recordAdminAction(admin, 'member.invite-resend', body.email);
     res.status(200).json({ ok: true, invitationStatus: 'requested', deliveryConfirmed: false });
   } catch (error) {
     failure(res, error);
@@ -264,6 +267,7 @@ export async function handleCreateResetLink(req, res) {
       );
     }
     const link = await createRecoveryLink(user);
+    await recordAdminAction(admin, 'member.reset-link', user.email);
     res.status(201).json({ ...link, email: user.email, emailSent: false });
   } catch (error) {
     failure(res, error);
@@ -294,6 +298,7 @@ export async function handleRevokeUser(req, res) {
     }
     invitation.revokedAt ??= new Date();
     await invitation.save();
+    await recordAdminAction(admin, 'member.revoke', body.email);
     // Workspace access is revoked first; the account ban and session removal follow.
     if (invitation.authUserId) {
       try {

@@ -16,7 +16,7 @@
 
 /**
  * @type {{ key: string, group: string, label: string, type: SettingType,
- *          help?: string, min?: number, max?: number, pattern?: RegExp }[]}
+ *          help?: string, min?: number, max?: number, integer?: boolean, pattern?: RegExp }[]}
  */
 export const PLATFORM_SETTINGS = [
   // AI
@@ -45,6 +45,7 @@ export const PLATFORM_SETTINGS = [
     group: 'Zerodha Kite',
     label: 'Redirect URL',
     type: 'url',
+    pattern: /\/api\/kite\/callback$/,
     help: 'Must match the Kite developer console exactly, e.g. https://your-domain/api/kite/callback.',
   },
 
@@ -86,7 +87,15 @@ export const PLATFORM_SETTINGS = [
 
   // Email
   { key: 'SMTP_HOST', group: 'Email (SMTP)', label: 'Host', type: 'text' },
-  { key: 'SMTP_PORT', group: 'Email (SMTP)', label: 'Port', type: 'number', min: 1, max: 65535 },
+  {
+    key: 'SMTP_PORT',
+    group: 'Email (SMTP)',
+    label: 'Port',
+    type: 'number',
+    integer: true,
+    min: 1,
+    max: 65535,
+  },
   {
     key: 'SMTP_SECURE',
     group: 'Email (SMTP)',
@@ -116,6 +125,8 @@ export const PLATFORM_SETTINGS = [
     group: 'Telegram bot',
     label: 'Webhook secret (32+ characters)',
     type: 'secret',
+    // Telegram allows letters, digits, _ and -; shorter secrets switch the bot off.
+    pattern: /^[A-Za-z0-9_-]{32,256}$/,
     help: 'After changing the token, run node scripts/telegram-set-webhook.js on the server.',
   },
 
@@ -138,7 +149,13 @@ export const PLATFORM_SETTINGS = [
     label: 'VAPID private key',
     type: 'secret',
   },
-  { key: 'VAPID_SUBJECT', group: 'Push notifications', label: 'Contact (mailto:…)', type: 'text' },
+  {
+    key: 'VAPID_SUBJECT',
+    group: 'Push notifications',
+    label: 'Contact (mailto:…)',
+    type: 'text',
+    pattern: /^(mailto:\S+@\S+|https:\/\/\S+)$/,
+  },
 
   // Live market data for every member (TrueData). Needs TrueData's redistribution permission.
   {
@@ -159,6 +176,7 @@ export const PLATFORM_SETTINGS = [
     group: 'Live market data (TrueData)',
     label: 'Real-time port (usually 8082)',
     type: 'number',
+    integer: true,
     min: 1,
     max: 65535,
   },

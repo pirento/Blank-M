@@ -40,7 +40,8 @@ function control(setting) {
       id,
       type: 'checkbox',
       class: 'h-4 w-4 accent-accent',
-      checked: setting.value === 'true',
+      // .env may say 1 or TRUE; the server reads those as on too.
+      checked: /^(1|true)$/i.test(String(setting.value ?? '')),
     });
     const initial = box.checked;
     return {
@@ -140,7 +141,7 @@ function paint() {
     h(
       'p',
       { class: 'mb-4 text-sm text-muted' },
-      'Values saved here replace the ones in the server .env file and take effect within a minute — no restart needed. Database address, session secret, encryption key, cron secret and app URL can only be changed in .env.',
+      'Values saved here replace the ones in the server .env file and take effect within a minute. Two need one more step: a new TrueData login is used after the feed restarts (pm2 restart pirento-feed), and a new Telegram token needs node scripts/telegram-set-webhook.js. Database address, session secret, encryption key, cron secret and app URL can only be changed in .env.',
     ),
     h('div', { class: 'grid gap-4 lg:grid-cols-2' }, ...groups.map(groupCard)),
   );

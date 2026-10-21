@@ -47,7 +47,22 @@ function startClock() {
 
 /* ---------------------------------- sign out ---------------------------------- */
 /** Ends the server session, then goes to the login page (also when the request fails). */
+/** Stops this device's push alerts, so the next person on a shared device does not get them. */
+async function forgetPushDevice() {
+  const registration = await navigator.serviceWorker?.getRegistration?.();
+  const subscription = await registration?.pushManager?.getSubscription();
+  if (!subscription) return;
+  const { endpoint } = subscription;
+  await subscription.unsubscribe();
+  await api('/api/push/unsubscribe', { method: 'POST', body: { endpoint } });
+}
+
 export async function signOut() {
+  try {
+    await forgetPushDevice();
+  } catch {
+    // Signing out must still work when push cannot be reached.
+  }
   try {
     await api('/auth/logout', { method: 'POST', body: {} });
   } catch {

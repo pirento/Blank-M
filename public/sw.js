@@ -5,7 +5,7 @@
  * Pages and API responses are private and never cached; when the network is
  * down a page request gets a small offline notice instead.
  */
-const VERSION = 'blank-static-v1';
+const VERSION = 'blank-static-v2';
 const PRECACHE = [
   '/css/app.css',
   '/icons.svg',
@@ -63,17 +63,17 @@ self.addEventListener('fetch', (event) => {
   ) {
     return;
   }
-  // Static files: serve the cached copy at once and refresh it in the background.
+  // Static files: always check the server first (a cheap 304 when unchanged), so a page never
+  // mixes scripts from two deploys; the cached copy is only for when the network is down.
   event.respondWith(
     caches.open(VERSION).then(async (cache) => {
-      const cached = await cache.match(request);
-      const network = fetch(request)
-        .then((response) => {
-          if (response.ok) cache.put(request, response.clone());
-          return response;
-        })
-        .catch(() => cached);
-      return cached || network;
+      try {
+        const response = await fetch(request, { cache: 'no-cache' });
+        if (response.ok) cache.put(request, response.clone());
+        return response;
+      } catch {
+        return (await cache.match(request)) ?? Response.error();
+      }
     }),
   );
 });

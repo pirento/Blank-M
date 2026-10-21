@@ -25,9 +25,11 @@ import { data, mfaNotice, when } from './shared.js';
 const root = $('[data-admin-announcements]');
 const AUDIENCES = { all: 'All members', premium: 'Premium members', free: 'Free members' };
 const state = { announcements: [], busy: false };
+// What is typed survives the repaints (progress refreshes every 5 s, and errors repaint).
+const draft = { subject: '', body: '', audience: 'all' };
 
 function composeCard() {
-  const subject = input({ id: 'announcement-subject', maxlength: '150' });
+  const subject = input({ id: 'announcement-subject', maxlength: '150', value: draft.subject });
   const body = h('textarea', {
     id: 'announcement-body',
     rows: 8,
@@ -35,14 +37,20 @@ function composeCard() {
     class:
       'w-full rounded-control border border-line bg-surface px-3 py-2 text-sm text-fg focus-ring',
   });
+  body.value = draft.body;
   const audience = h(
     'select',
     {
       id: 'announcement-audience',
       class: 'h-10 w-full rounded-control border border-line bg-surface px-3 text-sm focus-ring',
     },
-    ...Object.entries(AUDIENCES).map(([value, text]) => h('option', { value }, text)),
+    ...Object.entries(AUDIENCES).map(([value, text]) =>
+      h('option', { value, selected: value === draft.audience }, text),
+    ),
   );
+  subject.addEventListener('input', () => (draft.subject = subject.value));
+  body.addEventListener('input', () => (draft.body = body.value));
+  audience.addEventListener('change', () => (draft.audience = audience.value));
   const send = button(state.busy ? 'Sending…' : 'Send announcement', {
     disabled: state.busy || !data.health?.email,
     onclick: async () => {
@@ -59,6 +67,7 @@ function composeCard() {
           method: 'POST',
           body: { subject: subject.value, body: body.value, audience: audience.value },
         });
+        Object.assign(draft, { subject: '', body: '', audience: 'all' });
         notify('Sending started. Progress shows below.', 'success');
         await load();
       } catch (error) {

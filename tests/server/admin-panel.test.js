@@ -488,6 +488,16 @@ describe('Premium webhooks and checkout edge cases', () => {
     expect(cancel.body).toEqual({ cancel_at_cycle_end: 0 });
   });
 
+  it('keeps billing on while members have live subscriptions', async () => {
+    const { admin } = await payingMember();
+    await signedWebhook(entity('active', 30), 'evt_a');
+    const refused = await admin.send('put', '/api/admin/billing', { enabled: false });
+    expect(refused.status).toBe(409);
+    expect(refused.body.error).toMatch(/live subscription/);
+    await signedWebhook(entity('cancelled', 30), 'evt_b');
+    expect((await admin.send('put', '/api/admin/billing', { enabled: false })).status).toBe(200);
+  });
+
   it('needs the webhook secret to switch billing on and an authenticator to invite admins', async () => {
     const admin = await adminSession();
     await admin.send('put', '/api/admin/settings', {
@@ -765,6 +775,24 @@ describe('Google sign-in', () => {
         '/auth/google?for=admin',
       ),
     ).toBe('/admin');
+  });
+
+  it('never saves settings that would switch off Google sign-in', async () => {
+    const admin = await adminSession();
+    const refused = await admin.send('put', '/api/admin/settings', {
+      changes: { GOOGLE_AUTH_ENABLED: false },
+    });
+    expect(refused.status).toBe(409);
+    expect(refused.body.error).toMatch(/only way administrators sign in/);
+    // Clearing the panel value falls back to the .env one, and a new client ID is fine.
+    expect(
+      (await admin.send('put', '/api/admin/settings', { changes: { GOOGLE_CLIENT_ID: '' } }))
+        .status,
+    ).toBe(200);
+    expect(
+      (await admin.send('put', '/api/admin/settings', { changes: { GOOGLE_CLIENT_ID: 'new-id' } }))
+        .status,
+    ).toBe(200);
   });
 
   it('lets a Google-only member add a password only right after a Google sign-in', async () => {

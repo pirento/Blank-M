@@ -36,6 +36,11 @@ function openGrant(member, onDone) {
       });
       const save = button('Save', {
         onclick: async () => {
+          // An empty box would send 0, which ends the member's grant.
+          if (!days.value.trim()) {
+            notify('Enter the number of days (0 ends the grant).', 'error');
+            return;
+          }
           save.disabled = true;
           try {
             await api(`/api/admin/members/${encodeURIComponent(member.userId)}/premium`, {

@@ -29,7 +29,9 @@ describe('interface language', () => {
       ...files(path.join(root, 'views'), /\.ejs$/),
       ...files(path.join(root, 'public/js'), /\.js$/),
     ]) {
-      for (const match of fs.readFileSync(file, 'utf8').matchAll(/\bt\('((?:[^'\\]|\\.)+)'[,)]/g)) {
+      for (const match of fs
+        .readFileSync(file, 'utf8')
+        .matchAll(/\bt\(\s*'((?:[^'\\]|\\.)+)'\s*[,)]/g)) {
         used.add(match[1].replace(/\\'/g, "'"));
       }
     }
