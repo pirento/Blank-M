@@ -7,6 +7,11 @@ server {
     # Statement and workbook uploads are limited to 10 MB, backups to 25 MB.
     client_max_body_size 26m;
 
+    # Node does not compress; nginx gzips pages, scripts and styles (never the event streams).
+    gzip on;
+    gzip_proxied any;
+    gzip_types text/css application/javascript text/javascript application/json image/svg+xml;
+
     location / {
         proxy_pass http://127.0.0.1:3000;
         proxy_http_version 1.1;

@@ -23,5 +23,7 @@ const stop = async () => {
   await disconnectDatabase();
   process.exit(0);
 };
+// One failed database write must not stop everyone's live prices.
+process.on('unhandledRejection', (error) => console.error('Market data feed:', error));
 process.once('SIGINT', stop);
 process.once('SIGTERM', stop);

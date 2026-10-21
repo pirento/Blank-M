@@ -99,9 +99,10 @@ export async function handleListUsers(req, res) {
     ).lean();
     const hidden = new Set(manual.map((row) => row.email));
     const invitations = await AllowedUser.find().sort({ invitedAt: -1, _id: 1 }).lean();
-    const accounts = await User.find({
-      _id: { $in: invitations.map((row) => row.authUserId).filter(Boolean) },
-    }).lean();
+    const accounts = await User.find(
+      { _id: { $in: invitations.map((row) => row.authUserId).filter(Boolean) } },
+      { role: 1, status: 1, emailConfirmedAt: 1, lastSignInAt: 1, bannedUntil: 1 },
+    ).lean();
     const byId = new Map(accounts.map((account) => [account._id, account]));
     const users = invitations
       .filter((entry) => !hidden.has(entry._id))
