@@ -14,7 +14,13 @@ import { Subscription, TrialClaim } from '../../models/index.js';
 import { sha256Hex } from '../crypto.js';
 import { HttpError } from '../errors.js';
 import { featureLabel, loadPlan } from './plan.js';
-import { PER_REQUEST_FEATURES, takeFreeDay, takeFreeUse, usedThisMonth } from './usage.js';
+import {
+  PER_REQUEST_FEATURES,
+  giveBackFreeUse,
+  takeFreeDay,
+  takeFreeUse,
+  usedThisMonth,
+} from './usage.js';
 
 const DAY_MS = 24 * 60 * 60_000;
 // Razorpay charges a renewal (and sends its webhook) some time after the paid month ends.
@@ -156,10 +162,11 @@ export async function allowFeature(user, feature, { action = false } = {}) {
   if (!PER_REQUEST_FEATURES.has(feature)) {
     return { ok: await takeFreeDay(user._id, feature, limit), limit };
   }
-  const ok = action
-    ? await takeFreeUse(user._id, feature, limit)
-    : (await usedThisMonth(user._id, feature)) < limit;
-  return { ok, limit };
+  if (action) {
+    const took = await takeFreeUse(user._id, feature, limit);
+    return { ok: took, limit, took };
+  }
+  return { ok: (await usedThisMonth(user._id, feature)) < limit, limit };
 }
 
 /** The 402 error shown when a free member opens a Premium feature (`limit`: free uses used up). */
@@ -179,13 +186,22 @@ export function premiumRequired(feature, limit = 0) {
  * route's own sign-in check answers them as before.
  */
 export function requirePremium(feature) {
-  return async (req, _res, next) => {
+  return async (req, res, next) => {
     try {
       const user = req.member?.user ?? req.auth?.user;
       if (user && !req.auth?.accessError) {
         // A free member may use the feature a little each month before Premium is needed.
-        const { ok, limit } = await allowFeature(user, feature, { action: req.method !== 'GET' });
+        const { ok, limit, took } = await allowFeature(user, feature, {
+          action: req.method !== 'GET',
+        });
         if (!ok) throw premiumRequired(feature, limit);
+        // A request that is refused or fails (validation, hourly limit, provider error) did no
+        // work for the member: give the free use back.
+        if (took) {
+          res.once('finish', () => {
+            if (res.statusCode >= 400) void giveBackFreeUse(user._id, feature).catch(() => {});
+          });
+        }
       }
       next();
     } catch (error) {

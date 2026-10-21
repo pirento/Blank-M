@@ -59,6 +59,14 @@ export async function takeFreeUse(userId, feature, limit, now = new Date()) {
   }
 }
 
+/** Returns one free use taken this month (the request it was taken for did no work). */
+export async function giveBackFreeUse(userId, feature, now = new Date()) {
+  await UsageCounter.updateOne(
+    { _id: monthKey(userId, feature, currentMonth(now)), count: { $gt: 0 } },
+    { $inc: { count: -1 } },
+  );
+}
+
 /**
  * Per-day features: true when the member already used `feature` today, or one more free day could
  * be taken for today. Atomic on the month's counter (the days used are listed in it), so parallel

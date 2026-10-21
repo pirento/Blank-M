@@ -79,7 +79,7 @@ export function statementPath(userId, originalName) {
   const safeName = String(originalName || 'statement')
     .replace(/[^\w.-]/g, '_')
     .slice(-80);
-  return `${userId}/${Date.now()}-${safeName}`;
+  return `${userId}/${Date.now()}-${randomUUID().slice(0, 8)}-${safeName}`;
 }
 
 /** `<owner>/<trade>/<random>`: a new name per upload, so a replaced image is never served stale. */
@@ -160,6 +160,19 @@ export async function removeObjects(bucketName, paths) {
 }
 
 /** Oldest objects past the retention cutoff (temporary voice notes). */
+/** Total bytes stored in the member's `<userId>/` folder of a bucket. */
+export async function ownerBytes(bucketName, userId) {
+  const { config } = bucket(bucketName);
+  const [row] = await nativeDb()
+    .collection(`${config.name}.files`)
+    .aggregate([
+      { $match: { filename: { $regex: `^${userId}/` } } },
+      { $group: { _id: null, bytes: { $sum: '$length' } } },
+    ])
+    .toArray();
+  return row?.bytes ?? 0;
+}
+
 export async function expiredObjects(bucketName, cutoff, limit) {
   const { gridfs } = bucket(bucketName);
   const files = await gridfs

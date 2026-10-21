@@ -36,9 +36,10 @@ export async function handleJournalSearch(req, res) {
   let response;
   try {
     const { user } = await authenticateRequest(req);
-    userId = user.id;
-    await enforceAiRateLimit(user.id);
+    // Invalid or limited requests do no AI work, so they are not recorded as usage.
     const body = journalSearchRequestSchema.parse(readJsonBody(req));
+    await enforceAiRateLimit(user.id);
+    userId = user.id;
     const documents = await loadJournalDocuments(user.id);
     if (!documents.length) {
       await recordAiUsage({

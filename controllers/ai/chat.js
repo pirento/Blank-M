@@ -46,9 +46,10 @@ export async function handleChat(req, res) {
   try {
     controller.signal.throwIfAborted();
     const auth = await authenticateRequest(req);
-    userId = auth.user.id;
-    await enforceAiRateLimit(userId);
+    // Invalid or limited requests do no AI work, so they are not recorded as usage.
     const body = chatRequestSchema.parse(readJsonBody(req));
+    await enforceAiRateLimit(auth.user.id);
+    userId = auth.user.id;
     if (!body.message.trim() && !body.attachmentPath) {
       throw Object.assign(new Error('Provide a message or statement to analyze.'), { status: 400 });
     }
@@ -87,7 +88,8 @@ export async function handleChat(req, res) {
             constitution,
           input: input,
         },
-        { signal: controller.signal },
+        // Not retried: a timed-out request may already have been run and billed.
+        { signal: controller.signal, maxRetries: 0 },
       ),
     );
     controller.signal.throwIfAborted();

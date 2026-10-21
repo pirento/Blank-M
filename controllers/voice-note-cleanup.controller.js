@@ -20,22 +20,24 @@ const candidateSchema = z.object({
   updated_at: z.string().datetime({ offset: true }),
 });
 
+/**
+ * The expired files to remove. Rows that are not safe owner paths or not old enough are skipped,
+ * and a name listed twice (two uploads in the same millisecond) is kept once, since removal is by
+ * name: one odd row must never stop the cleanup of everyone else's files.
+ */
 function parseCandidates(data, retentionMs) {
   const candidates = z.array(candidateSchema).max(BATCH_SIZE).parse(data);
   const cutoff = Date.now() - retentionMs;
-  if (
-    new Set(candidates.map((item) => item.id)).size !== candidates.length ||
-    new Set(candidates.map((item) => item.name)).size !== candidates.length ||
-    candidates.some(
-      (item) =>
-        !isSafeOwnerStoragePath(item.name) ||
-        Date.parse(item.created_at) > cutoff ||
-        Date.parse(item.updated_at) > cutoff,
-    )
-  ) {
-    throw new Error('Invalid cleanup candidates');
-  }
-  return candidates;
+  const names = new Set();
+  return candidates.filter((item) => {
+    const keep =
+      !names.has(item.name) &&
+      isSafeOwnerStoragePath(item.name) &&
+      Date.parse(item.created_at) <= cutoff &&
+      Date.parse(item.updated_at) <= cutoff;
+    names.add(item.name);
+    return keep;
+  });
 }
 
 function matchesSecret(received, expected) {

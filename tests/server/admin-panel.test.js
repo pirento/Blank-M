@@ -273,9 +273,16 @@ describe('Premium', () => {
     for (let use = 0; use < 3; use += 1) {
       expect((await member.send('post', '/api/paper/refresh', {})).status).not.toBe(402);
     }
-    // Per request: each AI request uses one; reading results does not.
+    // Per request: a request that fails (here: no AI key) gives its free use back...
+    const failed = await member.send('post', '/api/ai/rule', {});
+    expect(failed.status).not.toBe(402);
+    await vi.waitFor(async () =>
+      expect((await member.agent.get('/api/billing')).body.freeUsage.ai.used).toBe(0),
+    );
+    // ...and each AI request that does work uses one; reading results does not.
+    const { takeFreeUse } = await import('../../services/billing/usage.js');
     for (let use = 0; use < 2; use += 1) {
-      expect((await member.send('post', '/api/ai/rule', {})).status).not.toBe(402);
+      expect(await takeFreeUse(member.userId, 'ai', 2)).toBe(true);
     }
     expect((await member.agent.get('/api/ai/coach-reviews')).status).toBe(402);
     const third = await member.send('post', '/api/ai/rule', {});

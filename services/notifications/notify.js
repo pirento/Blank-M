@@ -4,6 +4,7 @@
  * so one broken channel cannot block the others.
  */
 import { User } from '../../models/index.js';
+import { accessProblem } from '../auth/accounts.js';
 import { isMailConfigured, sendMail } from '../mailer.js';
 import { createLogger } from '../logger.js';
 import { sendPush } from './push.js';
@@ -20,6 +21,9 @@ const log = createLogger('notify');
  */
 export async function notifyMember(userId, message, channels = { push: true }) {
   const result = { push: 0, email: false, telegram: false };
+  // Banned, suspended or revoked members get no alerts on any channel.
+  const member = await User.findById(userId);
+  if (!member || (await accessProblem(member))) return result;
   if (channels.telegram !== false) {
     result.telegram = await sendToMember(userId, `${message.title}\n${message.body}`);
   }
