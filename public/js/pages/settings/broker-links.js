@@ -186,6 +186,17 @@ function mountCard(root, broker) {
         : status.expired
           ? `The ${broker.label} login has expired. Connect again.`
           : 'Not connected.';
+    const disconnect = () =>
+      button(t('Disconnect'), {
+        variant: 'ghost',
+        className: 'text-negative',
+        disabled: state.busy,
+        onclick: () =>
+          void run(async () => {
+            state.status = await api(`/api/${broker.key}/disconnect`, { method: 'POST' });
+            notify(`${broker.label} disconnected.`, 'success');
+          }),
+      });
     render(
       root,
       card(
@@ -206,20 +217,11 @@ function mountCard(root, broker) {
                     // The dialog reports what was added; nothing on this page changes.
                     openFillsToJournal({ broker: broker.key, onAdded: () => undefined }),
                 }),
-                button(t('Disconnect'), {
-                  variant: 'ghost',
-                  className: 'text-negative',
-                  disabled: state.busy,
-                  onclick: () =>
-                    void run(async () => {
-                      state.status = await api(`/api/${broker.key}/disconnect`, {
-                        method: 'POST',
-                      });
-                      notify(`${broker.label} disconnected.`, 'success');
-                    }),
-                }),
+                disconnect(),
               )
             : null,
+          // An expired login keeps its account link; Disconnect lets another account be linked.
+          status && !status.connected && (status.expired || status.clientId) ? disconnect() : null,
         ),
       ),
     );

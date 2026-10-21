@@ -7,6 +7,7 @@ import { riskStatus, toRiskLimits } from '../../shared/risk-limits.js';
 import { getMarketStatus, todayInIst } from '../../shared/market.js';
 import { getQuote, isKiteConfigured } from '../market/index.js';
 import { placeKiteGtt, placeKiteLimitOrder, readKiteOrder } from '../market/kite.js';
+import { applyPlatformSettings } from '../platform/settings.js';
 import { HttpError } from '../errors.js';
 import { accessProblem } from '../auth/accounts.js';
 import { hasFeature } from '../billing/membership.js';
@@ -148,6 +149,40 @@ export async function listLiveOrders(userId) {
 }
 
 /**
+ * Zerodha accepts an order (and returns its id) before its risk checks run, so an order saved as
+ * "placed" can be rejected moments later (for example for margin). Today's placed orders are
+ * re-read and marked rejected, so the plan can be sent again and the daily limit is not used up.
+ */
+async function settleRejectedOrders(userId) {
+  const placed = await LiveOrder.find(
+    { userId, status: 'placed', tradingDate: todayInIst(), brokerOrderId: { $ne: null } },
+    { brokerOrderId: 1 },
+  )
+    .limit(20)
+    .lean();
+  for (const order of placed) {
+    try {
+      const broker = await readKiteOrder(userId, order.brokerOrderId);
+      const dead =
+        broker.status === 'REJECTED' || (broker.status === 'CANCELLED' && !broker.filledQuantity);
+      if (dead) {
+        await LiveOrder.updateOne(
+          { _id: order._id, status: 'placed' },
+          {
+            $set: {
+              status: 'rejected',
+              error: `Zerodha ${broker.status.toLowerCase()} the order.`,
+            },
+          },
+        );
+      }
+    } catch {
+      // Unreadable now: leave it as placed (the safe direction for the daily limit).
+    }
+  }
+}
+
+/**
  * Send one reviewed plan to Zerodha as a regular DAY LIMIT order at the plan's
  * entry price. Every safety check runs on the server against the frozen plan;
  * the browser only names the plan and confirms its symbol.
@@ -160,6 +195,9 @@ export async function placeLiveOrder({
   idempotencyKey,
   autoStopTarget = false,
 }) {
+  // Real money: read the admin's live-trading switch and limits fresh, not a cached copy.
+  await applyPlatformSettings();
+  await settleRejectedOrders(user._id);
   const state = await liveTradingState(user, session);
   if (!state.enabled) throw new HttpError('Live trading is not enabled on this server.', 403);
   if (!state.accountEnabled) throw new HttpError('Enable live orders in Settings first.', 403);
@@ -439,7 +477,9 @@ async function sendStopTargetGtt(user, order) {
     { $set: { gttStatus: 'unknown', gttStop: stop, gttTarget: target, gttError: null } },
     { new: true },
   );
-  if (!claimed) throw new HttpError('A GTT was already sent for this order.', 409);
+  if (!claimed) {
+    throw new HttpError('A GTT was already sent for this order.', 409, { claimLost: true });
+  }
   try {
     const { triggerId } = await placeKiteGtt(user._id, {
       symbol: order.symbol,
@@ -470,6 +510,8 @@ const AUTO_GTT_WINDOW_MS = 3 * 24 * 60 * 60_000;
  * again here. Each outcome is sent to their Telegram chat.
  */
 export async function placePendingAutoGtts({ limit = 100 } = {}) {
+  // The admin's live-trading switch may have changed on another process a moment ago.
+  await applyPlatformSettings();
   const config = liveTradingConfig();
   if (!config.enabled) return { checked: 0, placed: 0, failed: 0, waiting: 0, enabled: false };
   const orders = await LiveOrder.find({
@@ -494,6 +536,8 @@ export async function placePendingAutoGtts({ limit = 100 } = {}) {
       try {
         result = await sendStopTargetGtt(user, order);
       } catch (error) {
+        // Another run (or the member by hand) is already placing this GTT: nothing to report.
+        if (error?.claimLost) continue;
         // Still filling, or Zerodha/the quote briefly unreachable: try on the next check.
         if (error?.pending || error?.status === 503) {
           counts.waiting += 1;

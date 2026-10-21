@@ -81,6 +81,17 @@ export function mountDhan() {
         : status.expired
           ? `The Dhan token for client ${status.clientId} has expired. Paste a new one to reconnect.`
           : 'Not connected.';
+    const disconnect = () =>
+      button(t('Disconnect'), {
+        variant: 'ghost',
+        className: 'text-negative',
+        disabled: state.busy,
+        onclick: () =>
+          void run(async () => {
+            state.status = await api('/api/dhan/disconnect', { method: 'POST' });
+            notify('Dhan disconnected.', 'success');
+          }),
+      });
     render(
       root,
       card(
@@ -134,18 +145,11 @@ export function mountDhan() {
                     // The dialog reports what was added; nothing on this page changes.
                     openFillsToJournal({ broker: 'dhan', onAdded: () => undefined }),
                 }),
-                button(t('Disconnect'), {
-                  variant: 'ghost',
-                  className: 'text-negative',
-                  disabled: state.busy,
-                  onclick: () =>
-                    void run(async () => {
-                      state.status = await api('/api/dhan/disconnect', { method: 'POST' });
-                      notify('Dhan disconnected.', 'success');
-                    }),
-                }),
+                disconnect(),
               )
             : null,
+          // An expired token keeps its account link; Disconnect lets another account be linked.
+          status && !status.connected && (status.expired || status.clientId) ? disconnect() : null,
         ),
       ),
     );

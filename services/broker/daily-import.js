@@ -19,6 +19,8 @@ import { upstoxStatus } from './upstox.js';
 import { importAllFills } from './fills-journal.js';
 
 const log = createLogger('daily-import');
+/** Time one batch may spend starting new members (the proxy times out at 180 s). */
+const BATCH_BUDGET_MS = 110_000;
 
 const BROKERS = [
   {
@@ -51,8 +53,9 @@ async function importForMember(user) {
   };
   const lines = [];
   for (const broker of BROKERS) {
-    if (!(await broker.connected(user._id))) continue;
     try {
+      // Inside the try: one broker whose status cannot be read must not skip the others.
+      if (!(await broker.connected(user._id))) continue;
       const result = await importAllFills(user._id, assertAccess, broker.key);
       const open = result.open?.length ? `, ${result.open.length} still open` : '';
       lines.push(`${broker.label}: added ${result.added.length} round trips${open}.`);
@@ -90,7 +93,14 @@ export async function runDailyImports({ now = new Date(), limit = 25 } = {}) {
   let done = 0;
   let skipped = 0;
   let failed = 0;
+  let outOfTime = false;
+  const started = Date.now();
   for (const settings of due) {
+    // Slow broker days: stop well before the proxy's 180 s timeout; the next call continues.
+    if (Date.now() - started > BATCH_BUDGET_MS) {
+      outOfTime = true;
+      break;
+    }
     // Claim the day first: a member skipped or failing below must not hold a place in every later
     // batch (which would starve everyone after the first `limit` members).
     const claim = await AccountSettings.updateOne(
@@ -118,5 +128,12 @@ export async function runDailyImports({ now = new Date(), limit = 25 } = {}) {
       failed += 1;
     }
   }
-  return { ran: true, date: today, done, skipped, failed, moreMayRemain: due.length === limit };
+  return {
+    ran: true,
+    date: today,
+    done,
+    skipped,
+    failed,
+    moreMayRemain: outOfTime || due.length === limit,
+  };
 }

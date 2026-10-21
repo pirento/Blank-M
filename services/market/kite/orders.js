@@ -60,14 +60,16 @@ async function kitePost(userId, connection, path, fields, what) {
       body: new URLSearchParams(fields),
     });
   } catch {
-    throw unknownOutcome(what);
-  } finally {
     clearTimeout(timer);
+    throw unknownOutcome(what);
   }
   if (response.status === 401 || response.status === 403) {
+    clearTimeout(timer);
     await throwAuthFailure(response, userId, connection);
   }
+  // The timeout also covers reading the body, so a stalled reply cannot hang the order.
   const payload = await response.json().catch(() => null);
+  clearTimeout(timer);
   if (response.status >= 500 || !payload) throw unknownOutcome(what);
   if (!response.ok || payload?.status !== 'success') {
     // Kite's own message explains rejections such as margin or circuit limits.
