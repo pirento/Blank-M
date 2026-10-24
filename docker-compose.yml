@@ -1,4 +1,4 @@
-# Local or single-server deployment: the app plus MongoDB.
+# Local or single-server deployment: the app, the live market data feed and MongoDB.
 # Usage: cp .env.example .env  (set SESSION_SECRET, APP_URL, …)  then  docker compose up -d --build
 services:
   app:
@@ -16,6 +16,23 @@ services:
       TRUST_PROXY: 'true'
     ports:
       - '127.0.0.1:3000:3000'
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  # The live market data feed (one TrueData connection per login, so exactly one).
+  # Idle until a TrueData login is set in the admin panel → Integrations.
+  feed:
+    build: .
+    restart: unless-stopped
+    command: ['node', 'scripts/market-feed.js']
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      MONGODB_URI: mongodb://mongo:27017/blank
+    # The image's health check calls the web server, which this container does not run.
+    healthcheck:
+      disable: true
     depends_on:
       mongo:
         condition: service_healthy

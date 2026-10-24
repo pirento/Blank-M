@@ -117,6 +117,9 @@ docker compose up -d --build
 docker compose exec -e ADMIN_EMAIL=you@example.com app node scripts/create-admin.js
 ```
 
+Compose also runs the live market data feed (`feed`, `node scripts/market-feed.js`); it stays idle
+until a TrueData login is set in the admin panel → Integrations.
+
 The app listens on `127.0.0.1:3000`; put Nginx with HTTPS in front of it (step A5). MongoDB data is
 kept in the `mongo-data` volume; Compose points the app at its own MongoDB, so `MONGODB_URI` in `.env`
 is overridden. Back it up with `docker compose exec mongo mongodump --archive > blank.archive`.
