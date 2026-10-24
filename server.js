@@ -16,6 +16,9 @@ import {
 
 const log = createLogger('server');
 
+// Replaced by the graceful shutdown once the server is listening.
+let shutdown = (code) => process.exit(code);
+
 /** Node entry point: connect MongoDB, then serve the EJS application and JSON API. */
 async function start() {
   assertRuntimeConfiguration();
@@ -41,28 +44,32 @@ async function start() {
       log.warn('SESSION_SECRET is not set. Using a development-only secret.');
     }
   });
+  // Outlive Nginx's idle upstream connections (60 s), so it never reuses a socket Node just closed.
+  server.keepAliveTimeout = 65_000;
+  server.headersTimeout = 66_000;
   let stopping = false;
-  const shutdown = () => {
+  shutdown = (code) => {
     if (stopping) return;
     stopping = true;
     endLiveQuoteStreams();
     server.close(() => {
-      void disconnectDatabase().finally(() => process.exit(0));
+      void disconnectDatabase().finally(() => process.exit(code));
     });
     setTimeout(() => process.exit(1), 30_000).unref();
   };
-  process.once('SIGTERM', shutdown);
-  process.once('SIGINT', shutdown);
+  process.once('SIGTERM', () => shutdown(0));
+  process.once('SIGINT', () => shutdown(0));
 }
 
-// A crash leaves the process in an unknown state: log it and let PM2/Docker restart it.
+// A crash leaves the process in an unknown state: log it, finish the requests in flight and let
+// PM2/Docker restart it.
 process.on('unhandledRejection', (reason) => {
   log.error('Unhandled promise rejection', { reason: reason?.stack ?? String(reason) });
-  process.exit(1);
+  shutdown(1);
 });
 process.on('uncaughtException', (error) => {
   log.error('Uncaught exception', { reason: error?.stack ?? String(error) });
-  process.exit(1);
+  shutdown(1);
 });
 
 start().catch((error) => {
