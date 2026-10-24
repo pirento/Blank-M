@@ -125,4 +125,36 @@ describe('shared live feed', () => {
     stopWatching();
     feed.stop();
   }, 20_000);
+
+  it('reconnects when the login changes in the admin panel and goes idle when it is cleared', async () => {
+    const sockets = [];
+    class FakeSocket {
+      constructor(url) {
+        this.url = url;
+        this.readyState = 1;
+        sockets.push(this);
+      }
+      send() {}
+      close() {
+        this.readyState = 3;
+      }
+    }
+    const feed = startTrueDataFeed({ WebSocketImpl: FakeSocket });
+    try {
+      // The settings refresh copies a new panel value into process.env.
+      process.env.TRUEDATA_PASSWORD = 'td-new-pass';
+      await vi.waitFor(() => expect(sockets[1]?.url).toContain('password=td-new-pass'), {
+        timeout: 10_000,
+      });
+      expect(sockets[0].readyState).toBe(3);
+      delete process.env.TRUEDATA_USER;
+      await vi.waitFor(() => expect(sockets[1].readyState).toBe(3), { timeout: 10_000 });
+      // Past the 2 s reconnect delay: no login, so no new connection.
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+      expect(sockets).toHaveLength(2);
+    } finally {
+      feed.stop();
+      Object.assign(process.env, { TRUEDATA_USER: 'td-user', TRUEDATA_PASSWORD: 'td-pass' });
+    }
+  }, 30_000);
 });

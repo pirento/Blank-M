@@ -14,9 +14,15 @@ import { AccessRequest, AdminAuditLog, ProblemReport, Trade, User } from '../mod
 import { isDatabaseConnected, nativeDb } from '../config/database.js';
 import { HttpError } from '../services/errors.js';
 import { hasOpenAiKey } from '../services/ai/openai-key.js';
-import { isMailConfigured } from '../services/mailer.js';
+import { isMailConfigured, sendMail } from '../services/mailer.js';
 import { isKiteConfigured } from '../services/market/index.js';
-import { isTelegramConfigured } from '../services/telegram/api.js';
+import {
+  isTelegramConfigured,
+  registerTelegramWebhook,
+  telegramBot,
+} from '../services/telegram/api.js';
+import { reserveAttempts } from '../services/rate-window.js';
+import { recordAdminAction } from '../services/admin/audit.js';
 import { isPushConfigured } from '../services/notifications/push.js';
 import { checkKeys, isRazorpayConfigured } from '../services/billing/razorpay.js';
 import { PREMIUM_FEATURES, loadPlan, publicPlan, savePlan } from '../services/billing/plan.js';
@@ -214,6 +220,50 @@ export async function getSettings(_req, res) {
 export async function saveSettings(req, res) {
   const changes = req.body?.changes;
   res.json({ groups: await savePlatformSettings(actorOf(req), changes) });
+}
+
+/** The Integrations test buttons reach outside services: 10 an hour per administrator. */
+async function reserveIntegrationTest(req) {
+  const quota = await reserveAttempts(
+    [{ key: `admin-integration-test:${req.member.userId}`, limit: 10 }],
+    60 * 60_000,
+  );
+  if (!quota.allowed) throw new HttpError('Too many tests. Try again in an hour.', 429);
+}
+
+/** POST /api/admin/integrations/test-email: emails the signed-in administrator over SMTP. */
+export async function sendTestEmail(req, res) {
+  await reserveIntegrationTest(req);
+  const to = req.member.user.email;
+  await sendMail({
+    to,
+    subject: 'Pirento Blank test email',
+    text: 'This test email from the admin panel → Integrations shows that email delivery works.',
+  });
+  await recordAdminAction({ user: actorOf(req) }, 'integration.test-email', to);
+  res.json({ ok: true, to });
+}
+
+/** POST /api/admin/integrations/telegram-check: asks Telegram which bot the saved token belongs to. */
+export async function checkTelegramBot(req, res) {
+  if (!process.env.TELEGRAM_BOT_TOKEN?.trim()) throw new HttpError('Add the bot token first.', 409);
+  await reserveIntegrationTest(req);
+  const bot = await telegramBot().catch(() => {
+    throw new HttpError('Telegram did not accept the bot token, or could not be reached.', 502);
+  });
+  await recordAdminAction({ user: actorOf(req) }, 'integration.telegram-check', bot.username);
+  res.json({ ok: true, username: bot.username });
+}
+
+/** POST /api/admin/integrations/telegram-webhook: points the bot at this server. */
+export async function setTelegramWebhookHandler(req, res) {
+  await reserveIntegrationTest(req);
+  const url = await registerTelegramWebhook().catch((error) => {
+    if (error instanceof HttpError) throw error;
+    throw new HttpError('Telegram did not accept the webhook, or could not be reached.', 502);
+  });
+  await recordAdminAction({ user: actorOf(req) }, 'integration.telegram-webhook', url);
+  res.json({ ok: true, url });
 }
 
 /* ------------------------------------- billing ------------------------------------- */

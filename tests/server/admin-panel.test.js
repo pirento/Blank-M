@@ -189,6 +189,108 @@ describe('admin panel', () => {
     expect(process.env.KITE_API_KEY).toBe('from-env-file');
     await admin.send('put', '/api/admin/settings', { changes: { OPENAI_API_KEY: '' } });
     expect(process.env.OPENAI_API_KEY).toBeUndefined();
+
+    // The older BLANK_OPENAI_API_KEY name in .env, which the AI features also read, counts as set.
+    process.env.BLANK_OPENAI_API_KEY = 'sk-alias-abcdefghijklmnopqrstuvwxyz9876';
+    try {
+      const listed = (await admin.agent.get('/api/admin/settings')).body.groups
+        .flatMap((group) => group.settings)
+        .find((setting) => setting.key === 'OPENAI_API_KEY');
+      expect(listed).toMatchObject({ source: 'env', value: null, hint: '9876' });
+    } finally {
+      delete process.env.BLANK_OPENAI_API_KEY;
+    }
+  });
+
+  it('sends a test email and checks the Telegram bot from Integrations, ten tests an hour', async () => {
+    const admin = await adminSession();
+    const test = (name) => admin.send('post', `/api/admin/integrations/${name}`, {});
+    expect((await test('test-email')).body).toEqual({ ok: true, to: 'admin@example.com' });
+    expect(mails.at(-1)).toMatchObject({
+      to: 'admin@example.com',
+      subject: 'Pirento Blank test email',
+    });
+
+    expect((await test('telegram-check')).status).toBe(409);
+    Object.assign(process.env, {
+      TELEGRAM_BOT_TOKEN: '123:token',
+      TELEGRAM_BOT_USERNAME: 'blank_bot',
+      TELEGRAM_WEBHOOK_SECRET: 'w'.repeat(32),
+    });
+    const telegram = [];
+    const fallback = globalThis.fetch;
+    globalThis.fetch = vi.fn(async (url, options) => {
+      if (!String(url).startsWith('https://api.telegram.org/')) return fallback(url, options);
+      const method = String(url).split('/').at(-1);
+      telegram.push({ method, body: JSON.parse(options.body) });
+      return Response.json({
+        ok: true,
+        result: method === 'getMe' ? { username: 'blank_bot' } : true,
+      });
+    });
+    try {
+      expect((await test('telegram-check')).body).toEqual({ ok: true, username: 'blank_bot' });
+      // Telegram only calls HTTPS webhooks.
+      expect((await test('telegram-webhook')).status).toBe(409);
+      process.env.APP_URL = 'https://blank.test';
+      const hook = await test('telegram-webhook');
+      expect(hook.body).toEqual({ ok: true, url: 'https://blank.test/api/telegram/webhook' });
+      expect(telegram.at(-1)).toMatchObject({
+        method: 'setWebhook',
+        body: { url: 'https://blank.test/api/telegram/webhook', secret_token: 'w'.repeat(32) },
+      });
+      expect(await AdminAuditLog.distinct('action')).toEqual(
+        expect.arrayContaining([
+          'integration.telegram-check',
+          'integration.telegram-webhook',
+          'integration.test-email',
+        ]),
+      );
+      // Four tests so far; six more are allowed this hour, then they are refused.
+      for (let used = 4; used < 10; used += 1) expect((await test('test-email')).status).toBe(200);
+      expect((await test('test-email')).status).toBe(429);
+    } finally {
+      process.env.APP_URL = 'http://blank.test';
+      for (const key of ['TELEGRAM_BOT_TOKEN', 'TELEGRAM_BOT_USERNAME', 'TELEGRAM_WEBHOOK_SECRET'])
+        delete process.env[key];
+    }
+  });
+
+  it('restores a suspended member, who signs in again; an invitation goes back to invited', async () => {
+    const admin = await adminSession();
+    const created = await createMember({ email: 'leaver@example.com' });
+    const body = { email: 'leaver@example.com', userId: created.user._id };
+    const signInLeaver = () =>
+      signIn(app, { email: 'leaver@example.com', password: created.password });
+    expect((await admin.send('post', '/api/admin/users/restore', body)).status).toBe(409);
+    expect((await admin.send('post', '/api/admin/users/revoke', body)).status).toBe(200);
+    await expect(signInLeaver()).rejects.toThrow(/login failed/);
+
+    expect((await admin.send('post', '/api/admin/users/restore', body)).body).toEqual({
+      ok: true,
+      status: 'active',
+    });
+    await signInLeaver();
+    const users = (await admin.agent.get('/api/admin/users')).body.users;
+    expect(users.find((user) => user.email === 'leaver@example.com')).toMatchObject({
+      status: 'active',
+      revokedAt: null,
+      authBanPending: false,
+    });
+    expect(
+      await AdminAuditLog.exists({ action: 'member.restore', target: body.email }),
+    ).toBeTruthy();
+
+    // A revoked invitation that was never activated can be resent once restored.
+    const invite = { email: 'new@example.com' };
+    expect((await admin.send('post', '/api/admin/users/invite', invite)).status).toBe(201);
+    await admin.send('post', '/api/admin/users/revoke', invite);
+    expect((await admin.send('post', '/api/admin/users/resend', invite)).status).toBe(409);
+    expect((await admin.send('post', '/api/admin/users/restore', invite)).body).toEqual({
+      ok: true,
+      status: 'invited',
+    });
+    expect((await admin.send('post', '/api/admin/users/resend', invite)).status).toBe(200);
   });
 
   it('needs a one-time setup code before an administrator adds a first authenticator', async () => {
@@ -753,7 +855,7 @@ describe('Google sign-in', () => {
     forgetPlanCache();
     const visitor = supertest.agent(app);
     expect(await googleRoundTrip(visitor, { email: 'New@Gmail.com' })).toBe('/dashboard');
-    expect((await visitor.get('/api/workspace')).status).toBe(200);
+    expect((await visitor.get('/api/account/export')).status).toBe(200);
     await vi.waitFor(() => expect(mails.at(-1)?.subject).toBe('Welcome to Pirento Blank'));
 
     // The admin sign-in with Google refuses a member and lets an administrator through.
@@ -777,6 +879,18 @@ describe('Google sign-in', () => {
     ).toBe('/admin');
   });
 
+  /** Answers Google's token endpoint with `answer` (a bogus code is all a settings check sends). */
+  function googleTokenAnswer(answer) {
+    const fallback = globalThis.fetch;
+    const checks = [];
+    globalThis.fetch = vi.fn(async (url, options) => {
+      if (String(url) !== 'https://oauth2.googleapis.com/token') return fallback(url, options);
+      checks.push(Object.fromEntries(new URLSearchParams(String(options.body))));
+      return answer();
+    });
+    return checks;
+  }
+
   it('never saves settings that would switch off Google sign-in', async () => {
     const admin = await adminSession();
     const refused = await admin.send('put', '/api/admin/settings', {
@@ -784,15 +898,50 @@ describe('Google sign-in', () => {
     });
     expect(refused.status).toBe(409);
     expect(refused.body.error).toMatch(/only way administrators sign in/);
-    // Clearing the panel value falls back to the .env one, and a new client ID is fine.
+    // Clearing the panel value falls back to the .env one, and a new client ID is fine once
+    // Google confirms the pair (a right ID and secret with a bogus code get invalid_grant).
+    const checks = googleTokenAnswer(() =>
+      Response.json({ error: 'invalid_grant' }, { status: 400 }),
+    );
     expect(
       (await admin.send('put', '/api/admin/settings', { changes: { GOOGLE_CLIENT_ID: '' } }))
         .status,
     ).toBe(200);
+    expect(checks).toHaveLength(0);
     expect(
       (await admin.send('put', '/api/admin/settings', { changes: { GOOGLE_CLIENT_ID: 'new-id' } }))
         .status,
     ).toBe(200);
+    expect(checks).toEqual([
+      {
+        grant_type: 'authorization_code',
+        code: 'settings-check',
+        client_id: 'new-id',
+        client_secret: 'client-secret',
+        redirect_uri: 'http://blank.test/auth/google/callback',
+      },
+    ]);
+  });
+
+  it('refuses a Google client ID and secret that Google rejects, or cannot check', async () => {
+    const admin = await adminSession();
+    googleTokenAnswer(() => Response.json({ error: 'invalid_client' }, { status: 401 }));
+    const wrong = await admin.send('put', '/api/admin/settings', {
+      changes: { GOOGLE_CLIENT_SECRET: 'mistyped-secret' },
+    });
+    expect(wrong.status).toBe(409);
+    expect(wrong.body.error).toMatch(/Google rejected this client ID and secret/);
+    expect(process.env.GOOGLE_CLIENT_SECRET).toBe('client-secret');
+    expect(await PlatformSetting.exists({ _id: 'GOOGLE_CLIENT_SECRET' })).toBeNull();
+
+    googleTokenAnswer(() => {
+      throw new TypeError('fetch failed');
+    });
+    const offline = await admin.send('put', '/api/admin/settings', {
+      changes: { GOOGLE_CLIENT_SECRET: 'another-secret' },
+    });
+    expect(offline.status).toBe(503);
+    expect(process.env.GOOGLE_CLIENT_SECRET).toBe('client-secret');
   });
 
   it('lets a Google-only member add a password only right after a Google sign-in', async () => {

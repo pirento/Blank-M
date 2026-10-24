@@ -8,6 +8,7 @@ import { checkAllAlerts } from '../services/notifications/price-alerts.js';
 import { authorizeMaintenance } from '../services/maintenance/authorize.js';
 import { requireMethod } from '../services/http.js';
 import { placePendingAutoGtts } from '../services/broker/live-orders.js';
+import { reserveAttempts } from '../services/rate-window.js';
 
 /** GET /api/paper: open and recent closed paper trades, with a summary of the closed ones. */
 export async function list(req, res) {
@@ -39,17 +40,23 @@ export async function remove(req, res) {
 }
 
 /**
- * POST /api/maintenance/price-checks: closes paper trades whose stop or target
- * was crossed, fires price alerts and places automatic stop/target GTTs for
- * filled live orders.
+ * POST /api/maintenance/price-checks: places automatic stop/target GTTs for
+ * filled live orders, closes paper trades whose stop or target was crossed and
+ * fires price alerts. At most one run starts every 4 minutes (the job runs every 5).
  */
 export async function runPriceChecks(req, res) {
   res.setHeader('Cache-Control', 'private, no-store');
   if (!requireMethod(req, res, 'POST')) return;
   if (!authorizeMaintenance(req, res)) return;
-  res.json({
-    paper: await paper.checkAllPaperTrades(),
-    alerts: await checkAllAlerts(),
-    autoGtt: await placePendingAutoGtts(),
-  });
+  const slot = await reserveAttempts([{ key: 'job:price-checks', limit: 1 }], 4 * 60_000);
+  if (!slot.allowed) {
+    res.json({
+      skipped: true,
+      reason: 'A price check is already running (started under 4 minutes ago).',
+    });
+    return;
+  }
+  // Real-money stops and targets first; paper trades and alerts can wait.
+  const autoGtt = await placePendingAutoGtts();
+  res.json({ paper: await paper.checkAllPaperTrades(), alerts: await checkAllAlerts(), autoGtt });
 }

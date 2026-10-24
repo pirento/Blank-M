@@ -1,10 +1,12 @@
 // @vitest-environment node
 import { randomUUID } from 'node:crypto';
+import mongoose from 'mongoose';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createMember, resetDatabase, signIn, startTestApp, stopTestApp } from '../helpers/app.js';
 import { computeTradeEconomics } from '../../shared/pnl.js';
 import { rMultiple } from '../../shared/trade-tags.js';
 import { DEFAULT_CHARGES } from '../../shared/types.js';
+import { User } from '../../models/index.js';
 
 let app;
 beforeAll(async () => {
@@ -83,9 +85,9 @@ describe('trades', () => {
     const owner = await member('owner@example.com');
     const other = await member('other@example.com');
     const { trade } = (await owner.send('post', '/api/trades', TRADE)).body;
-    expect((await other.agent.get('/api/workspace')).body.trades).toEqual([]);
+    expect((await other.agent.get('/api/account/export')).body.trades).toEqual([]);
     expect((await other.send('delete', `/api/trades/${trade.id}`)).status).toBe(404);
-    expect((await owner.agent.get('/api/workspace')).body.trades).toHaveLength(1);
+    expect((await owner.agent.get('/api/account/export')).body.trades).toHaveLength(1);
   });
 
   it('imports idempotently by stable row ID', async () => {
@@ -109,7 +111,7 @@ describe('trades', () => {
       trade: { ...row, pnl: row.pnl + 1 },
     });
     expect(tampered.status).toBe(409);
-    expect((await agent.get('/api/workspace')).body.trades).toHaveLength(1);
+    expect((await agent.get('/api/account/export')).body.trades).toHaveLength(1);
 
     // An option row from a CSV import (segment and option type from the contract name).
     const option = { ...TRADE, symbol: 'NIFTY26OCT24500CE', segment: 'OPT', optionType: 'CE' };
@@ -126,10 +128,29 @@ describe('trades', () => {
       },
     });
     expect(imported.body).toMatchObject({ result: 'inserted' });
-    const saved = (await agent.get('/api/workspace')).body.trades.find(
+    const saved = (await agent.get('/api/account/export')).body.trades.find(
       (trade) => trade.symbol === 'NIFTY26OCT24500CE',
     );
     expect(saved).toMatchObject({ segment: 'OPT', optionType: 'CE' });
+  });
+
+  it('loads only what each page reads: notes where shown, the balance alone as a sum', async () => {
+    const { send, agent } = await member();
+    await send('post', '/api/trades', TRADE);
+    await send('post', '/api/trades', { ...TRADE, exitPrice: 1490, notes: 'stopped out' });
+    const pageData = async (path) =>
+      JSON.parse(/id="page-data">([^<]*)<\/script>/.exec((await agent.get(path)).text)[1])
+        .workspace;
+    const journal = await pageData('/journal');
+    const dashboard = await pageData('/dashboard');
+    const calculator = await pageData('/calculator');
+    expect(journal.trades.map((trade) => trade.notes).sort()).toEqual(['breakout', 'stopped out']);
+    expect(dashboard.trades.map((trade) => trade.notes)).toEqual(['', '']);
+    expect(dashboard.trades.map(({ id, pnl }) => ({ id, pnl }))).toEqual(
+      journal.trades.map(({ id, pnl }) => ({ id, pnl })),
+    );
+    expect(calculator.trades).toBeUndefined();
+    expect(calculator.portfolioBalance).toBe(dashboard.portfolioBalance);
   });
 });
 
@@ -145,7 +166,7 @@ describe('strategies, rules, watchlist, chat and settings', () => {
     ).body;
     await send('post', '/api/trades', { ...TRADE, strategyId: strategy.id });
     expect((await send('delete', `/api/strategies/${strategy.id}`)).status).toBe(200);
-    const { trades, strategies } = (await agent.get('/api/workspace')).body;
+    const { trades, strategies } = (await agent.get('/api/account/export')).body;
     expect(strategies).toEqual([]);
     expect(trades[0].strategyId).toBeNull();
   });
@@ -173,13 +194,13 @@ describe('strategies, rules, watchlist, chat and settings', () => {
       openingBalance: 250000,
       charges: { enabled: false },
     });
-    const workspace = (await agent.get('/api/workspace')).body;
+    const workspace = (await agent.get('/api/account/export')).body;
     expect(workspace.rules).toHaveLength(1);
     expect(workspace.watchlist.map((item) => item.symbol)).toEqual(['TCS']);
     expect(workspace.chatMessages).toHaveLength(1);
-    expect(workspace.portfolioBalance).toBe(250000);
+    expect(workspace.settings.openingBalance).toBe(250000);
     expect((await send('delete', '/api/chat/messages')).status).toBe(200);
-    expect((await agent.get('/api/workspace')).body.chatMessages).toEqual([]);
+    expect((await agent.get('/api/account/export')).body.chatMessages).toEqual([]);
   });
 
   it('claims a username once and allows sign-in with it', async () => {
@@ -267,14 +288,38 @@ describe('trade screenshots', () => {
     const image = await owner.agent.get(`/api/trades/${trade.id}/screenshot`);
     expect(image.status).toBe(200);
     expect(image.headers['content-type']).toMatch(/^image\/png/);
+    expect(image.headers['cache-control']).toBe('private, no-cache');
+    expect(Buffer.compare(image.body, PNG)).toBe(0);
+    const revalidate = (etag) =>
+      owner.agent.get(`/api/trades/${trade.id}/screenshot`).set('If-None-Match', etag);
+    expect((await revalidate(image.headers.etag)).status).toBe(304);
 
     const other = await member('other@example.com');
     expect((await other.agent.get(`/api/trades/${trade.id}/screenshot`)).status).toBe(404);
 
     expect((await upload()).status).toBe(201);
+    // A replaced image has a new ETag, so the cached one is not reused.
+    expect((await revalidate(image.headers.etag)).status).toBe(200);
     const removed = await owner.send('delete', `/api/trades/${trade.id}/screenshot`);
     expect(removed.body.trade.hasScreenshot).toBe(false);
     expect((await owner.agent.get(`/api/trades/${trade.id}/screenshot`)).status).toBe(404);
+  });
+
+  it('refuses a screenshot beyond the 500 MB per member', async () => {
+    const owner = await member();
+    const { trade } = (await owner.send('post', '/api/trades', TRADE)).body;
+    const { _id: userId } = await User.findOne({ email: 'member@example.com' }).lean();
+    await mongoose.connection.db.collection('tradeScreenshots.files').insertOne({
+      filename: `${userId}/old/file`,
+      length: 500 * 1024 * 1024,
+      uploadDate: new Date(),
+    });
+    const response = await owner.agent
+      .post(`/api/trades/${trade.id}/screenshot`)
+      .set('X-CSRF-Token', owner.csrf)
+      .attach('file', PNG, { filename: 'chart.png', contentType: 'image/png' });
+    expect(response.status).toBe(413);
+    expect(response.body.error).toMatch(/500 MB/);
   });
 
   it('rejects files that are not images', async () => {

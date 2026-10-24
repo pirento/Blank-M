@@ -30,12 +30,17 @@ Copy `.env.example` to `.env` on the server and set at least:
 | `APP_URL`        | Your public HTTPS address, e.g. `https://blank.example.com`                                                             |
 | `MONGODB_URI`    | Connection string                                                                                                       |
 | `SESSION_SECRET` | 32+ random characters: `openssl rand -base64 48`. Changing it signs everyone out and invalidates authenticator secrets. |
-| `TRUST_PROXY`    | `true` behind Nginx / a load balancer / Hostinger's proxy                                                               |
+| `TRUST_PROXY`    | `true` behind Nginx or Hostinger's proxy; the number of proxies (e.g. `2`) when a load balancer sits in front of Nginx  |
 | `CRON_SECRET`    | 32+ random characters, for the scheduled jobs                                                                           |
 
 Optional: `OPENAI_API_KEY` (AI features), `SMTP_*` (email invitations, password reset email, weekly
 reports, alert emails), `VAPID_*` (push notifications), `GOOGLE_*` (Google sign-in for invited addresses), `KITE_*` and
 `BROKER_TOKEN_ENCRYPTION_KEY` (Zerodha), `LIVE_TRADING_*` (see section 6).
+
+Most API keys can instead be entered in the **admin panel → Integrations** (`/admin/integrations`):
+OpenAI, Zerodha Kite, Upstox, Fyers, Razorpay, SMTP, Telegram, Google sign-in, push (VAPID),
+TrueData and the business details on the legal pages. A value saved there wins over `.env` and
+reaches every server process within a minute. Keep `BROKER_TOKEN_ENCRYPTION_KEY` in `.env`.
 
 ### Without email (SMTP)
 
@@ -117,6 +122,9 @@ docker compose up -d --build
 docker compose exec -e ADMIN_EMAIL=you@example.com app node scripts/create-admin.js
 ```
 
+Compose also runs the live market data feed (`feed`, `node scripts/market-feed.js`); it stays idle
+until a TrueData login is set in the admin panel → Integrations.
+
 The app listens on `127.0.0.1:3000`; put Nginx with HTTPS in front of it (step A5). MongoDB data is
 kept in the `mongo-data` volume; Compose points the app at its own MongoDB, so `MONGODB_URI` in `.env`
 is overridden. Back it up with `docker compose exec mongo mongodump --archive > blank.archive`.
@@ -140,16 +148,22 @@ matter.
 Copy `deploy/crontab.example` into `crontab -e` and adjust the path:
 
 - **Daily** — `node scripts/maintenance-voice-notes.js` removes temporary voice-note uploads older
-  than 24 hours.
+  than 24 hours and chart screenshot files no trade uses any more.
 - **Daily** — `node scripts/maintenance-signups.js` deletes public sign-ups whose email was never
   confirmed within 7 days (connects to MongoDB directly; admin invitations are never touched).
+- **Daily** — `node scripts/billing-reminders.js` emails members whose free trial ends within 3
+  days, once per trial (connects to MongoDB directly).
 - **Monday morning** — `node scripts/send-weekly-reports.js` emails last week's report to members who
   opted in (Settings → Email reports). Each member gets one email per week; re-running is safe.
-
+- **Weekday mornings (08:00 IST)** — `node scripts/premarket-plan.js` sends the pre-market plan on
+  Telegram to members who turned it on (skips NSE holidays, does nothing after 09:15 IST).
 - **Every 5 minutes in market hours** — `node scripts/price-checks.js` closes paper trades whose stop
-  or target was crossed and fires price alerts.
+  or target was crossed, fires price alerts and places the automatic stop/target GTTs (section 6).
+- **Weekdays after the close (16:15 IST)** — `node scripts/daily-import.js` adds today's Zerodha,
+  Dhan, Upstox, Fyers and Angel One fills to the journal of members who turned on "Daily automatic
+  journal", with the day's summary on Telegram.
 
-All of them call the running server with `Authorization: Bearer $CRON_SECRET`.
+The others call the running server with `Authorization: Bearer $CRON_SECRET`.
 
 ### Telegram bot (optional)
 
@@ -205,6 +219,31 @@ profile endpoint, stored encrypted with `BROKER_TOKEN_ENCRYPTION_KEY` and used r
 today's fills into the journal. Dhan tokens expire (usually after a day); members paste a new one
 when Settings says it has expired.
 
+### Upstox, Fyers and Angel One (optional)
+
+Upstox and Fyers log in over OAuth through one platform app each: create the app with the broker,
+register `https://<your-domain>/api/upstox/callback` or `https://<your-domain>/api/fyers/callback`
+as its redirect URL, and enter its keys in the admin panel → Integrations. Angel One needs no server
+setup: each member enters their own SmartAPI details in Settings → Angel One. All three are
+read-only and bring fills into the journal; balance, holdings and live orders are Zerodha only.
+
+### Live market data (TrueData, optional)
+
+With a TrueData login in the admin panel → Integrations → Live market data, quotes, charts and live
+prices come from TrueData first (then Zerodha, then Yahoo). TrueData allows one connection per
+login, so a separate process holds it: `pm2 start ecosystem.config.cjs` starts it as
+**`pirento-feed`** next to `pirento-blank` (`pm2 logs pirento-feed`). It stays idle until a login is
+set. Docker Compose and the managed host (path C) do not start it; run `node scripts/market-feed.js`
+there as one extra long-running process. When billing is on and live prices are Premium, free
+members get delayed Yahoo prices instead.
+
+### Payments (Razorpay, optional)
+
+Enter the Razorpay key ID, key secret and webhook secret in the admin panel → Integrations, add the
+webhook `https://<your-domain>/api/billing/razorpay/webhook` (subscription events) in the Razorpay
+Dashboard, then set the price and switch billing on in the admin panel → Plans & billing.
+Members subscribe and cancel on the Billing page. `START-HERE.md` has a test-mode checklist.
+
 ## 6. Live orders (real money)
 
 Live orders are **off** by default. To allow them:
@@ -217,15 +256,18 @@ Live orders are **off** by default. To allow them:
 
 An order is then sent only for a **reviewed, synced plan**, only while the market is open, only once
 per plan, and only after the member types the symbol to confirm. It is a regular **DAY LIMIT** order
-at the plan's entry price on NSE; the planned stop and target are **not** placed automatically.
-Every attempt is recorded (placed, rejected or unknown) and shown on the Order review page. Test with
-a small quantity first.
+at the plan's entry price on NSE. Every attempt is recorded (placed, rejected or unknown) and shown
+on the Order review page. Test with a small quantity first.
 
-For a **delivery (CNC) buy**, once Zerodha reports it completely filled, the Order review page offers
-**Place stop & target (GTT)**: one GTT that sells the filled quantity at the plan's stop-loss (as a
-LIMIT 0.5% below the trigger) or at its target, whichever comes first. Both triggers must be at least
-0.25% from the current price, and the symbol must be typed to confirm. Zerodha GTTs do not support
-intraday (MIS) positions, so MIS orders need their stop placed in Kite.
+For a **delivery (CNC) buy** with a stop-loss, the stop and target are placed **automatically**: the
+order dialog's "Place my stop-loss … on Zerodha as soon as this order fills" box is ticked by
+default, and the price-checks job (section 4) places the GTT once Zerodha reports the entry
+completely filled, then sends the outcome on Telegram. With the box unticked, the Order review page
+offers **Place stop & target (GTT)** once filled (the symbol must be typed to confirm). Either way it
+is one GTT that sells the filled quantity at the plan's stop-loss (as a LIMIT 0.5% below the
+trigger) or at its target, whichever comes first; both triggers must be at least 0.25% from the
+current price. Zerodha GTTs do not support intraday (MIS) positions, so MIS orders need their stop
+placed in Kite.
 
 ## 7. Health check and logs
 

@@ -75,7 +75,7 @@ describe('Zerodha fills to journal', () => {
     expect(second.body).toMatchObject({ added: [], skipped: 1 });
     const again = await session.agent.get('/api/kite/fills');
     expect(again.body.candidates[0].alreadyInJournal).toBe(true);
-    const ledger = await session.agent.get('/api/workspace');
+    const ledger = await session.agent.get('/api/account/export');
     expect(ledger.body.trades).toHaveLength(1);
   });
 

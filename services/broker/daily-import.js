@@ -8,6 +8,7 @@ import { AccountSettings, User } from '../../models/index.js';
 import { MARKET_CLOSE_MINUTE, getMarketStatus, toIst } from '../../shared/market.js';
 import { accessProblem } from '../auth/accounts.js';
 import { hasFeature } from '../billing/membership.js';
+import { inBatches } from '../batches.js';
 import { HttpError } from '../errors.js';
 import { createLogger, errorName } from '../logger.js';
 import { activeConnection } from '../market/kite/connection.js';
@@ -95,11 +96,13 @@ export async function runDailyImports({ now = new Date(), limit = 25 } = {}) {
   let failed = 0;
   let outOfTime = false;
   const started = Date.now();
-  for (const settings of due) {
-    // Slow broker days: stop well before the proxy's 180 s timeout; the next call continues.
+  // Five members at a time: each claim below is atomic, so parallel work never imports twice.
+  await inBatches(due, 5, async (settings) => {
+    // Slow broker days: stop well before the proxy's 180 s timeout; the next call continues
+    // with the members not claimed yet.
     if (Date.now() - started > BATCH_BUDGET_MS) {
       outOfTime = true;
-      break;
+      return;
     }
     // Claim the day first: a member skipped or failing below must not hold a place in every later
     // batch (which would starve everyone after the first `limit` members).
@@ -107,7 +110,7 @@ export async function runDailyImports({ now = new Date(), limit = 25 } = {}) {
       { _id: settings._id, dailyAutoImportFor: { $ne: today } },
       { $set: { dailyAutoImportFor: today } },
     );
-    if (!claim.modifiedCount) continue;
+    if (!claim.modifiedCount) return;
     const user = await User.findById(settings._id);
     // Free members on a billed platform keep the setting but are not imported for.
     if (
@@ -116,7 +119,7 @@ export async function runDailyImports({ now = new Date(), limit = 25 } = {}) {
       !(await hasFeature(user, 'brokers', { startTrial: false }))
     ) {
       skipped += 1;
-      continue;
+      return;
     }
     try {
       const lines = await importForMember(user);
@@ -127,7 +130,7 @@ export async function runDailyImports({ now = new Date(), limit = 25 } = {}) {
       log.warn('daily import run failed', { error: errorName(error) });
       failed += 1;
     }
-  }
+  });
   return {
     ran: true,
     date: today,

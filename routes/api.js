@@ -117,6 +117,18 @@ router.post('/billing/cancel', requireApiAuth, wrap(billing.cancel));
 router.get('/admin/overview', requireApiAdmin, wrap(adminPanel.overview));
 router.get('/admin/settings', requireApiAdmin, wrap(adminPanel.getSettings));
 router.put('/admin/settings', requireApiAdmin, requireAdminMfa, wrap(adminPanel.saveSettings));
+router.post('/admin/integrations/test-email', requireApiAdmin, wrap(adminPanel.sendTestEmail));
+router.post(
+  '/admin/integrations/telegram-check',
+  requireApiAdmin,
+  wrap(adminPanel.checkTelegramBot),
+);
+router.post(
+  '/admin/integrations/telegram-webhook',
+  requireApiAdmin,
+  requireAdminMfa,
+  wrap(adminPanel.setTelegramWebhookHandler),
+);
 router.get('/admin/billing', requireApiAdmin, wrap(adminPanel.getBilling));
 router.put('/admin/billing', requireApiAdmin, requireAdminMfa, wrap(adminPanel.saveBilling));
 router.post('/admin/billing/check-keys', requireApiAdmin, wrap(adminPanel.checkRazorpayKeys));
@@ -144,6 +156,7 @@ router.get('/admin/users', wrap(admin.handleListUsers));
 router.post('/admin/users/invite', wrap(admin.handleInviteUser));
 router.post('/admin/users/resend', wrap(admin.handleResendInvite));
 router.post('/admin/users/revoke', wrap(admin.handleRevokeUser));
+router.post('/admin/users/restore', wrap(admin.handleRestoreUser));
 router.post('/admin/users/reset-link', wrap(admin.handleCreateResetLink));
 router.get('/admin/access-requests', wrap(admin.handleListAccessRequests));
 router.post('/admin/access-requests/:id', wrap(admin.handleDecideAccessRequest));
@@ -163,7 +176,6 @@ router.post('/admin/ai/test', wrap(adminAi.handleTestAiConfig));
 router.all('/invitations/accept', wrap(manualInvitations.handleAcceptManualInvitation));
 
 /* ------------------------------- member workspace ----------------------------- */
-router.get('/workspace', requireApiAuth, wrap(workspace.snapshot));
 router.post('/trades', requireApiAuth, wrap(workspace.createTrade));
 router.post('/trades/import', requireApiAuth, wrap(workspace.importTrade));
 router.put('/trades/:id', requireApiAuth, wrap(workspace.updateTrade));
@@ -215,6 +227,7 @@ router.put('/settings/language', requireApiAuth, wrap(workspace.saveLanguage));
 router.get('/account/sessions', requireApiAuth, wrap(account.listSessions));
 router.post('/account/sessions/revoke', requireApiAuth, wrap(account.revokeSession));
 router.post('/account/sessions/revoke-others', requireApiAuth, wrap(account.revokeOtherSessions));
+router.post('/account/delete', requireApiAuth, wrap(account.deleteAccount));
 router.get('/account/export', requireApiAuth, wrap(account.exportBackup));
 router.post('/account/restore', requireApiAuth, account.backupFile, wrap(account.importBackup));
 router.get('/account/notifications', requireApiAuth, wrap(account.getNotifications));

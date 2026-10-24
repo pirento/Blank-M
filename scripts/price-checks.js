@@ -1,7 +1,7 @@
 /**
- * Scheduled price checks: closes paper trades whose stop or target was crossed
- * (and, once configured, fires price alerts). Run every few minutes during
- * market hours.
+ * Scheduled price checks: closes paper trades whose stop or target was crossed,
+ * fires price alerts and places the automatic stop/target GTTs for filled live
+ * orders. Run every few minutes during market hours.
  *
  * Usage:
  *   APP_URL=https://blank.example.com CRON_SECRET=... node scripts/price-checks.js

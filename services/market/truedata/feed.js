@@ -20,6 +20,12 @@ const SYNC_MS = 3000;
 const SILENCE_MS = 20_000; // TrueData sends a heartbeat about every 5 s
 const MAX_SYMBOLS = 500;
 
+/** The login settings the connection is built from (changed in the admin panel at any time). */
+const loginSettings = () =>
+  ['TRUEDATA_USER', 'TRUEDATA_PASSWORD', 'TRUEDATA_PORT']
+    .map((key) => process.env[key]?.trim() ?? '')
+    .join('\n');
+
 /**
  * Prices in one TrueData message: `[{ symbol, price, at }]`. `ids` maps TrueData's symbol IDs to our
  * symbols and is filled from subscribe replies (trades carry only the ID).
@@ -55,6 +61,7 @@ export function startTrueDataFeed({ WebSocketImpl = globalThis.WebSocket } = {})
   let retryMs = 2000;
   // True once TrueData accepted the login on the current connection.
   let ready = false;
+  let login = '';
   const ids = new Map();
   const subscribed = new Set();
   const pending = new Map();
@@ -74,6 +81,7 @@ export function startTrueDataFeed({ WebSocketImpl = globalThis.WebSocket } = {})
     url.searchParams.set('user', process.env.TRUEDATA_USER.trim());
     url.searchParams.set('password', process.env.TRUEDATA_PASSWORD.trim());
     ready = false;
+    login = loginSettings();
     socket = new WebSocketImpl(url.toString());
     lastMessage = Date.now();
     socket.onopen = () => log.info('connected');
@@ -166,6 +174,11 @@ export function startTrueDataFeed({ WebSocketImpl = globalThis.WebSocket } = {})
       syncSymbols().catch((error) => log.warn('sync failed', { error: errorName(error) }));
       // No message (not even a heartbeat) for a while: the connection is dead; reconnect now.
       if (socket && Date.now() - lastMessage > SILENCE_MS) reconnect();
+      // The login changed in the admin panel: reconnect with it (or go idle when it was cleared).
+      if (socket && loginSettings() !== login) {
+        retryMs = 2000;
+        reconnect();
+      }
       // Tells web processes the feed is alive (they fall back to brokers when it is not).
       if (ready) {
         LiveQuote.updateOne(

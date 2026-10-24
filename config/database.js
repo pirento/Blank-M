@@ -25,7 +25,18 @@ export async function connectDatabase(uri = env.mongoUri) {
     });
   await connecting;
   await ensureSessionIndexes();
+  await ensureUploadIndexes();
   return mongoose.connection;
+}
+
+/**
+ * GridFS only indexes files by name. Upload cleanup and the screenshot sweep select them by upload
+ * time (services/storage.js expiredObjects).
+ */
+async function ensureUploadIndexes() {
+  for (const bucket of ['statements', 'voiceNotes', 'tradeScreenshots']) {
+    await mongoose.connection.db.collection(`${bucket}.files`).createIndex({ uploadDate: 1 });
+  }
 }
 
 /**

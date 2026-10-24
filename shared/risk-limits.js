@@ -5,12 +5,6 @@
  * daily loss or trade-count limit is reached, live orders are refused.
  */
 
-export const DEFAULT_RISK_LIMITS = Object.freeze({
-  dailyLossLimit: null,
-  maxTradesPerDay: null,
-  monthlyProfitGoal: null,
-});
-
 const MAX_AMOUNT = 1e12;
 
 function optionalAmount(value, label, errors, key) {

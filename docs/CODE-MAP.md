@@ -414,7 +414,7 @@ The admin panel's browser modules (one per page in `views/admin/`, plus `shell.j
 | `market-feed.js`             | The TrueData live feed process (PM2 app).            |
 | `dev-memory.js`              | Local preview without installing MongoDB             |
 | `daily-import.js`            | Scheduled daily automatic journal (after the close). |
-| `premarket-plan.js`          | Scheduled pre-market plan on Telegram (08:00 IST).   |
+| `premarket-plan.js`          | Scheduled pre-market plan on Telegram (07:30 IST).   |
 | `maintenance-voice-notes.js` | Scheduled voice-note cleanup (run daily from cron).  |
 | `send-weekly-reports.js`     | Scheduled weekly report emails.                      |
 

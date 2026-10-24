@@ -93,7 +93,7 @@ theek hone par "OK again". Chalu karne ke liye:
   shaam ~4:15 baje aaj ke Zerodha/Dhan/Upstox/Fyers/Angel One trades journal mein khud aa jaate hain aur din ka P&L
   Telegram par aata hai. Zerodha ke liye us din Blank mein Zerodha login hona chahiye.
 - **Pre-market plan Telegram par:** Settings → "Pre-market plan on Telegram" on kariye. Har trading
-  din subah 8 se 9:15 baje ke beech (market khulne se pehle) Telegram par chhota plan aata hai: watchlist, pichhle
+  din subah 7:30 se 9:15 baje ke beech (market khulne se pehle) Telegram par chhota plan aata hai: watchlist, pichhle
   din ka P&L, aapki baar-baar wali galtiyan, aapke rules aur aaj ki risk limits, aur AI key ho to
   4–6 focus points. Ye investment advice nahi hai. Server par cron line
   `scripts/premarket-plan.js` (`deploy/crontab.example`) lagani hogi.
@@ -165,7 +165,7 @@ cd /srv/blank && set -a && . ./.env && set +a && node scripts/admin-setup-code.j
 
 1. `rzp_test_` wali keys daaliye → Plans & billing → **Check keys** (keys galat hon to yahin bata deta hai).
 2. Plans & billing mein billing on, trial `0` din rakhiye (taaki turant charge ho), ek test member
-   banaiye aur Settings → Plan & billing → Subscribe.
+   banaiye aur menu mein **Billing** page (`/billing`) → Subscribe.
 3. Razorpay page par test card `4111 1111 1111 1111` (koi bhi future date, CVV `123`) ya UPI
    `success@razorpay` se pay kariye.
 4. Kuch second mein member par "Premium active" aana chahiye aur admin Overview mein payment dikhni
@@ -173,7 +173,7 @@ cd /srv/blank && set -a && . ./.env && set +a && node scripts/admin-setup-code.j
 5. Member se Cancel karke dekhiye, phir trial waapas set kariye aur `rzp_live_` keys + live webhook
    secret daaliye.
 
-Member Settings → Plan & billing se Subscribe karta hai, payment Razorpay ke apne page par hoti hai
+Member **Billing** page (`/billing`) se Subscribe karta hai, payment Razorpay ke apne page par hoti hai
 (card/UPI detail hamare server par kabhi nahi aati). Trial chal raha ho to pehla charge trial khatam
 hone par. Cancel karne par mahine ke aakhir tak Premium rehta hai. Billing off ho to sab free (pehle
 jaisa).

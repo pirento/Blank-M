@@ -113,6 +113,12 @@ describe('paper trading', () => {
       .set('Authorization', `Bearer ${SECRET}`);
     expect(run.status).toBe(200);
     expect(run.body.paper).toMatchObject({ checked: 1, closed: 1 });
+    // A second run while the first one's window is open does nothing.
+    const overlap = await supertest(app)
+      .post('/api/maintenance/price-checks')
+      .set('Authorization', `Bearer ${SECRET}`);
+    expect(overlap.body).toMatchObject({ skipped: true });
+    expect(overlap.body.paper).toBeUndefined();
     const list = await send('get', '/api/paper');
     expect(list.body.closed[0]).toMatchObject({ exitReason: 'target', exitPrice: 1525 });
   });

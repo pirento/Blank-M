@@ -104,7 +104,7 @@ export function mountDailyJournal() {
           h('h3', { class: 'text-sm font-semibold' }, t('Pre-market plan on Telegram')),
           toggleRow(
             'premarketPlan',
-            'Send me a pre-market plan between 8:00 and 9:15 am IST on trading days',
+            'Send me a pre-market plan between 7:30 and 9:15 am IST on trading days',
             'Your watchlist, last session, recent mistakes, your own rules and today’s risk limits, with a few AI focus points when AI is set up. Needs a linked Telegram chat. Not investment advice.',
           ),
           statusLine(state.message),

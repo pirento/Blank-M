@@ -87,7 +87,7 @@ describe('daily automatic journal', () => {
     const session = await optedInMember();
 
     expect(await runDailyImports()).toMatchObject({ ran: true, date: '2026-10-16', done: 1 });
-    const { trades } = (await session.agent.get('/api/workspace')).body;
+    const { trades } = (await session.agent.get('/api/account/export')).body;
     expect(trades).toEqual([
       expect.objectContaining({ symbol: 'TCS', date: '2026-10-16', quantity: 4, grossPnl: 40 }),
     ]);
@@ -98,7 +98,7 @@ describe('daily automatic journal', () => {
 
     // Already done for today: nothing more is added or sent.
     expect(await runDailyImports()).toMatchObject({ ran: true, done: 0 });
-    expect((await session.agent.get('/api/workspace')).body.trades).toHaveLength(1);
+    expect((await session.agent.get('/api/account/export')).body.trades).toHaveLength(1);
     expect(telegram.sent).toHaveLength(1);
   });
 

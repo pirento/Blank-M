@@ -15,9 +15,11 @@ import {
   instrumentCount,
   isKiteConfigured,
   refreshInstruments,
+  yahooProvider,
 } from '../services/market/index.js';
+import { hasFeature } from '../services/billing/membership.js';
 import { authenticateRequest, requireAdmin } from '../services/auth/request-auth.js';
-import { ServerConfigurationError } from '../services/errors.js';
+import { HttpError, ServerConfigurationError } from '../services/errors.js';
 import { isDatabaseConnected } from '../config/database.js';
 import { resolveAiConfig } from '../services/ai/config.js';
 import { hasOpenAiKey } from '../services/ai/openai-key.js';
@@ -26,8 +28,22 @@ import { isMailConfigured } from '../services/mailer.js';
 import { createLogger, errorName } from '../services/logger.js';
 import { subscribeLiveQuotes } from '../services/market/kite/ticker.js';
 import { subscribeVendorQuotes } from '../services/market/vendor-quotes.js';
+import { reserveAttempts } from '../services/rate-window.js';
 
 const log = createLogger('market');
+
+/**
+ * Quotes and history come from outside sources that rate limit the whole site, so each member
+ * gets a share. Generous: the Watchlist asks for one quote per row on every load.
+ */
+async function meterPriceRequest(userId) {
+  const quota = await reserveAttempts([{ key: `prices:${userId}`, limit: 240 }], 60_000);
+  if (!quota.allowed) {
+    throw new HttpError('Too many price requests. Try again in a minute.', 429, {
+      retryAfter: quota.retryAfterSeconds,
+    });
+  }
+}
 
 /**
  * Reports which optional integrations are configured, without leaking values,
@@ -74,13 +90,25 @@ function marketFailure(res, error, label) {
     res.status(error.status).json({ error: error.message });
     return;
   }
-  if (error instanceof Error && 'status' in error && error.status === 409) {
-    res.status(409).json({ error: error.message });
+  if (
+    error instanceof Error &&
+    'status' in error &&
+    (error.status === 409 || error.status === 429)
+  ) {
+    if (error.retryAfter) res.setHeader('Retry-After', String(error.retryAfter));
+    res.status(error.status).json({ error: error.message });
     return;
   }
   log.error('unexpected failure', { endpoint: label, error: errorName(error) });
   res.status(500).json({ error: 'Unexpected server error' });
 }
+
+/**
+ * Whether the signed-in member may get live-vendor or Zerodha prices. Without Premium live prices
+ * the quote and history endpoints still work (paper trading, alerts, the trade form) from the
+ * public, delayed source. Never starts a trial: a price lookup is not a visit.
+ */
+const livePrices = (req) => hasFeature(req.auth.user, 'livePrices', { startTrial: false });
 
 /** GET /api/quote?symbol=: the signed-in member's quote for one symbol. 503 without a database. */
 export async function quote(req, res) {
@@ -97,7 +125,11 @@ export async function quote(req, res) {
     // Passing the raw value also rejects repeated query parameters.
     const symbol = assertValidSymbol(req.query?.symbol);
     const { user } = await authenticateRequest(req);
-    res.status(200).json(await getQuote(symbol, user.id));
+    await meterPriceRequest(user.id);
+    const live = await livePrices(req);
+    res
+      .status(200)
+      .json(live ? await getQuote(symbol, user.id) : await yahooProvider.fetchQuote(symbol));
   } catch (error) {
     marketFailure(res, error, 'quote');
   }
@@ -125,7 +157,15 @@ export async function history(req, res) {
     assertValidHistoryRange(from, to);
     assertBoundedIntradayRange(from, to, interval);
     const { user } = await authenticateRequest(req);
-    res.status(200).json(await getHistory(symbol, from, to, interval, user.id));
+    await meterPriceRequest(user.id);
+    const live = await livePrices(req);
+    res
+      .status(200)
+      .json(
+        live
+          ? await getHistory(symbol, from, to, interval, user.id)
+          : await yahooProvider.fetchHistory(symbol, from, to, interval),
+      );
   } catch (error) {
     marketFailure(res, error, 'history');
   }

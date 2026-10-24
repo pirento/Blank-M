@@ -6,7 +6,6 @@
  * Partial exits are stored as legs; the trade's exit price is their
  * quantity-weighted average and each leg counts as one exit order.
  */
-import { orderCount } from './pnl.js';
 
 export const MAX_EXIT_LEGS = 20;
 const PRICE = /^\+?(?:\d+(?:\.\d{1,4})?|\.\d{1,4})$/;
@@ -110,9 +109,3 @@ export function riskFromStop(entryPrice, stopLoss, quantity) {
   if (!(stopLoss > 0) || !(entryPrice > 0) || !(quantity > 0)) return null;
   return Math.round(Math.abs(entryPrice - stopLoss) * quantity * 100) / 100;
 }
-
-/** Orders per side for charges (1 when not recorded). */
-export const orderCounts = (trade) => ({
-  entryOrders: orderCount(trade.entryOrders),
-  exitOrders: orderCount(trade.exitOrders),
-});

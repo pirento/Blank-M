@@ -36,8 +36,11 @@ export const env = {
       Boolean(process.env.GOOGLE_CLIENT_ID?.trim() && process.env.GOOGLE_CLIENT_SECRET?.trim())
     );
   },
+  /** Proxy hops in front of the app: "true" (or "1") is one, e.g. "2" for a load balancer + Nginx; 0 is none. */
   get trustProxy() {
-    return truthy(process.env.TRUST_PROXY);
+    const value = String(process.env.TRUST_PROXY ?? '').trim();
+    if (truthy(value)) return 1;
+    return /^\d+$/.test(value) ? Number(value) : 0;
   },
 };
 

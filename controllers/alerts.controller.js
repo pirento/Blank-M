@@ -6,6 +6,7 @@ import * as alerts from '../services/notifications/price-alerts.js';
 import * as push from '../services/notifications/push.js';
 import { isMailConfigured } from '../services/mailer.js';
 import { HttpError } from '../services/errors.js';
+import { reserveAttempts } from '../services/rate-window.js';
 
 /** GET /api/alerts: the member's price alerts and which delivery channels the server supports. */
 export async function list(req, res) {
@@ -33,6 +34,16 @@ export async function reactivate(req, res) {
 
 /** POST /api/alerts/check: checks the member's active alerts now. */
 export async function check(req, res) {
+  // Each check reads an outside quote per symbol; an open Watchlist asks once a minute.
+  const quota = await reserveAttempts(
+    [{ key: `alerts-check:${req.member.userId}`, limit: 6 }],
+    60_000,
+  );
+  if (!quota.allowed) {
+    throw new HttpError('Alerts were checked moments ago. Try again in a minute.', 429, {
+      retryAfter: quota.retryAfterSeconds,
+    });
+  }
   res.json(await alerts.checkMemberAlerts(req.member.userId));
 }
 

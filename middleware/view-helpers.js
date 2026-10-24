@@ -25,14 +25,18 @@ export function formatCurrency(amount) {
   return currency.format(amount);
 }
 
+const JSON_ESCAPES = {
+  '<': '\\u003c',
+  '>': '\\u003e',
+  '&': '\\u0026',
+  '\u2028': '\\u2028',
+  '\u2029': '\\u2029',
+};
+
 /** JSON for a `<script type="application/json">` block; `<` can never close the tag. */
 export function safeJson(value) {
-  return JSON.stringify(value ?? null)
-    .replace(/</g, '\\u003c')
-    .replace(/>/g, '\\u003e')
-    .replace(/&/g, '\\u0026')
-    .replace(/\u2028/g, '\\u2028')
-    .replace(/\u2029/g, '\\u2029');
+  // One pass: page data can be megabytes.
+  return JSON.stringify(value ?? null).replace(/[<>&\u2028\u2029]/g, (char) => JSON_ESCAPES[char]);
 }
 
 /** Joins truthy class names. */

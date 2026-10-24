@@ -34,7 +34,8 @@ export function errorHandler(error, req, res, _next) {
     message = 'Request encoding is not supported.';
   } else if (error?.code === 'LIMIT_FILE_SIZE') {
     status = 413;
-    message = 'The file must be 10 MB or smaller.';
+    // Limits differ per upload (10 MB files, 25 MB backups) and multer does not report which.
+    message = 'The file is too large for this upload.';
   } else if (error?.name === 'MulterError') {
     // Wrong field name, too many files and similar upload mistakes are the client's.
     status = 400;

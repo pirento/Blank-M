@@ -19,6 +19,7 @@ import { summarisePerformance } from '../../shared/pnl.js';
 import { riskStatus, toRiskLimits } from '../../shared/risk-limits.js';
 import { accessProblem } from '../auth/accounts.js';
 import { hasFeature } from '../billing/membership.js';
+import { inBatches } from '../batches.js';
 import { toTrade } from '../journal/workspace.js';
 import { createLogger, errorName } from '../logger.js';
 import { isTelegramConfigured } from '../telegram/api.js';
@@ -191,7 +192,8 @@ export async function runPremarketPlans({ now = new Date(), limit = 10 } = {}) {
   let done = 0;
   let skipped = 0;
   let failed = 0;
-  for (const settings of due) {
+  // Five members at a time: each claim below is atomic, so parallel work never doubles a plan.
+  await inBatches(due, 5, async (settings) => {
     try {
       // Claim the day first: two overlapping runs never send (or pay for) a plan twice, and a
       // member who is skipped below does not hold a place in the next run's batch.
@@ -199,7 +201,7 @@ export async function runPremarketPlans({ now = new Date(), limit = 10 } = {}) {
         { _id: settings._id, premarketPlanFor: { $ne: today } },
         { $set: { premarketPlanFor: today } },
       );
-      if (!claim.modifiedCount) continue;
+      if (!claim.modifiedCount) return;
       const user = await User.findById(settings._id);
       // No linked chat: nothing to send, so spend no AI on it.
       if (
@@ -210,7 +212,7 @@ export async function runPremarketPlans({ now = new Date(), limit = 10 } = {}) {
         !(await TelegramLink.exists({ userId: user._id }))
       ) {
         skipped += 1;
-        continue;
+        return;
       }
       const text = await premarketPlanText(user._id, settings, today);
       if (await sendToMember(user._id, text)) done += 1;
@@ -219,6 +221,6 @@ export async function runPremarketPlans({ now = new Date(), limit = 10 } = {}) {
       log.warn('premarket plan failed', { error: errorName(error) });
       failed += 1;
     }
-  }
+  });
   return { ran: true, date: today, done, skipped, failed, moreMayRemain: due.length === limit };
 }

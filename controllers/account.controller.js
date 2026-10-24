@@ -1,15 +1,18 @@
 /**
- * Account endpoints: signed-in devices, data backup export/restore, email
+ * Account endpoints: signed-in devices, account deletion, data backup export/restore, email
  * report preferences, the scheduled report jobs and live order settings.
  */
 import multer from 'multer';
 import { z } from 'zod';
-import { SESSION_MAX_AGE_MS } from '../middleware/session.js';
+import { SESSION_COOKIE, SESSION_MAX_AGE_MS } from '../middleware/session.js';
 import {
+  confirmAccountOwner,
+  destroySession,
   listUserSessions,
   revokeUserSession,
   revokeUserSessions,
 } from '../services/auth/accounts.js';
+import { deleteMember } from '../services/admin/delete-member.js';
 import { buildBackup, restoreBackup } from '../services/journal/backup.js';
 import { AccountSettings } from '../models/index.js';
 import { isMailConfigured } from '../services/mailer.js';
@@ -43,6 +46,9 @@ export const backupFile = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_BACKUP_BYTES, files: 1, fields: 4 },
 }).single('file');
+
+/** Restores in this process: each holds the file, its text and the parsed backup in memory. */
+let restoresRunning = 0;
 
 /* ------------------------------------ sessions ------------------------------------ */
 
@@ -78,10 +84,44 @@ export async function revokeOtherSessions(req, res) {
   res.json({ ok: true });
 }
 
+/**
+ * POST /api/account/delete { confirm, currentPassword }: the member deletes their own account and
+ * all its data for good, after typing their email and proving it is them. Any Razorpay renewal is
+ * cancelled first. Administrators are refused (another administrator removes them).
+ */
+export async function deleteAccount(req, res) {
+  const user = req.member.user;
+  if (user.role === 'admin') {
+    throw new HttpError('An administrator account cannot delete itself from Settings.', 403);
+  }
+  if (
+    String(req.body?.confirm ?? '')
+      .trim()
+      .toLowerCase() !== user.email
+  ) {
+    throw new HttpError('Type your email address exactly as shown to confirm.', 400);
+  }
+  await confirmAccountOwner(user, req.member.session, req.body?.currentPassword, 'account-delete');
+  await deleteMember(user.email);
+  await destroySession(req);
+  res.clearCookie(SESSION_COOKIE);
+  res.json({ ok: true, redirect: '/' });
+}
+
 /* ------------------------------------- backup ------------------------------------- */
 
 /** GET /api/account/export: downloads everything the member owns as one dated JSON backup file. */
 export async function exportBackup(req, res) {
+  // A backup reads every record the member owns: a few an hour is plenty.
+  const quota = await reserveAttempts(
+    [{ key: `export:${req.member.userId}`, limit: 5 }],
+    60 * 60_000,
+  );
+  if (!quota.allowed) {
+    throw new HttpError('Too many backup downloads. Try again later.', 429, {
+      retryAfter: quota.retryAfterSeconds,
+    });
+  }
   const backup = await buildBackup(req.member.userId, req.member.user.email);
   res.setHeader('Cache-Control', 'private, no-store');
   res.setHeader(
@@ -97,20 +137,31 @@ export async function exportBackup(req, res) {
  */
 export async function importBackup(req, res) {
   if (!req.file) throw new HttpError('Choose a backup file to restore.', 400);
-  // A restore parses up to 25 MB and writes many rows: a few an hour is plenty.
-  const quota = await reserveAttempts(
-    [{ key: `restore:${req.member.userId}`, limit: 3 }],
-    60 * 60_000,
-  );
-  if (!quota.allowed) throw new HttpError('Too many restores. Try again in an hour.', 429);
-  let raw;
-  try {
-    raw = JSON.parse(req.file.buffer.toString('utf8'));
-  } catch {
-    throw new HttpError('This file is not a valid Pirento Blank backup.', 400);
+  // Checked before the quota, so a busy server does not use up the member's restores.
+  if (restoresRunning > 0) {
+    throw new HttpError('Another restore is running on the server. Try again in a minute.', 503, {
+      retryAfter: 60,
+    });
   }
-  const includeSettings = req.body?.includeSettings === 'true';
-  res.json({ summary: await restoreBackup(req.member.userId, raw, { includeSettings }) });
+  restoresRunning += 1;
+  try {
+    // A restore parses up to 25 MB and writes many rows: a few an hour is plenty.
+    const quota = await reserveAttempts(
+      [{ key: `restore:${req.member.userId}`, limit: 3 }],
+      60 * 60_000,
+    );
+    if (!quota.allowed) throw new HttpError('Too many restores. Try again in an hour.', 429);
+    let raw;
+    try {
+      raw = JSON.parse(req.file.buffer.toString('utf8'));
+    } catch {
+      throw new HttpError('This file is not a valid Pirento Blank backup.', 400);
+    }
+    const includeSettings = req.body?.includeSettings === 'true';
+    res.json({ summary: await restoreBackup(req.member.userId, raw, { includeSettings }) });
+  } finally {
+    restoresRunning -= 1;
+  }
 }
 
 /* --------------------------------- weekly report email --------------------------------- */

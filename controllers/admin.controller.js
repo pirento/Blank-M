@@ -1,6 +1,6 @@
 /**
  * Administrator member management: list members, invite by email, resend an
- * invitation, create a password reset link and revoke access.
+ * invitation, create a password reset link, and revoke or restore access.
  */
 import { z } from 'zod';
 import { readJsonBody, requireMethod } from '../services/http.js';
@@ -331,6 +331,44 @@ export async function handleRevokeUser(req, res) {
       workspaceAccessRevoked: true,
       authBanStatus: invitation.authUserId ? 'complete' : 'not_required',
     });
+  } catch (error) {
+    failure(res, error);
+  }
+}
+
+/**
+ * POST /api/admin/users/restore { email, userId? }: gives a suspended member access back by
+ * undoing the revoke's ban only. Ended sessions, removed broker links, push devices and Telegram
+ * links, and a cancelled subscription stay gone.
+ */
+export async function handleRestoreUser(req, res) {
+  if (!requireMethod(req, res, 'POST')) return;
+  try {
+    const admin = await requireAdmin(req);
+    assertAdminStepUp(req);
+    const body = revokeSchema.parse(readJsonBody(req));
+    await requireAccessAdmin(admin.user.id);
+    const invitation = await AllowedUser.findById(body.email);
+    if (!invitation) throw new AdminContractError('Invitation not found', 404);
+    if (body.userId && body.userId !== invitation.authUserId) {
+      throw new AdminContractError('Expected user does not match invitation identity', 409);
+    }
+    // A revoked private invitation link stays revoked; create a new one instead.
+    if (await ManualInvitation.exists({ email: body.email, status: { $ne: 'accepted' } })) {
+      throw new AdminContractError('This address uses a manual invitation', 409);
+    }
+    const account = invitation.authUserId ? await User.findById(invitation.authUserId) : null;
+    if (!invitation.revokedAt && account?.status !== 'revoked') {
+      throw new AdminContractError('This member is not suspended.', 409);
+    }
+    invitation.revokedAt = null;
+    await invitation.save();
+    if (account) {
+      // An unconfirmed account goes back to "invited": it is active but not yet activated.
+      await User.updateOne({ _id: account._id }, { $set: { status: 'active', bannedUntil: null } });
+    }
+    await recordAdminAction(admin, 'member.restore', body.email);
+    res.status(200).json({ ok: true, status: account?.emailConfirmedAt ? 'active' : 'invited' });
   } catch (error) {
     failure(res, error);
   }
