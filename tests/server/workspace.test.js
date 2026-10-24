@@ -1,10 +1,12 @@
 // @vitest-environment node
 import { randomUUID } from 'node:crypto';
+import mongoose from 'mongoose';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createMember, resetDatabase, signIn, startTestApp, stopTestApp } from '../helpers/app.js';
 import { computeTradeEconomics } from '../../shared/pnl.js';
 import { rMultiple } from '../../shared/trade-tags.js';
 import { DEFAULT_CHARGES } from '../../shared/types.js';
+import { User } from '../../models/index.js';
 
 let app;
 beforeAll(async () => {
@@ -275,6 +277,23 @@ describe('trade screenshots', () => {
     const removed = await owner.send('delete', `/api/trades/${trade.id}/screenshot`);
     expect(removed.body.trade.hasScreenshot).toBe(false);
     expect((await owner.agent.get(`/api/trades/${trade.id}/screenshot`)).status).toBe(404);
+  });
+
+  it('refuses a screenshot beyond the 500 MB per member', async () => {
+    const owner = await member();
+    const { trade } = (await owner.send('post', '/api/trades', TRADE)).body;
+    const { _id: userId } = await User.findOne({ email: 'member@example.com' }).lean();
+    await mongoose.connection.db.collection('tradeScreenshots.files').insertOne({
+      filename: `${userId}/old/file`,
+      length: 500 * 1024 * 1024,
+      uploadDate: new Date(),
+    });
+    const response = await owner.agent
+      .post(`/api/trades/${trade.id}/screenshot`)
+      .set('X-CSRF-Token', owner.csrf)
+      .attach('file', PNG, { filename: 'chart.png', contentType: 'image/png' });
+    expect(response.status).toBe(413);
+    expect(response.body.error).toMatch(/500 MB/);
   });
 
   it('rejects files that are not images', async () => {

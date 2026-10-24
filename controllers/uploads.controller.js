@@ -25,6 +25,10 @@ import { HttpError } from '../services/errors.js';
 const MAX_BYTES = 10 * 1024 * 1024;
 /** Per member, across the statements kept for 7 days. */
 const MAX_STATEMENT_BYTES = 200 * 1024 * 1024;
+/** Per member, across all trades' chart screenshots (kept until removed). */
+const MAX_SCREENSHOT_BYTES = 500 * 1024 * 1024;
+/** Per member, across voice notes waiting for transcription (removed within a day). */
+const MAX_VOICE_NOTE_BYTES = 50 * 1024 * 1024;
 
 /** In-memory single-file parser; files never touch the server's disk. */
 export const singleFile = multer({
@@ -64,6 +68,12 @@ export async function uploadStatement(req, res) {
  */
 export async function uploadVoiceNote(req, res) {
   const file = await requireFile(req);
+  if ((await ownerBytes('voice-notes', req.member.userId)) + file.size > MAX_VOICE_NOTE_BYTES) {
+    throw new HttpError(
+      'Too many voice notes are waiting to be transcribed. Older ones are removed after a day.',
+      413,
+    );
+  }
   const { path, filename } = voiceNotePath(req.member.userId, file.originalname);
   const mime = String(file.mimetype || 'audio/webm')
     .split(';')[0]
@@ -154,6 +164,15 @@ export async function parseWorkbook(req, res) {
 /** POST /api/trades/:id/screenshot (multipart file): attaches or replaces the chart image; 201 with the trade. */
 export async function uploadTradeScreenshot(req, res) {
   const file = await requireFile(req);
+  if (
+    (await ownerBytes('trade-screenshots', req.member.userId)) + file.size >
+    MAX_SCREENSHOT_BYTES
+  ) {
+    throw new HttpError(
+      'Your chart screenshots use all 500 MB of your space. Remove some to add new ones.',
+      413,
+    );
+  }
   res.status(201).json({
     trade: await attachTradeScreenshot(req.member.userId, req.params.id, file),
   });
