@@ -1,5 +1,11 @@
 # /etc/nginx/sites-available/blank  — reverse proxy in front of the Node server.
 # Replace blank.example.com, then:  sudo certbot --nginx -d blank.example.com
+upstream blank_app {
+    server 127.0.0.1:3000;
+    # Reuse idle connections to Node instead of opening one per request (Node keeps them 65 s).
+    keepalive 32;
+}
+
 server {
     listen 80;
     server_name blank.example.com;
@@ -13,8 +19,10 @@ server {
     gzip_types text/css application/javascript text/javascript application/json image/svg+xml;
 
     location / {
-        proxy_pass http://127.0.0.1:3000;
+        proxy_pass http://blank_app;
         proxy_http_version 1.1;
+        # Required for the upstream keepalive above.
+        proxy_set_header Connection "";
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;

@@ -148,6 +148,23 @@ describe('price alerts', () => {
     expect(insecure.status).toBe(400);
     expect((await send('get', '/api/push')).body).toMatchObject({ configured: true, devices: 0 });
   });
+
+  it('limits each member’s quote reads and alert checks, with Retry-After', async () => {
+    const { RateWindow } = await import('../../models/index.js');
+    const { send } = await member();
+    expect((await send('get', '/api/quote?symbol=INFY')).status).toBe(200);
+    // Use up this minute's allowance instead of sending 240 requests.
+    await RateWindow.updateOne({ _id: /^prices:/ }, { $set: { attempts: 240 } });
+    const quote = await send('get', '/api/quote?symbol=INFY');
+    expect(quote.status).toBe(429);
+    expect(Number(quote.headers['retry-after'])).toBeGreaterThan(0);
+    for (let run = 0; run < 6; run += 1) {
+      expect((await send('post', '/api/alerts/check')).status).toBe(200);
+    }
+    const check = await send('post', '/api/alerts/check');
+    expect(check.status).toBe(429);
+    expect(Number(check.headers['retry-after'])).toBeGreaterThan(0);
+  });
 });
 
 describe('scheduled price check at scale', () => {

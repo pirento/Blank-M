@@ -198,16 +198,18 @@ async function checkTrades(rows, quoteUserId) {
     } catch {
       return; // Leave the trade open; the next check retries.
     }
+    const stillOpen = [];
     for (const row of group) {
       const reason = exitTriggered(row, price);
-      if (reason) {
-        if (await close(row, price, reason)) closedCount += 1;
-      } else {
-        await PaperTrade.updateOne(
-          { _id: row._id, status: 'open' },
-          { $set: { lastPrice: price, lastPriceAt: new Date() } },
-        );
-      }
+      if (!reason) stillOpen.push(row._id);
+      else if (await close(row, price, reason)) closedCount += 1;
+    }
+    // The same price for every trade left open: one write per symbol.
+    if (stillOpen.length) {
+      await PaperTrade.updateMany(
+        { _id: { $in: stillOpen }, status: 'open' },
+        { $set: { lastPrice: price, lastPriceAt: new Date() } },
+      );
     }
   });
   return closedCount;

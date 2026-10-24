@@ -133,6 +133,25 @@ describe('trades', () => {
     );
     expect(saved).toMatchObject({ segment: 'OPT', optionType: 'CE' });
   });
+
+  it('loads only what each page reads: notes where shown, the balance alone as a sum', async () => {
+    const { send, agent } = await member();
+    await send('post', '/api/trades', TRADE);
+    await send('post', '/api/trades', { ...TRADE, exitPrice: 1490, notes: 'stopped out' });
+    const pageData = async (path) =>
+      JSON.parse(/id="page-data">([^<]*)<\/script>/.exec((await agent.get(path)).text)[1])
+        .workspace;
+    const journal = await pageData('/journal');
+    const dashboard = await pageData('/dashboard');
+    const calculator = await pageData('/calculator');
+    expect(journal.trades.map((trade) => trade.notes).sort()).toEqual(['breakout', 'stopped out']);
+    expect(dashboard.trades.map((trade) => trade.notes)).toEqual(['', '']);
+    expect(dashboard.trades.map(({ id, pnl }) => ({ id, pnl }))).toEqual(
+      journal.trades.map(({ id, pnl }) => ({ id, pnl })),
+    );
+    expect(calculator.trades).toBeUndefined();
+    expect(calculator.portfolioBalance).toBe(dashboard.portfolioBalance);
+  });
 });
 
 describe('strategies, rules, watchlist, chat and settings', () => {

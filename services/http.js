@@ -25,8 +25,8 @@ export function readJsonBody(req) {
 }
 
 /**
- * The client address for rate limits. `req.ip` honours `trust proxy` (one
- * hop, set from TRUST_PROXY), so behind Nginx it is the real client rather
+ * The client address for rate limits. `req.ip` honours `trust proxy` (the
+ * hop count from TRUST_PROXY), so behind Nginx it is the real client rather
  * than the proxy; without a proxy it is the socket address. Keep the app
  * reachable only through the proxy (HOST=127.0.0.1) so the header that
  * proxy sets cannot be forged.

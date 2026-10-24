@@ -21,7 +21,7 @@ export function sessionMiddleware({ store } = {}) {
     resave: false,
     saveUninitialized: false,
     rolling: true,
-    proxy: env.trustProxy,
+    proxy: env.trustProxy > 0,
     store:
       store ??
       MongoStore.create({

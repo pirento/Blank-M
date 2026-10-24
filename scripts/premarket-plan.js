@@ -1,7 +1,7 @@
 /**
  * Scheduled pre-market plan (before the open): sends a short plan to the
  * linked Telegram chat of members who opted in. Run once per trading day at
- * from about 08:00 IST; the server skips holidays and refuses after 09:15 IST.
+ * from about 07:30 IST; the server skips holidays and refuses after 09:15 IST.
  *
  * Usage:
  *   APP_URL=https://blank.example.com CRON_SECRET=... node scripts/premarket-plan.js

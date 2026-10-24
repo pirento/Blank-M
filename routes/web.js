@@ -54,8 +54,25 @@ const WORKSPACE_PAGES = [
   ['/paper', 'paper', [], [], 'paper'],
   ['/options', 'options', [], [], 'options'],
 ];
+// Pages whose browser code never reads trade notes (they can be long) load trades without them.
+// Not the journal and transactions (show, search and edit notes) or analytics and reports (send
+// trades to the AI).
+const WITHOUT_TRADE_NOTES = new Set([
+  '/dashboard',
+  '/today',
+  '/strategy',
+  '/import',
+  '/backtest',
+  '/insights',
+  '/tax',
+]);
 for (const [path, view, data, vendor, feature] of WORKSPACE_PAGES) {
-  router.get(path, requirePageAuth, wrap(pages.workspacePage(view, { data, vendor, feature })));
+  const tradeNotes = !WITHOUT_TRADE_NOTES.has(path);
+  router.get(
+    path,
+    requirePageAuth,
+    wrap(pages.workspacePage(view, { data, vendor, feature, tradeNotes })),
+  );
 }
 // Member management moved to the admin panel.
 router.get('/users', (_req, res) => res.redirect(301, '/admin/members'));

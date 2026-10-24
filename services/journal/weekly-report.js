@@ -14,6 +14,7 @@ import {
 import { todayInIst } from '../../shared/market.js';
 import { accessProblem } from '../auth/accounts.js';
 import { hasFeature } from '../billing/membership.js';
+import { inBatches } from '../batches.js';
 import { isMailConfigured, sendMail } from '../mailer.js';
 import { toTrade } from './workspace.js';
 import { hasOpenAiKey } from '../ai/openai-key.js';
@@ -147,14 +148,15 @@ export async function sendWeeklyReports({ today = todayInIst(), limit = 15 } = {
   let sent = 0;
   let skipped = 0;
   let failed = 0;
-  for (const settings of due) {
+  // Five members at a time: each claim below is atomic, so parallel work never doubles an email.
+  await inBatches(due, 5, async (settings) => {
     // Claim the week first: a member who is skipped or fails below does not hold a place in every
     // later run's batch (which would starve everyone after the first `limit` members).
     const claim = await AccountSettings.updateOne(
       { _id: settings._id, weeklyReportSentFor: { $ne: period.start } },
       { $set: { weeklyReportSentFor: period.start } },
     );
-    if (!claim.modifiedCount) continue;
+    if (!claim.modifiedCount) return;
     const user = await User.findById(settings._id);
     if (
       !user ||
@@ -162,7 +164,7 @@ export async function sendWeeklyReports({ today = todayInIst(), limit = 15 } = {
       !(await hasFeature(user, 'reports', { startTrial: false }))
     ) {
       skipped += 1;
-      continue;
+      return;
     }
     try {
       await sendWeeklyReport(user, period);
@@ -170,7 +172,7 @@ export async function sendWeeklyReports({ today = todayInIst(), limit = 15 } = {
     } catch {
       failed += 1;
     }
-  }
+  });
   return {
     sent,
     skipped,

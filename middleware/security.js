@@ -46,6 +46,7 @@ export function privateApiResponse(_req, res, next) {
 }
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+const ANONYMOUS_SESSION_MS = 2 * 60 * 60_000;
 /** Endpoints authorized by something other than the session cookie. */
 const CSRF_EXEMPT = new Set([
   '/api/maintenance/voice-notes',
@@ -72,10 +73,14 @@ function sameToken(expected, received) {
  */
 export function csrfProtection(req, res, next) {
   // Only pages hand a token to the browser. Creating one marks the session as
-  // changed and stores it, so API calls, webhooks, cron jobs and health
-  // checks must not mint one (each would leave a session behind for a week).
-  const isPage = SAFE_METHODS.has(req.method) && !req.path.startsWith('/api/');
-  if (req.session && isPage) req.session.csrfToken ??= randomBytes(32).toString('base64url');
+  // changed and stores it, so API calls, webhooks, cron jobs, health checks and
+  // HEAD probes must not mint one.
+  const isPage = req.method === 'GET' && !req.path.startsWith('/api/');
+  if (req.session && isPage && !req.session.csrfToken) {
+    req.session.csrfToken = randomBytes(32).toString('base64url');
+    // Crawlers and visitors who never sign in keep it 2 hours, not a week; login regenerates it.
+    if (!req.session.auth) req.session.cookie.maxAge = ANONYMOUS_SESSION_MS;
+  }
   res.locals.csrfToken = req.session?.csrfToken ?? '';
   if (SAFE_METHODS.has(req.method) || CSRF_EXEMPT.has(req.path)) return next();
   const received = req.get('x-csrf-token') || req.body?._csrf;

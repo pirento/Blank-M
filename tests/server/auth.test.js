@@ -8,6 +8,7 @@ import {
   startTestApp,
   stopTestApp,
 } from '../helpers/app.js';
+import mongoose from 'mongoose';
 import { currentStep, totpCode } from '../../services/auth/totp.js';
 
 let app;
@@ -58,6 +59,19 @@ describe('password sign-in and sessions', () => {
     const page = await request(app).get('/dashboard');
     expect(page.status).toBe(302);
     expect(page.headers.location).toMatch(/^\/login/);
+  });
+
+  it('stores visitor sessions for 2 hours (none for HEAD) and members for a week', async () => {
+    const sessions = mongoose.connection.db.collection('sessions');
+    expect((await request(app).head('/login')).headers['set-cookie']).toBeUndefined();
+    expect(await sessions.countDocuments()).toBe(0);
+    await request(app).get('/login');
+    const member = await createMember();
+    await signIn(app, { email: member.user.email, password: member.password });
+    const hoursLeft = async (filter) =>
+      ((await sessions.findOne(filter)).expires - Date.now()) / 3_600_000;
+    expect(await hoursLeft({ 'session.auth': { $exists: false } })).toBeLessThanOrEqual(2);
+    expect(await hoursLeft({ 'session.auth': { $exists: true } })).toBeGreaterThan(24 * 6);
   });
 
   it('ends the session on logout', async () => {
