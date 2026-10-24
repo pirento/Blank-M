@@ -127,7 +127,7 @@ export const PLATFORM_SETTINGS = [
     type: 'secret',
     // Telegram allows letters, digits, _ and -; shorter secrets switch the bot off.
     pattern: /^[A-Za-z0-9_-]{32,256}$/,
-    help: 'After changing the token, run node scripts/telegram-set-webhook.js on the server.',
+    help: 'After changing the token or this secret, save and press Set webhook.',
   },
 
   // Google sign-in

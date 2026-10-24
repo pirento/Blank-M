@@ -117,6 +117,18 @@ router.post('/billing/cancel', requireApiAuth, wrap(billing.cancel));
 router.get('/admin/overview', requireApiAdmin, wrap(adminPanel.overview));
 router.get('/admin/settings', requireApiAdmin, wrap(adminPanel.getSettings));
 router.put('/admin/settings', requireApiAdmin, requireAdminMfa, wrap(adminPanel.saveSettings));
+router.post('/admin/integrations/test-email', requireApiAdmin, wrap(adminPanel.sendTestEmail));
+router.post(
+  '/admin/integrations/telegram-check',
+  requireApiAdmin,
+  wrap(adminPanel.checkTelegramBot),
+);
+router.post(
+  '/admin/integrations/telegram-webhook',
+  requireApiAdmin,
+  requireAdminMfa,
+  wrap(adminPanel.setTelegramWebhookHandler),
+);
 router.get('/admin/billing', requireApiAdmin, wrap(adminPanel.getBilling));
 router.put('/admin/billing', requireApiAdmin, requireAdminMfa, wrap(adminPanel.saveBilling));
 router.post('/admin/billing/check-keys', requireApiAdmin, wrap(adminPanel.checkRazorpayKeys));
@@ -144,6 +156,7 @@ router.get('/admin/users', wrap(admin.handleListUsers));
 router.post('/admin/users/invite', wrap(admin.handleInviteUser));
 router.post('/admin/users/resend', wrap(admin.handleResendInvite));
 router.post('/admin/users/revoke', wrap(admin.handleRevokeUser));
+router.post('/admin/users/restore', wrap(admin.handleRestoreUser));
 router.post('/admin/users/reset-link', wrap(admin.handleCreateResetLink));
 router.get('/admin/access-requests', wrap(admin.handleListAccessRequests));
 router.post('/admin/access-requests/:id', wrap(admin.handleDecideAccessRequest));

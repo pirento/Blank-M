@@ -1,5 +1,5 @@
 /**
- * Members invited by email: loading the list, resending or revoking an
+ * Members invited by email: loading the list, resending, revoking or restoring an
  * invitation, creating one-hour password reset links, and each member row.
  */
 import { h, icon, button, input, label, badge } from '../../core/dom.js';
@@ -177,12 +177,55 @@ function requestRevoke(user) {
   });
 }
 
-/** Builds a member or invitation row: status badges and warnings, plus reset-link, resend and revoke buttons. */
+function requestRestore(user) {
+  if (state.busy) return;
+  openModal({
+    title: 'Restore access?',
+    description: `Give ${user.email} access again.`,
+    content: (close) =>
+      h(
+        'div',
+        {},
+        h(
+          'p',
+          { class: 'text-sm leading-6 text-muted' },
+          'They can sign in again (an invitation not yet activated can be resent). What the suspension removed does not come back: broker connections, push devices and the Telegram link must be set up again, and a cancelled Premium subscription stays cancelled.',
+        ),
+        h(
+          'div',
+          { class: 'mt-6 flex flex-wrap justify-end gap-3' },
+          button('Cancel', { variant: 'outline', onclick: close }),
+          button('Restore access', {
+            disabled: Boolean(state.busy),
+            onclick: () => {
+              close();
+              void withBusy(user.email, async () => {
+                try {
+                  await api('/api/admin/users/restore', {
+                    method: 'POST',
+                    body: { email: user.email, userId: user.userId },
+                  });
+                  notify('Access restored.', 'success');
+                  await refresh();
+                } catch (error) {
+                  notifyError(error, 'Could not restore access.');
+                }
+              });
+            },
+          }),
+        ),
+      ),
+  });
+}
+
+/** Builds a member or invitation row: status badges and warnings, plus reset-link, resend, revoke and restore buttons. */
 export function userRow(user) {
   const busy = Boolean(state.busy);
   const tone =
     user.status === 'active' ? 'positive' : user.status === 'revoked' ? 'negative' : 'caution';
   const created = user.accessStatus !== 'not_created';
+  const canRevoke =
+    user.status !== 'revoked' || user.authBanPending || user.accessStatus === 'active';
   return h(
     'div',
     { class: 'admin-reference-row' },
@@ -224,27 +267,35 @@ export function userRow(user) {
         `Invited ${readableDate(user.invitedAt)} · Last sign-in ${readableDate(user.lastSignInAt)}`,
       ),
     ),
-    user.status !== 'revoked' || user.authBanPending || user.accessStatus === 'active'
-      ? h(
-          'div',
-          { class: 'admin-reference-actions' },
-          user.status === 'active' && user.accessStatus === 'active'
-            ? button([icon('key-round', 14, 'mr-1.5'), 'Reset link'], {
-                variant: 'outline',
-                size: 'sm',
-                disabled: busy,
-                onclick: () => void createResetLink(user),
-              })
-            : null,
-          user.status === 'invited' && user.accessStatus !== 'revoked'
-            ? button('Resend', {
-                variant: 'outline',
-                size: 'sm',
-                disabled: busy,
-                onclick: () => void resend(user),
-              })
-            : null,
-          button(
+    h(
+      'div',
+      { class: 'admin-reference-actions' },
+      user.status === 'active' && user.accessStatus === 'active'
+        ? button([icon('key-round', 14, 'mr-1.5'), 'Reset link'], {
+            variant: 'outline',
+            size: 'sm',
+            disabled: busy,
+            onclick: () => void createResetLink(user),
+          })
+        : null,
+      user.status === 'invited' && user.accessStatus !== 'revoked'
+        ? button('Resend', {
+            variant: 'outline',
+            size: 'sm',
+            disabled: busy,
+            onclick: () => void resend(user),
+          })
+        : null,
+      user.status === 'revoked'
+        ? button([icon('undo-2', 14, 'mr-1.5'), 'Restore access'], {
+            variant: 'outline',
+            size: 'sm',
+            disabled: busy,
+            onclick: () => requestRestore(user),
+          })
+        : null,
+      canRevoke
+        ? button(
             [
               icon('user-round-x', 14, 'mr-1.5'),
               user.status === 'revoked'
@@ -260,8 +311,8 @@ export function userRow(user) {
               disabled: busy,
               onclick: () => requestRevoke(user),
             },
-          ),
-        )
-      : null,
+          )
+        : null,
+    ),
   );
 }

@@ -15,6 +15,7 @@ import { createLogger, errorName } from '../logger.js';
 import { loadPlan } from '../billing/plan.js';
 import { env } from '../../config/env.js';
 import { resetMailer } from '../mailer.js';
+import { openAiApiKey } from '../ai/openai-key.js';
 import { PLATFORM_SETTINGS, settingDefinition } from './settings-registry.js';
 
 const log = createLogger('platform-settings');
@@ -100,7 +101,10 @@ export async function describePlatformSettings() {
   const groups = new Map();
   for (const definition of PLATFORM_SETTINGS) {
     const row = rows.get(definition.key);
-    const current = process.env[definition.key];
+    // The OpenAI key may come from the older BLANK_OPENAI_API_KEY name in .env.
+    const current =
+      (definition.key === 'OPENAI_API_KEY' ? openAiApiKey() : undefined) ??
+      process.env[definition.key];
     const source = fromPanel.has(definition.key) ? 'panel' : current?.trim() ? 'env' : 'unset';
     const secret = definition.type === 'secret';
     const item = {
@@ -176,6 +180,44 @@ export function normalizeSettingValue(definition, raw) {
 }
 
 /**
+ * A mistyped Google secret would lock every administrator out, so ask Google first: a bogus code
+ * gets `invalid_grant` when the client ID and secret are right and `invalid_client` when not.
+ */
+async function assertGoogleClient(clientId, clientSecret) {
+  let payload;
+  try {
+    const response = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code: 'settings-check',
+        client_id: clientId,
+        client_secret: clientSecret,
+        // As googleRedirectUri() in controllers/auth.controller.js builds it.
+        redirect_uri: `${env.appUrl ? new URL(env.appUrl).origin : ''}/auth/google/callback`,
+      }),
+      signal: AbortSignal.timeout(8000),
+    });
+    payload = await response.json().catch(() => null);
+  } catch {
+    payload = null;
+  }
+  if (payload?.error === 'invalid_client') {
+    throw new HttpError(
+      'Google rejected this client ID and secret. Copy both again from Google Cloud Console → Credentials.',
+      409,
+    );
+  }
+  if (payload?.error !== 'invalid_grant' && !payload?.access_token) {
+    throw new HttpError(
+      'Google could not be reached to check the client ID and secret. Try again in a minute.',
+      503,
+    );
+  }
+}
+
+/**
  * Saves changes from the panel: `{ KEY: value }`, where an empty value clears the
  * panel value (the .env value applies again). Validates everything before
  * writing, encrypts secrets, writes an audit entry per key (never the secret
@@ -218,6 +260,16 @@ export async function savePlatformSettings(actor, changes) {
     throw new HttpError(
       'Google sign-in is the only way administrators sign in, so it cannot be switched off or left without a client ID and secret.',
       409,
+    );
+  }
+  if (
+    googleStaysOn &&
+    (after('GOOGLE_CLIENT_ID') !== process.env.GOOGLE_CLIENT_ID ||
+      after('GOOGLE_CLIENT_SECRET') !== process.env.GOOGLE_CLIENT_SECRET)
+  ) {
+    await assertGoogleClient(
+      after('GOOGLE_CLIENT_ID').trim(),
+      after('GOOGLE_CLIENT_SECRET').trim(),
     );
   }
   for (const { definition, value } of cleaned) {

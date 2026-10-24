@@ -3,6 +3,8 @@
  * registering the webhook. Needs TELEGRAM_BOT_TOKEN, TELEGRAM_BOT_USERNAME and
  * TELEGRAM_WEBHOOK_SECRET.
  */
+import { HttpError } from '../errors.js';
+
 const API = 'https://api.telegram.org';
 
 /** Whether the bot token and username are set and the webhook secret has at least 32 characters. */
@@ -52,4 +54,29 @@ export function setTelegramWebhook(url) {
     allowed_updates: ['message'],
     drop_pending_updates: true,
   });
+}
+
+/** The bot behind TELEGRAM_BOT_TOKEN (`{ username, … }`); throws when Telegram refuses the token. */
+export const telegramBot = () => call('getMe', {});
+
+/**
+ * Registers `APP_URL/api/telegram/webhook` (scripts/telegram-set-webhook.js and the admin panel's
+ * "Set webhook" button). Returns the URL; throws HttpError 409 when the settings are not ready.
+ */
+export async function registerTelegramWebhook() {
+  if (!isTelegramConfigured()) {
+    throw new HttpError(
+      'Set TELEGRAM_BOT_TOKEN, TELEGRAM_BOT_USERNAME and TELEGRAM_WEBHOOK_SECRET (32+ characters).',
+      409,
+    );
+  }
+  const base = String(process.env.APP_URL || '').replace(/\/$/, '');
+  if (!base.startsWith('https://')) {
+    throw new HttpError(
+      'APP_URL must be the public HTTPS address; Telegram only calls HTTPS webhooks.',
+      409,
+    );
+  }
+  await setTelegramWebhook(`${base}/api/telegram/webhook`);
+  return `${base}/api/telegram/webhook`;
 }
