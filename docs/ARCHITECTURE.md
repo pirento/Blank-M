@@ -79,21 +79,21 @@ admin grant), so nothing has to expire it.
 Every collection with its indexes, retention, size per member and sensitive fields, plus backups
 and scaling: [DATABASE.md](DATABASE.md).
 
-| Collection(s)                                          | Purpose                                              |
-| ------------------------------------------------------ | ---------------------------------------------------- |
-| `users`, `allowedusers`, `loginusernames`              | Members, invitations allow-list, optional usernames  |
-| `sessions`                                             | Server-side sessions (connect-mongo)                 |
-| `authtokens`, `manualinvitations`                      | Activation/recovery tokens, private invitation links |
-| `trades`, `strategies`, `tradingrules`                 | Journal records                                      |
-| `watchlistitems`, `chatmessages`                       | Watchlist and AI conversation                        |
-| `accountsettings`                                      | Capital, charge rates, risk limits, preferences      |
-| `papertrades`, `pricealerts`                           | Paper trading and price alerts                       |
-| `liveorders`                                           | Audit log of live Zerodha orders and GTTs            |
-| `pushsubscriptions`, `telegramlinks`                   | Push devices and linked Telegram chats               |
-| `sharelinks`, `coachreviews`                           | Mentor read-only links, saved AI coach reviews       |
-| `ratewindows`                                          | Rate-limit counters (expire automatically)           |
-| `orderplanrecords`                                     | Append-only saved order plans and reviews            |
-| `strategyevidences`, `…reviews`                        | Immutable backtest evidence and owner decisions      |
-| `researchruns`, `aiusageevents`, …                     | AI research archive, usage limits, model config      |
-| `brokerconnections`, `instruments`                     | Encrypted Kite/Dhan tokens, NSE instrument master    |
-| GridFS `statements`, `voice-notes`, `tradeScreenshots` | Uploads, temporary audio, chart screenshots          |
+| Collection(s)                                         | Purpose                                              |
+| ----------------------------------------------------- | ---------------------------------------------------- |
+| `users`, `allowedusers`, `loginusernames`             | Members, invitations allow-list, optional usernames  |
+| `sessions`                                            | Server-side sessions (connect-mongo)                 |
+| `authtokens`, `manualinvitations`                     | Activation/recovery tokens, private invitation links |
+| `trades`, `strategies`, `tradingrules`                | Journal records                                      |
+| `watchlistitems`, `chatmessages`                      | Watchlist and AI conversation                        |
+| `accountsettings`                                     | Capital, charge rates, risk limits, preferences      |
+| `papertrades`, `pricealerts`                          | Paper trading and price alerts                       |
+| `liveorders`                                          | Audit log of live Zerodha orders and GTTs            |
+| `pushsubscriptions`, `telegramlinks`                  | Push devices and linked Telegram chats               |
+| `sharelinks`, `coachreviews`                          | Mentor read-only links, saved AI coach reviews       |
+| `ratewindows`                                         | Rate-limit counters (expire automatically)           |
+| `orderplanrecords`                                    | Append-only saved order plans and reviews            |
+| `strategyevidences`, `…reviews`                       | Immutable backtest evidence and owner decisions      |
+| `researchruns`, `aiusageevents`, …                    | AI research archive, usage limits, model config      |
+| `brokerconnections`, `instruments`                    | Encrypted Kite/Dhan tokens, NSE instrument master    |
+| GridFS `statements`, `voiceNotes`, `tradeScreenshots` | Uploads, temporary audio, chart screenshots          |

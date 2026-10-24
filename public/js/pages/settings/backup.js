@@ -82,7 +82,7 @@ export function mountBackup() {
           h(
             'p',
             { class: 'text-sm text-muted' },
-            'The backup is a JSON file with your trades, strategies, rules, watchlist, AI chat, saved plans, backtest evidence and settings. Keep it private.',
+            'The backup is a JSON file with your trades, strategies, rules, watchlist, AI chat, saved plans, backtest evidence and settings. Chart screenshots are not included. Keep it private.',
           ),
           h(
             'div',

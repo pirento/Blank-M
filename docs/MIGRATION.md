@@ -11,7 +11,7 @@ This rewrite keeps the application's behaviour and rules while replacing the pla
 | Supabase Postgres, RLS, SQL RPC functions | MongoDB + Mongoose; ownership enforced in every query        |
 | Supabase Auth (JWT, GoTrue MFA)           | Express sessions in MongoDB, bcrypt, built-in TOTP           |
 | Supabase Realtime                         | Request/response with immediate local updates after writes   |
-| Supabase Storage buckets                  | MongoDB GridFS buckets `statements` and `voice-notes`        |
+| Supabase Storage buckets                  | MongoDB GridFS buckets `statements` and `voiceNotes`         |
 | Vercel Functions + `vercel.json` cron     | One Express server; `scripts/maintenance-voice-notes.js`     |
 | pgvector journal search                   | Embeddings stored in MongoDB, cosine similarity in Node      |
 | Recharts                                  | Chart.js                                                     |

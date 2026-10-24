@@ -26,6 +26,8 @@ describe('workbook size check', () => {
     expect(() => assertWorkbookSize(zipDeclaring([2_000, 50_000]))).not.toThrow();
     expect(() => assertWorkbookSize(zipDeclaring([4_000_000_000]))).toThrow(/too large/);
     expect(() => assertWorkbookSize(zipDeclaring(Array(30).fill(5_000_000)))).toThrow(/too large/);
+    // The limit is 50 MB unpacked.
+    expect(() => assertWorkbookSize(zipDeclaring(Array(12).fill(5_000_000)))).toThrow(/too large/);
     // Not a zip at all: left to the reader, which rejects it.
     expect(() => assertWorkbookSize(Buffer.from('not a workbook'))).not.toThrow();
   });

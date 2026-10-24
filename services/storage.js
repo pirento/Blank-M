@@ -131,20 +131,28 @@ export async function uploadObject(bucketName, path, userId, file) {
   return path;
 }
 
-/** The stored file's bytes and content type, or null when no file has that path. */
-export async function downloadObject(bucketName, path) {
+/**
+ * A read stream of the stored file with its byte length and content type, or null when no file
+ * has that path. Nothing is read until the stream is consumed.
+ */
+export async function streamObject(bucketName, path) {
   const { gridfs } = bucket(bucketName);
   const [file] = await gridfs.find({ filename: path }).limit(1).toArray();
   if (!file) return null;
+  return {
+    stream: gridfs.openDownloadStream(file._id),
+    length: file.length,
+    contentType: file.metadata?.contentType || '',
+  };
+}
+
+/** The stored file's bytes and content type, or null when no file has that path. */
+export async function downloadObject(bucketName, path) {
+  const data = await streamObject(bucketName, path);
+  if (!data) return null;
   const chunks = [];
-  await new Promise((resolve, reject) => {
-    gridfs
-      .openDownloadStream(file._id)
-      .on('data', (chunk) => chunks.push(chunk))
-      .once('error', reject)
-      .once('end', resolve);
-  });
-  return { buffer: Buffer.concat(chunks), contentType: file.metadata?.contentType || '' };
+  for await (const chunk of data.stream) chunks.push(chunk);
+  return { buffer: Buffer.concat(chunks), contentType: data.contentType };
 }
 
 /** Returns the names actually removed, so callers can verify a cleanup. */
@@ -159,7 +167,6 @@ export async function removeObjects(bucketName, paths) {
   return removed;
 }
 
-/** Oldest objects past the retention cutoff (temporary voice notes). */
 /** Total bytes stored in the member's `<userId>/` folder of a bucket. */
 export async function ownerBytes(bucketName, userId) {
   const { config } = bucket(bucketName);
@@ -173,10 +180,14 @@ export async function ownerBytes(bucketName, userId) {
   return row?.bytes ?? 0;
 }
 
-export async function expiredObjects(bucketName, cutoff, limit) {
+/**
+ * Oldest objects uploaded between `from` and the retention cutoff (temporary uploads; the
+ * screenshot sweep walks its bucket in slices with `from`).
+ */
+export async function expiredObjects(bucketName, cutoff, limit, from = new Date(0)) {
   const { gridfs } = bucket(bucketName);
   const files = await gridfs
-    .find({ uploadDate: { $lte: cutoff } })
+    .find({ uploadDate: { $gte: from, $lte: cutoff } })
     .sort({ uploadDate: 1 })
     .limit(limit)
     .toArray();

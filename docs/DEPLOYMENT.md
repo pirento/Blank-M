@@ -143,7 +143,7 @@ matter.
 Copy `deploy/crontab.example` into `crontab -e` and adjust the path:
 
 - **Daily** — `node scripts/maintenance-voice-notes.js` removes temporary voice-note uploads older
-  than 24 hours.
+  than 24 hours and chart screenshot files no trade uses any more.
 - **Daily** — `node scripts/maintenance-signups.js` deletes public sign-ups whose email was never
   confirmed within 7 days (connects to MongoDB directly; admin invitations are never touched).
 - **Monday morning** — `node scripts/send-weekly-reports.js` emails last week's report to members who
