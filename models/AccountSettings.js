@@ -30,6 +30,8 @@ const accountSettingsSchema = new mongoose.Schema(
     riskLimits: { type: mongoose.Schema.Types.Mixed, default: null },
     /** The member's own opt-in to place live orders (also requires the server switch). */
     liveTradingEnabled: { type: Boolean, default: false },
+    /** Details for the member's GST invoices: { name, state, gstin, address } (Billing page). */
+    billingDetails: { type: mongoose.Schema.Types.Mixed, default: null },
   },
   { timestamps: { createdAt: false, updatedAt: 'updatedAt' }, minimize: false },
 );

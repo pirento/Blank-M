@@ -16,6 +16,8 @@ const paymentSchema = new mongoose.Schema(
     status: { type: String, required: true },
     method: { type: String, default: null },
     paidAt: { type: Date, required: true },
+    /** Captured after GST invoices existed: needs an Invoice (older payments get none). */
+    invoiceDue: { type: Boolean, default: false },
   },
   { timestamps: true },
 );

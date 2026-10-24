@@ -5,7 +5,7 @@
  * triggered it (a webhook, an activation). Administrator announcements live in
  * services/admin/announcements.js.
  */
-import { AccountSettings, Subscription, User } from '../../models/index.js';
+import { AccountSettings, Invoice, Subscription, User } from '../../models/index.js';
 import { loadPlan } from '../billing/plan.js';
 import { createLogger, errorName } from '../logger.js';
 import { isMailConfigured, sendMail } from '../mailer.js';
@@ -84,13 +84,21 @@ export async function billingEventEmail(event, record) {
   const plan = await loadPlan();
   const billingLink = origin() ? `${origin()}/billing` : null;
   switch (event.event) {
-    case 'subscription.charged':
+    case 'subscription.charged': {
+      // Issued by the webhook just before this email (missing if that failed).
+      const invoice = payment?.id
+        ? await Invoice.findOne({ paymentId: payment.id }, { number: 1, type: 1 }).lean()
+        : null;
       return sendQuietly(user.email, `Payment received — ${plan.name}`, [
         `We received your payment${payment?.amount ? ` of ${rupees(payment.amount / 100)}` : ''}.`,
         record.paidUntil ? `${plan.name} is active until ${day(record.paidUntil)}.` : null,
         '',
+        invoice && origin()
+          ? `Your ${invoice.type === 'tax-invoice' ? 'tax invoice' : 'receipt'}: ${origin()}/billing/invoices/${invoice.number}`
+          : null,
         billingLink ? `Your payments: ${billingLink}` : null,
       ]);
+    }
     case 'payment.failed':
       return sendQuietly(user.email, `Your ${plan.name} payment did not go through`, [
         'Your bank or card declined this month’s payment. Razorpay will try again over the next few days.',

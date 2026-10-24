@@ -31,6 +31,7 @@ export { PlatformSetting } from './PlatformSetting.js';
 export { AdminAuditLog } from './AdminAuditLog.js';
 export { Subscription } from './Subscription.js';
 export { Payment } from './Payment.js';
+export { Invoice } from './Invoice.js';
 export { BillingEvent } from './BillingEvent.js';
 export { TrialClaim } from './TrialClaim.js';
 export { UsageCounter } from './UsageCounter.js';

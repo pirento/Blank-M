@@ -112,6 +112,7 @@ router.get('/billing', requireApiAuth, wrap(billing.status));
 router.post('/billing/checkout', requireApiAuth, wrap(billing.checkout));
 router.post('/billing/refresh', requireApiAuth, wrap(billing.refresh));
 router.post('/billing/cancel', requireApiAuth, wrap(billing.cancel));
+router.put('/billing/details', requireApiAuth, wrap(billing.saveDetails));
 
 /* --------------------------------- admin panel -------------------------------- */
 router.get('/admin/overview', requireApiAdmin, wrap(adminPanel.overview));
@@ -131,6 +132,12 @@ router.post(
 );
 router.get('/admin/billing', requireApiAdmin, wrap(adminPanel.getBilling));
 router.put('/admin/billing', requireApiAdmin, requireAdminMfa, wrap(adminPanel.saveBilling));
+router.put(
+  '/admin/billing/business',
+  requireApiAdmin,
+  requireAdminMfa,
+  wrap(adminPanel.saveInvoiceBusiness),
+);
 router.post('/admin/billing/check-keys', requireApiAdmin, wrap(adminPanel.checkRazorpayKeys));
 router.get('/admin/payments', requireApiAdmin, wrap(adminPanel.listPayments));
 router.get('/admin/memberships', requireApiAdmin, wrap(adminPanel.listMemberships));

@@ -313,5 +313,17 @@
   "You sign in with Google: sign in with Google again just before deleting.": "आप Google से साइन इन करते हैं: हटाने से ठीक पहले Google से फिर से साइन इन करें।",
   "Your account and its data were deleted. Goodbye.": "आपका खाता और उसका डेटा हटा दिया गया है। अलविदा।",
   "The account could not be deleted.": "खाता हटाया नहीं जा सका।",
-  "Live prices are part of Premium, so these prices are delayed. Open Billing to upgrade.": "लाइव कीमतें Premium में शामिल हैं, इसलिए ये कीमतें देरी से हैं। अपग्रेड करने के लिए बिलिंग खोलें।"
+  "Live prices are part of Premium, so these prices are delayed. Open Billing to upgrade.": "लाइव कीमतें Premium में शामिल हैं, इसलिए ये कीमतें देरी से हैं। अपग्रेड करने के लिए बिलिंग खोलें।",
+  "Invoice {number}": "इनवॉइस {number}",
+  "Choose your state": "अपना राज्य चुनें",
+  "Details saved.": "विवरण सेव हो गए।",
+  "Your details could not be saved.": "आपके विवरण सेव नहीं हो सके।",
+  "Invoice details": "इनवॉइस विवरण",
+  "These details go on invoices issued from now on.": "ये विवरण अब से बनने वाले इनवॉइस पर आएँगे।",
+  "Name on invoice": "इनवॉइस पर नाम",
+  "State (place of supply)": "राज्य (आपूर्ति का स्थान)",
+  "GSTIN (optional)": "GSTIN (वैकल्पिक)",
+  "A GSTIN lets a business claim input tax credit on this payment.": "GSTIN देने पर व्यवसाय इस भुगतान पर इनपुट टैक्स क्रेडिट ले सकता है।",
+  "Address (optional)": "पता (वैकल्पिक)",
+  "Save details": "विवरण सेव करें"
 }
