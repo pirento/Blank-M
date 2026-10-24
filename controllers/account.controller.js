@@ -44,6 +44,9 @@ export const backupFile = multer({
   limits: { fileSize: MAX_BACKUP_BYTES, files: 1, fields: 4 },
 }).single('file');
 
+/** Restores in this process: each holds the file, its text and the parsed backup in memory. */
+let restoresRunning = 0;
+
 /* ------------------------------------ sessions ------------------------------------ */
 
 /** GET /api/account/sessions: the member's signed-in devices, newest activity first; marks this one. */
@@ -97,20 +100,31 @@ export async function exportBackup(req, res) {
  */
 export async function importBackup(req, res) {
   if (!req.file) throw new HttpError('Choose a backup file to restore.', 400);
-  // A restore parses up to 25 MB and writes many rows: a few an hour is plenty.
-  const quota = await reserveAttempts(
-    [{ key: `restore:${req.member.userId}`, limit: 3 }],
-    60 * 60_000,
-  );
-  if (!quota.allowed) throw new HttpError('Too many restores. Try again in an hour.', 429);
-  let raw;
-  try {
-    raw = JSON.parse(req.file.buffer.toString('utf8'));
-  } catch {
-    throw new HttpError('This file is not a valid Pirento Blank backup.', 400);
+  // Checked before the quota, so a busy server does not use up the member's restores.
+  if (restoresRunning > 0) {
+    throw new HttpError('Another restore is running on the server. Try again in a minute.', 503, {
+      retryAfter: 60,
+    });
   }
-  const includeSettings = req.body?.includeSettings === 'true';
-  res.json({ summary: await restoreBackup(req.member.userId, raw, { includeSettings }) });
+  restoresRunning += 1;
+  try {
+    // A restore parses up to 25 MB and writes many rows: a few an hour is plenty.
+    const quota = await reserveAttempts(
+      [{ key: `restore:${req.member.userId}`, limit: 3 }],
+      60 * 60_000,
+    );
+    if (!quota.allowed) throw new HttpError('Too many restores. Try again in an hour.', 429);
+    let raw;
+    try {
+      raw = JSON.parse(req.file.buffer.toString('utf8'));
+    } catch {
+      throw new HttpError('This file is not a valid Pirento Blank backup.', 400);
+    }
+    const includeSettings = req.body?.includeSettings === 'true';
+    res.json({ summary: await restoreBackup(req.member.userId, raw, { includeSettings }) });
+  } finally {
+    restoresRunning -= 1;
+  }
 }
 
 /* --------------------------------- weekly report email --------------------------------- */

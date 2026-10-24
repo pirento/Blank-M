@@ -93,7 +93,7 @@ export async function removeVoiceNote(req, res) {
 }
 
 /** Unpacked workbook limit: a small, highly compressed file must not expand to gigabytes. */
-const MAX_UNZIPPED_BYTES = 100 * 1024 * 1024;
+const MAX_UNZIPPED_BYTES = 50 * 1024 * 1024;
 
 /**
  * Reads the sizes an .xlsx (zip) declares in its central directory, before anything is unpacked,
