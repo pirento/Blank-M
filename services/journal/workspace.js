@@ -129,10 +129,20 @@ export function toChatMessage(row) {
 
 /* ---------------------------------- reads ---------------------------------- */
 
-/** All of the member's trades, newest first. */
-export async function loadTrades(userId) {
-  const rows = await Trade.find({ userId }).sort({ tradeDate: -1, _id: -1 }).lean();
-  return rows.map(toTrade);
+/** All of the member's trades, newest first; `tradeNotes: false` leaves notes empty (not loaded). */
+export async function loadTrades(userId, { tradeNotes = true } = {}) {
+  const query = Trade.find({ userId }).sort({ tradeDate: -1, _id: -1 });
+  if (!tradeNotes) query.select('-notes');
+  return (await query.lean()).map(toTrade);
+}
+
+/** The sum of the member's trades' net P&L, without loading the trades. */
+export async function totalNetPnl(userId) {
+  const [row] = await Trade.aggregate([
+    { $match: { userId } },
+    { $group: { _id: null, total: { $sum: '$netPnl' } } },
+  ]);
+  return row?.total ?? 0;
 }
 /** The member's strategies, latest trade date first. */
 export async function loadStrategies(userId) {
@@ -172,10 +182,11 @@ export const WORKSPACE_PARTS = Object.keys(WORKSPACE_LOADERS);
 
 /**
  * The owner's workspace snapshot. Pass `parts` to load only what a page uses
- * (for example ['rules']); by default everything is loaded.
+ * (for example ['rules']); by default everything is loaded. `options` go to the
+ * loaders (`tradeNotes`, see loadTrades).
  */
-export async function loadWorkspace(userId, parts = WORKSPACE_PARTS) {
-  const values = await Promise.all(parts.map((part) => WORKSPACE_LOADERS[part](userId)));
+export async function loadWorkspace(userId, parts = WORKSPACE_PARTS, options = {}) {
+  const values = await Promise.all(parts.map((part) => WORKSPACE_LOADERS[part](userId, options)));
   return Object.fromEntries(parts.map((part, index) => [part, values[index]]));
 }
 

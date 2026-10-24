@@ -2,7 +2,7 @@
  * Server-rendered pages: the workspace pages, landing, login, invitation and
  * emailed-link pages, and the 404 page.
  */
-import { WORKSPACE_PARTS, loadWorkspace } from '../services/journal/workspace.js';
+import { WORKSPACE_PARTS, loadWorkspace, totalNetPnl } from '../services/journal/workspace.js';
 import { computeCurrentBalance } from '../shared/pnl.js';
 import { env } from '../config/env.js';
 import { hasOpenAiKey } from '../services/ai/openai-key.js';
@@ -32,7 +32,7 @@ function integrations() {
  * Workspace pages: the server loads the parts of the owner's snapshot the page
  * uses (`data`, default: everything) and the view receives them both for server
  * rendering and as JSON for its browser module. `portfolioBalance` is derived
- * from trades and settings.
+ * from trades and settings. `tradeNotes: false` for pages that never show notes.
  */
 export function workspacePage(
   view,
@@ -41,13 +41,14 @@ export function workspacePage(
     vendor = [],
     data: parts = [...WORKSPACE_PARTS, 'portfolioBalance'],
     feature = null,
+    tradeNotes = true,
   } = {},
 ) {
   // The dock shows the watchlist count on every page.
   const wanted = new Set([...parts, 'watchlist']);
   const withBalance = wanted.delete('portfolioBalance');
   const load = new Set(wanted);
-  if (withBalance) load.add('trades').add('settings');
+  if (withBalance) load.add('settings');
   return async (req, res) => {
     const userId = req.member.userId;
     const membership = await membershipFor(req.member.user);
@@ -68,13 +69,12 @@ export function workspacePage(
         membership,
       });
     }
-    const snapshot = await loadWorkspace(userId, [...load]);
+    const snapshot = await loadWorkspace(userId, [...load], { tradeNotes });
     const data = Object.fromEntries([...wanted].map((part) => [part, snapshot[part]]));
     if (withBalance) {
-      data.portfolioBalance = computeCurrentBalance(
-        snapshot.settings.openingBalance,
-        snapshot.trades,
-      );
+      // A page without the trade list only needs their P&L total, summed in MongoDB.
+      const trades = snapshot.trades ?? [{ pnl: await totalNetPnl(userId) }];
+      data.portfolioBalance = computeCurrentBalance(snapshot.settings.openingBalance, trades);
     }
     const health = integrations();
     res.renderWorkspace(`pages/${view}`, {
