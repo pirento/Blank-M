@@ -158,15 +158,18 @@ orphan sweep keeps its S3 position (a file name) in `counters._id = 'screenshot_
   data (the WiredTiger cache uses about half the RAM); watch for slow queries with
   `db.setProfilingLevel(1, { slowms: 100 })` or Atlas Performance Advisor, and check
   `db.<collection>.aggregate([{ $indexStats: {} }])` for unused indexes.
-- **Before taking payments:** move to a three-node **replica set** (Atlas M10 or larger, or your own)
-  for automatic failover and point-in-time backups. Multi-document transactions also need one.
-  Only `MONGODB_URI` changes.
+- **Replica set:** `deploy/setup-vps.sh` and Docker Compose run MongoDB as a one-node replica set
+  `rs0` (`?replicaSet=rs0` in `MONGODB_URI`; older installs can switch once, see
+  docs/DEPLOYMENT.md). **Before taking payments**, grow it to three nodes (or Atlas M10 or larger)
+  for automatic failover and point-in-time backups; only `MONGODB_URI` changes. The driver retries
+  writes and a replica set's default write concern is majority, and `tests/server/replica-set.test.js`
+  runs the app on one. Steps: docs/DEPLOYMENT.md → "Running on more than one server".
 - **Sharding** is only worth it when one replica set can no longer hold the data or the writes
   (roughly beyond 1–2 TB or sustained write saturation), far beyond thousands of members. Every
   member query filters by `userId`, so `{ userId: 'hashed' }` would be the shard key for member
   collections.
-- **Connections:** each app process keeps a Mongoose pool (100 by default). With PM2 in cluster mode
-  or several servers, keep processes × pool under the server's connection limit.
+- **Connections:** each app process keeps a Mongoose pool of up to 50 (`config/database.js`). With
+  PM2 in cluster mode or several servers, keep processes × pool under the server's connection limit.
 
 ## Known follow-ups
 
