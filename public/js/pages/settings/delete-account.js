@@ -79,7 +79,7 @@ export function mountDeleteAccount() {
           h(
             'a',
             { href: '/api/account/export', download: '', class: 'underline' },
-            t('Download backup'),
+            t('Download a backup now'),
           ),
         ),
         label(

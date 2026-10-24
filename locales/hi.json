@@ -307,7 +307,7 @@
   "Delete my account": "मेरा खाता हटाएँ",
   "Deletes your account, journal, files, broker links and AI data for good. This cannot be undone. Payment records are kept as the law requires.": "आपका खाता, जर्नल, फ़ाइलें, ब्रोकर कनेक्शन और AI डेटा हमेशा के लिए हट जाते हैं। इसे वापस नहीं किया जा सकता। भुगतान के रिकॉर्ड क़ानून के अनुसार रखे जाते हैं।",
   "Take a backup first if you want to keep your records.": "अगर आप अपने रिकॉर्ड रखना चाहते हैं, तो पहले बैकअप ले लें।",
-  "Download backup": "बैकअप डाउनलोड करें",
+  "Download a backup now": "अभी बैकअप डाउनलोड करें",
   "Type your email address to confirm: {email}": "पुष्टि के लिए अपना ईमेल पता लिखें: {email}",
   "Current password": "मौजूदा पासवर्ड",
   "You sign in with Google: sign in with Google again just before deleting.": "आप Google से साइन इन करते हैं: हटाने से ठीक पहले Google से फिर से साइन इन करें।",
