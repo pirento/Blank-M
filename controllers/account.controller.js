@@ -1,15 +1,18 @@
 /**
- * Account endpoints: signed-in devices, data backup export/restore, email
+ * Account endpoints: signed-in devices, account deletion, data backup export/restore, email
  * report preferences, the scheduled report jobs and live order settings.
  */
 import multer from 'multer';
 import { z } from 'zod';
-import { SESSION_MAX_AGE_MS } from '../middleware/session.js';
+import { SESSION_COOKIE, SESSION_MAX_AGE_MS } from '../middleware/session.js';
 import {
+  confirmAccountOwner,
+  destroySession,
   listUserSessions,
   revokeUserSession,
   revokeUserSessions,
 } from '../services/auth/accounts.js';
+import { deleteMember } from '../services/admin/delete-member.js';
 import { buildBackup, restoreBackup } from '../services/journal/backup.js';
 import { AccountSettings } from '../models/index.js';
 import { isMailConfigured } from '../services/mailer.js';
@@ -79,6 +82,30 @@ export async function revokeSession(req, res) {
 export async function revokeOtherSessions(req, res) {
   await revokeUserSessions(req.member.userId, req.sessionID);
   res.json({ ok: true });
+}
+
+/**
+ * POST /api/account/delete { confirm, currentPassword }: the member deletes their own account and
+ * all its data for good, after typing their email and proving it is them. Any Razorpay renewal is
+ * cancelled first. Administrators are refused (another administrator removes them).
+ */
+export async function deleteAccount(req, res) {
+  const user = req.member.user;
+  if (user.role === 'admin') {
+    throw new HttpError('An administrator account cannot delete itself from Settings.', 403);
+  }
+  if (
+    String(req.body?.confirm ?? '')
+      .trim()
+      .toLowerCase() !== user.email
+  ) {
+    throw new HttpError('Type your email address exactly as shown to confirm.', 400);
+  }
+  await confirmAccountOwner(user, req.member.session, req.body?.currentPassword, 'account-delete');
+  await deleteMember(user.email);
+  await destroySession(req);
+  res.clearCookie(SESSION_COOKIE);
+  res.json({ ok: true, redirect: '/' });
 }
 
 /* ------------------------------------- backup ------------------------------------- */

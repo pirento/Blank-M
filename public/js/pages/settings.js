@@ -20,6 +20,7 @@ import { mountLanguage } from './settings/language.js';
 import { mountAi } from './settings/ai.js';
 import { mountCharges } from './settings/charges.js';
 import { mountReportProblem } from './settings/report-problem.js';
+import { mountDeleteAccount } from './settings/delete-account.js';
 
 mountBroker();
 mountCapital();
@@ -40,3 +41,4 @@ mountBackup();
 mountAi();
 mountCharges();
 mountReportProblem();
+mountDeleteAccount();

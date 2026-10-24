@@ -15,7 +15,9 @@ import {
   instrumentCount,
   isKiteConfigured,
   refreshInstruments,
+  yahooProvider,
 } from '../services/market/index.js';
+import { hasFeature } from '../services/billing/membership.js';
 import { authenticateRequest, requireAdmin } from '../services/auth/request-auth.js';
 import { HttpError, ServerConfigurationError } from '../services/errors.js';
 import { isDatabaseConnected } from '../config/database.js';
@@ -101,6 +103,13 @@ function marketFailure(res, error, label) {
   res.status(500).json({ error: 'Unexpected server error' });
 }
 
+/**
+ * Whether the signed-in member may get live-vendor or Zerodha prices. Without Premium live prices
+ * the quote and history endpoints still work (paper trading, alerts, the trade form) from the
+ * public, delayed source. Never starts a trial: a price lookup is not a visit.
+ */
+const livePrices = (req) => hasFeature(req.auth.user, 'livePrices', { startTrial: false });
+
 /** GET /api/quote?symbol=: the signed-in member's quote for one symbol. 503 without a database. */
 export async function quote(req, res) {
   res.setHeader('Cache-Control', 'private, no-store');
@@ -117,7 +126,10 @@ export async function quote(req, res) {
     const symbol = assertValidSymbol(req.query?.symbol);
     const { user } = await authenticateRequest(req);
     await meterPriceRequest(user.id);
-    res.status(200).json(await getQuote(symbol, user.id));
+    const live = await livePrices(req);
+    res
+      .status(200)
+      .json(live ? await getQuote(symbol, user.id) : await yahooProvider.fetchQuote(symbol));
   } catch (error) {
     marketFailure(res, error, 'quote');
   }
@@ -146,7 +158,14 @@ export async function history(req, res) {
     assertBoundedIntradayRange(from, to, interval);
     const { user } = await authenticateRequest(req);
     await meterPriceRequest(user.id);
-    res.status(200).json(await getHistory(symbol, from, to, interval, user.id));
+    const live = await livePrices(req);
+    res
+      .status(200)
+      .json(
+        live
+          ? await getHistory(symbol, from, to, interval, user.id)
+          : await yahooProvider.fetchHistory(symbol, from, to, interval),
+      );
   } catch (error) {
     marketFailure(res, error, 'history');
   }

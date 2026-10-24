@@ -165,7 +165,7 @@ cd /srv/blank && set -a && . ./.env && set +a && node scripts/admin-setup-code.j
 
 1. `rzp_test_` wali keys daaliye → Plans & billing → **Check keys** (keys galat hon to yahin bata deta hai).
 2. Plans & billing mein billing on, trial `0` din rakhiye (taaki turant charge ho), ek test member
-   banaiye aur Settings → Plan & billing → Subscribe.
+   banaiye aur menu mein **Billing** page (`/billing`) → Subscribe.
 3. Razorpay page par test card `4111 1111 1111 1111` (koi bhi future date, CVV `123`) ya UPI
    `success@razorpay` se pay kariye.
 4. Kuch second mein member par "Premium active" aana chahiye aur admin Overview mein payment dikhni
@@ -173,7 +173,7 @@ cd /srv/blank && set -a && . ./.env && set +a && node scripts/admin-setup-code.j
 5. Member se Cancel karke dekhiye, phir trial waapas set kariye aur `rzp_live_` keys + live webhook
    secret daaliye.
 
-Member Settings → Plan & billing se Subscribe karta hai, payment Razorpay ke apne page par hoti hai
+Member **Billing** page (`/billing`) se Subscribe karta hai, payment Razorpay ke apne page par hoti hai
 (card/UPI detail hamare server par kabhi nahi aati). Trial chal raha ho to pehla charge trial khatam
 hone par. Cancel karne par mahine ke aakhir tak Premium rehta hai. Billing off ho to sab free (pehle
 jaisa).

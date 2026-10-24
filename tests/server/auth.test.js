@@ -22,7 +22,7 @@ describe('password sign-in and sessions', () => {
   it('signs in an invited member and loads the workspace', async () => {
     const member = await createMember();
     const { agent } = await signIn(app, { email: member.user.email, password: member.password });
-    const workspace = await agent.get('/api/workspace');
+    const workspace = await agent.get('/api/account/export');
     expect(workspace.status).toBe(200);
     expect(workspace.body).toMatchObject({ trades: [], strategies: [], rules: [], watchlist: [] });
     const page = await agent.get('/dashboard');
@@ -55,7 +55,7 @@ describe('password sign-in and sessions', () => {
   });
 
   it('keeps anonymous visitors out of pages and APIs', async () => {
-    expect((await request(app).get('/api/workspace')).status).toBe(401);
+    expect((await request(app).get('/api/account/export')).status).toBe(401);
     const page = await request(app).get('/dashboard');
     expect(page.status).toBe(302);
     expect(page.headers.location).toMatch(/^\/login/);
@@ -86,7 +86,7 @@ describe('password sign-in and sessions', () => {
       .set('Accept', 'application/json')
       .send({});
     expect(logout.status).toBe(200);
-    expect((await agent.get('/api/workspace')).status).toBe(401);
+    expect((await agent.get('/api/account/export')).status).toBe(401);
   });
 
   it('rejects a request queued under a previous login session', async () => {
@@ -123,7 +123,7 @@ describe('authenticator (TOTP) protection', () => {
 
     const second = await signIn(app, { email: member.user.email, password: member.password });
     // Password alone (aal1) cannot read workspace data once a factor is verified.
-    expect((await second.agent.get('/api/workspace')).status).toBe(403);
+    expect((await second.agent.get('/api/account/export')).status).toBe(403);
     const reused = await second.agent
       .post('/auth/mfa/verify')
       .set('X-CSRF-Token', second.csrf)
@@ -135,7 +135,7 @@ describe('authenticator (TOTP) protection', () => {
       .set('X-CSRF-Token', second.csrf)
       .send({ factorId: enrol.body.id, code: totpCode(enrol.body.secret, currentStep() + 1) });
     expect(next.status).toBe(200);
-    expect((await second.agent.get('/api/workspace')).status).toBe(200);
+    expect((await second.agent.get('/api/account/export')).status).toBe(200);
   });
 });
 
@@ -161,7 +161,7 @@ describe('account takeover guards', () => {
       code: totpCode(leftover.secret, currentStep()),
     });
     expect(refused.status).toBe(403);
-    expect((await again.agent.get('/api/workspace')).status).toBe(403);
+    expect((await again.agent.get('/api/account/export')).status).toBe(403);
   });
 
   it('asks for the current password to change it outside a recovery link', async () => {

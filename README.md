@@ -3,7 +3,8 @@
 Blank is an invite-only trading journal for the Indian market: journal P&L with configurable
 brokerage and statutory charges, trade and strategy records, a risk calculator with saved order
 plans, deterministic backtesting with reviewable research evidence, weekly/monthly reports,
-Zerodha Kite data and OpenAI-assisted research.
+OpenAI-assisted research and broker links. Zerodha, Dhan, Upstox, Fyers and Angel One fills come
+into the journal (daily automatic import); balance, holdings and live orders are Zerodha only.
 
 **Stack:** Node.js 22 · Express 4 (MVC) · MongoDB with Mongoose 8 · EJS templates · plain
 JavaScript ES modules (no TypeScript, no client build step) · Tailwind CSS 4 · Chart.js ·
@@ -36,19 +37,22 @@ Run `pnpm run watch:css` alongside `pnpm run dev` while editing templates or cli
 
 ## Commands
 
-| Command                               | Purpose                                                            |
-| ------------------------------------- | ------------------------------------------------------------------ |
-| `pnpm run dev`                        | Start the server with file watching                                |
-| `pnpm start`                          | Start the production server                                        |
-| `pnpm run dev:memory`                 | Start against a throwaway in-memory MongoDB                        |
-| `pnpm run build` / `build:css`        | Compile `assets/css/app.css` → `public/css/app.css`                |
-| `pnpm run seed:admin`                 | Create or reset the first administrator                            |
-| `pnpm run maintenance:voice-notes`    | Remove expired temporary voice-note uploads (cron)                 |
-| `pnpm run maintenance:weekly-reports` | Send weekly report emails to members who opted in (cron)           |
-| `pnpm run lint`                       | ESLint                                                             |
-| `pnpm run format:check`               | Prettier                                                           |
-| `pnpm test`                           | Vitest: domain, client-module and server integration tests         |
-| `pnpm run test:e2e`                   | Playwright browser tests against an in-memory server (`tests/e2e`) |
+| Command                               | Purpose                                                             |
+| ------------------------------------- | ------------------------------------------------------------------- |
+| `pnpm run dev`                        | Start the server with file watching                                 |
+| `pnpm start`                          | Start the production server                                         |
+| `pnpm run dev:memory`                 | Start against a throwaway in-memory MongoDB                         |
+| `pnpm run build` / `build:css`        | Compile `assets/css/app.css` → `public/css/app.css`                 |
+| `pnpm run seed:admin`                 | Create or reset the first administrator                             |
+| `pnpm run maintenance:voice-notes`    | Remove expired temporary voice-note uploads (cron)                  |
+| `pnpm run maintenance:weekly-reports` | Send weekly report emails to members who opted in (cron)            |
+| `pnpm run maintenance:price-checks`   | Paper trade stops/targets, price alerts, automatic GTTs (cron)      |
+| `pnpm run maintenance:daily-import`   | Bring today's broker fills into members' journals (cron)            |
+| `pnpm run maintenance:premarket-plan` | Send the pre-market plan on Telegram to members who opted in (cron) |
+| `pnpm run lint`                       | ESLint                                                              |
+| `pnpm run format:check`               | Prettier                                                            |
+| `pnpm test`                           | Vitest: domain, client-module and server integration tests          |
+| `pnpm run test:e2e`                   | Playwright browser tests against an in-memory server (`tests/e2e`)  |
 
 ## Project layout
 
@@ -61,7 +65,8 @@ controllers/           request handlers (pages, auth, MFA, workspace, Kite, admi
 services/              business logic, by area: auth/, journal/, market/ (Kite, Yahoo), broker/,
                        ai/, admin/, maintenance/, plus shared helpers (storage, mail, crypto)
 middleware/            sessions, CSRF/CSP, authentication guards, view helpers, errors
-routes/                web.js (EJS pages), auth.js (/auth/*), api.js (/api/*)
+routes/                web.js (EJS pages), admin.js (admin panel pages under /admin),
+                       auth.js (/auth/*), api.js (/api/*)
 views/                 EJS layouts, partials and one template per page
 public/js/             browser ES modules: core helpers, page scripts (large pages split into
                        a folder of the same name), components, libraries

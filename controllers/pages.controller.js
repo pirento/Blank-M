@@ -90,6 +90,7 @@ export function workspacePage(
         role: req.member.user.role,
         status: req.member.user.status ?? 'active',
         loginMethod: req.member.session.method ?? 'password',
+        hasPassword: Boolean(req.member.user.passwordHash),
         health: { ...health, aiAvailable: health.openai },
         workspace: data,
         query: req.query,

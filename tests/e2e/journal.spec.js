@@ -142,7 +142,7 @@ test('a broker tradebook is paired into round trips before import', async ({ pag
   const reloaded = page.waitForEvent('load');
   await page.getByRole('button', { name: 'Import 1 trade' }).click();
   await reloaded;
-  const workspace = await apiRequest(page, 'GET', '/api/workspace');
+  const workspace = await apiRequest(page, 'GET', '/api/account/export');
   const trade = workspace.body.trades.find((row) => row.symbol === symbol);
   expect(trade).toMatchObject({ type: 'Long', entryPrice: 101, exitPrice: 105, quantity: 20 });
 });

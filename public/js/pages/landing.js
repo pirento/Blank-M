@@ -4,6 +4,8 @@
  */
 import { $ } from '../core/dom.js';
 import { api, errorMessage } from '../core/api.js';
+// Shows a message left by the previous page (the goodbye after deleting an account).
+import '../core/toast.js';
 
 const form = $('[data-access-request]');
 const errorBox = $('[data-access-error]');
