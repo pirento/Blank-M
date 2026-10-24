@@ -39,7 +39,7 @@ reports, alert emails), `VAPID_*` (push notifications), `GOOGLE_*` (Google sign-
 
 Most API keys can instead be entered in the **admin panel → Integrations** (`/admin/integrations`):
 OpenAI, Zerodha Kite, Upstox, Fyers, Razorpay, SMTP, Telegram, Google sign-in, push (VAPID),
-TrueData and the business details on the legal pages. A value saved there wins over `.env` and
+TrueData, screenshot storage (S3) and the business details on the legal pages. A value saved there wins over `.env` and
 reaches every server process within a minute. Keep `BROKER_TOKEN_ENCRYPTION_KEY` in `.env`.
 
 ### Without email (SMTP)
@@ -268,6 +268,38 @@ is one GTT that sells the filled quantity at the plan's stop-loss (as a LIMIT 0.
 trigger) or at its target, whichever comes first; both triggers must be at least 0.25% from the
 current price. Zerodha GTTs do not support intraday (MIS) positions, so MIS orders need their stop
 placed in Kite.
+
+## Storing screenshots in S3
+
+Trade chart screenshots are the only files kept for good (up to 500 MB per member), so a growing
+install can keep them in S3-compatible storage instead of MongoDB: AWS S3, Cloudflare R2,
+DigitalOcean Spaces, Wasabi or MinIO. Statements and voice notes are temporary and stay in MongoDB.
+
+1. Create a **private** bucket (no public access: the app checks the owner and streams each image
+   itself).
+2. Create an access key that can use **only that bucket**: list, read, write and delete objects. On
+   AWS, an IAM user with `s3:ListBucket` on `arn:aws:s3:::<bucket>` and `s3:GetObject`,
+   `s3:PutObject`, `s3:DeleteObject` on `arn:aws:s3:::<bucket>/*`; on R2, an API token with
+   _Object Read & Write_ for that bucket.
+3. In the **admin panel → Integrations → Screenshot storage (S3)** set the bucket name, region
+   (`ap-south-1` for AWS Mumbai, `auto` for R2), the endpoint URL when not on AWS (for example
+   `https://<account-id>.r2.cloudflarestorage.com` or `https://sgp1.digitaloceanspaces.com`), the
+   access key ID and the secret. Tick _Path-style addresses_ for MinIO. (`S3_*` in `.env` work too.)
+   Once the bucket and both keys are set, new screenshots go to the bucket (on every server process
+   within a minute); old ones keep loading from MongoDB.
+4. A minute later, copy the old ones:
+   `cd /srv/blank && node scripts/migrate-screenshots-to-s3.js` (or
+   `pnpm run maintenance:screenshots-to-s3`). It skips files already copied with the same size, so
+   it can simply be run again after an interruption, and it exits with an error when any file
+   failed.
+5. Open a few trades' screenshots in the app, then delete the MongoDB copies:
+   `node scripts/migrate-screenshots-to-s3.js --delete` (each copy is deleted only after its S3 copy
+   is checked). Until then a member's storage use counts both copies.
+
+**Backups:** files in S3 are not in `mongodump` (`deploy/backup-mongo.sh`). Turn on bucket
+versioning where the provider has it (AWS S3, Wasabi, MinIO), with a lifecycle rule that removes old
+versions after 30 days, or use the provider's backups or replication. Keep the S3 settings once the
+copy is done: without them, screenshots stored in S3 can no longer be shown.
 
 ## 7. Health check and logs
 

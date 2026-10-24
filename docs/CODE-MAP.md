@@ -404,19 +404,20 @@ The admin panel's browser modules (one per page in `views/admin/`, plus `shell.j
 
 ### `scripts/`
 
-| File                         | What it does                                         |
-| ---------------------------- | ---------------------------------------------------- |
-| `create-admin.js`            | Bootstrap the first administrator.                   |
-| `admin-setup-code.js`        | Code for an admin's first authenticator (no email).  |
-| `maintenance-signups.js`     | Daily: delete sign-ups unconfirmed after 7 days.     |
-| `delete-member.js`           | Delete a member and all their data (on request).     |
-| `billing-reminders.js`       | Daily: "your trial ends soon" emails.                |
-| `market-feed.js`             | The TrueData live feed process (PM2 app).            |
-| `dev-memory.js`              | Local preview without installing MongoDB             |
-| `daily-import.js`            | Scheduled daily automatic journal (after the close). |
-| `premarket-plan.js`          | Scheduled pre-market plan on Telegram (07:30 IST).   |
-| `maintenance-voice-notes.js` | Scheduled voice-note cleanup (run daily from cron).  |
-| `send-weekly-reports.js`     | Scheduled weekly report emails.                      |
+| File                           | What it does                                         |
+| ------------------------------ | ---------------------------------------------------- |
+| `create-admin.js`              | Bootstrap the first administrator.                   |
+| `admin-setup-code.js`          | Code for an admin's first authenticator (no email).  |
+| `maintenance-signups.js`       | Daily: delete sign-ups unconfirmed after 7 days.     |
+| `delete-member.js`             | Delete a member and all their data (on request).     |
+| `billing-reminders.js`         | Daily: "your trial ends soon" emails.                |
+| `market-feed.js`               | The TrueData live feed process (PM2 app).            |
+| `dev-memory.js`                | Local preview without installing MongoDB             |
+| `daily-import.js`              | Scheduled daily automatic journal (after the close). |
+| `premarket-plan.js`            | Scheduled pre-market plan on Telegram (07:30 IST).   |
+| `maintenance-voice-notes.js`   | Scheduled voice-note cleanup (run daily from cron).  |
+| `send-weekly-reports.js`       | Scheduled weekly report emails.                      |
+| `migrate-screenshots-to-s3.js` | Copy trade screenshots from GridFS to S3 (once).     |
 
 ### `services/`
 
@@ -430,7 +431,7 @@ The admin panel's browser modules (one per page in `views/admin/`, plus `shell.j
 | `mailer.js`       | Outgoing email over SMTP, text plus branded HTML (replaceable in tests).         |
 | `rate-window.js`  | Durable fixed-window rate limits shared by all server processes.                 |
 | `storage-path.js` | Storage download interpolates object paths into a URL under service credentials. |
-| `storage.js`      | File storage in MongoDB GridFS                                                   |
+| `storage.js`      | File storage in MongoDB GridFS (trade screenshots in S3 when configured)         |
 
 ### `services/admin/`
 

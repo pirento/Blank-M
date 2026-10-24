@@ -20,6 +20,7 @@
     "test": "vitest run",
     "seed:admin": "node scripts/create-admin.js",
     "maintenance:voice-notes": "node scripts/maintenance-voice-notes.js",
+    "maintenance:screenshots-to-s3": "node scripts/migrate-screenshots-to-s3.js",
     "check": "npm run lint && npm run format:check && npm test",
     "test:watch": "vitest",
     "dev:memory": "node scripts/dev-memory.js",
@@ -30,6 +31,7 @@
     "maintenance:premarket-plan": "node scripts/premarket-plan.js"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "3.1149.0",
     "@tailwindcss/cli": "^4.1.14",
     "bcryptjs": "^3.0.2",
     "chart.js": "^4.5.0",

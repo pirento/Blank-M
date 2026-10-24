@@ -15,6 +15,7 @@ import { createLogger, errorName } from '../logger.js';
 import { loadPlan } from '../billing/plan.js';
 import { env } from '../../config/env.js';
 import { resetMailer } from '../mailer.js';
+import { resetS3 } from '../storage.js';
 import { openAiApiKey } from '../ai/openai-key.js';
 import { PLATFORM_SETTINGS, settingDefinition } from './settings-registry.js';
 
@@ -41,6 +42,8 @@ function setEnv(key, value) {
   }
   // The mail transport is built once from SMTP_*; rebuild it after a change.
   if (key.startsWith('SMTP_') && before !== process.env[key]) resetMailer();
+  // Likewise the screenshot storage client from S3_*.
+  if (key.startsWith('S3_') && before !== process.env[key]) resetS3();
 }
 
 function storedValue(row) {
