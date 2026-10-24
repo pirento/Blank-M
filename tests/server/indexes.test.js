@@ -128,6 +128,10 @@ describe('database indexes', () => {
       (await indexOn('liveorders', { status: 1, gttStatus: 1, createdAt: 1 }))
         ?.partialFilterExpression,
     ).toEqual({ autoGtt: true });
+    // Upload cleanup and the screenshot sweep pick GridFS files by upload time.
+    for (const bucket of ['statements', 'voiceNotes', 'tradeScreenshots']) {
+      expect(await indexOn(`${bucket}.files`, { uploadDate: 1 }), bucket).toBeDefined();
+    }
 
     // connect-mongo adds the session TTL once the store is used.
     const { password } = await createMember();
