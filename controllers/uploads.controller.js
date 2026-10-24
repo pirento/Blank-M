@@ -2,15 +2,16 @@
  * File uploads: broker statements, temporary voice notes, trade chart
  * screenshots and Excel workbook parsing for the import page.
  */
+import { pipeline } from 'node:stream/promises';
 import { reserveAttempts } from '../services/rate-window.js';
 import multer from 'multer';
 import readXlsxFile from 'read-excel-file/node';
 import { normalizeSheet } from '../shared/spreadsheet-data.js';
 import {
-  downloadObject,
   ownerBytes,
   removeObjects,
   statementPath,
+  streamObject,
   uploadObject,
   voiceNotePath,
 } from '../services/storage.js';
@@ -178,12 +179,22 @@ export async function uploadTradeScreenshot(req, res) {
   });
 }
 
-/** Streams the owner's screenshot (API responses are private and not cached). */
+/**
+ * Streams the owner's screenshot. Every replace stores it under a new path, so the path is its
+ * ETag: the browser may keep the image but revalidates it (304) on each view.
+ */
 export async function getTradeScreenshot(req, res) {
   const path = await tradeScreenshot(req.member.userId, req.params.id);
-  const data = path ? await downloadObject('trade-screenshots', path) : null;
+  if (!path) throw new HttpError('This trade has no screenshot.', 404);
+  res.set({ ETag: `"${path}"`, 'Cache-Control': 'private, no-cache' });
+  if (req.fresh) {
+    res.status(304).end();
+    return;
+  }
+  const data = await streamObject('trade-screenshots', path);
   if (!data) throw new HttpError('This trade has no screenshot.', 404);
-  res.type(data.contentType).send(data.buffer);
+  res.type(data.contentType).set('Content-Length', String(data.length));
+  await pipeline(data.stream, res);
 }
 
 /** DELETE /api/trades/:id/screenshot: removes the trade's screenshot and returns the updated trade. */

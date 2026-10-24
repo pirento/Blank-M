@@ -269,11 +269,18 @@ describe('trade screenshots', () => {
     const image = await owner.agent.get(`/api/trades/${trade.id}/screenshot`);
     expect(image.status).toBe(200);
     expect(image.headers['content-type']).toMatch(/^image\/png/);
+    expect(image.headers['cache-control']).toBe('private, no-cache');
+    expect(Buffer.compare(image.body, PNG)).toBe(0);
+    const revalidate = (etag) =>
+      owner.agent.get(`/api/trades/${trade.id}/screenshot`).set('If-None-Match', etag);
+    expect((await revalidate(image.headers.etag)).status).toBe(304);
 
     const other = await member('other@example.com');
     expect((await other.agent.get(`/api/trades/${trade.id}/screenshot`)).status).toBe(404);
 
     expect((await upload()).status).toBe(201);
+    // A replaced image has a new ETag, so the cached one is not reused.
+    expect((await revalidate(image.headers.etag)).status).toBe(200);
     const removed = await owner.send('delete', `/api/trades/${trade.id}/screenshot`);
     expect(removed.body.trade.hasScreenshot).toBe(false);
     expect((await owner.agent.get(`/api/trades/${trade.id}/screenshot`)).status).toBe(404);

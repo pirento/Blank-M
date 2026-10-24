@@ -131,20 +131,28 @@ export async function uploadObject(bucketName, path, userId, file) {
   return path;
 }
 
-/** The stored file's bytes and content type, or null when no file has that path. */
-export async function downloadObject(bucketName, path) {
+/**
+ * A read stream of the stored file with its byte length and content type, or null when no file
+ * has that path. Nothing is read until the stream is consumed.
+ */
+export async function streamObject(bucketName, path) {
   const { gridfs } = bucket(bucketName);
   const [file] = await gridfs.find({ filename: path }).limit(1).toArray();
   if (!file) return null;
+  return {
+    stream: gridfs.openDownloadStream(file._id),
+    length: file.length,
+    contentType: file.metadata?.contentType || '',
+  };
+}
+
+/** The stored file's bytes and content type, or null when no file has that path. */
+export async function downloadObject(bucketName, path) {
+  const data = await streamObject(bucketName, path);
+  if (!data) return null;
   const chunks = [];
-  await new Promise((resolve, reject) => {
-    gridfs
-      .openDownloadStream(file._id)
-      .on('data', (chunk) => chunks.push(chunk))
-      .once('error', reject)
-      .once('end', resolve);
-  });
-  return { buffer: Buffer.concat(chunks), contentType: file.metadata?.contentType || '' };
+  for await (const chunk of data.stream) chunks.push(chunk);
+  return { buffer: Buffer.concat(chunks), contentType: data.contentType };
 }
 
 /** Returns the names actually removed, so callers can verify a cleanup. */
