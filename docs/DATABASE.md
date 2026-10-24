@@ -56,9 +56,9 @@ Sizes are rough figures for an active member, to plan disk and RAM, not limits.
 | `brokerconnections`       | Encrypted broker access tokens, one per member and provider                  | `userId+provider` unique                                                                                      | Kept until disconnected                             | ~0.5 KB per broker                         |
 | `brokeroauthstates`       | One-time broker login markers                                                | TTL `expiresAt`                                                                                               | **1 day after expiry**                              | tiny                                       |
 | `instruments`             | NSE instrument master (shared, not per member)                               | `exchange+tradingSymbol`, `instrumentToken` unique (sparse)                                                   | Refreshed                                           | ~3 MB in total                             |
-| GridFS `statements`       | Uploaded statements/charts for AI analysis (≤ 10 MB each)                    | GridFS `filename+uploadDate`                                                                                  | **7 days** (same daily job)                         | depends on uploads                         |
-| GridFS `voiceNotes`       | Temporary voice notes                                                        | GridFS `filename+uploadDate`                                                                                  | **24 hours** (`scripts/maintenance-voice-notes.js`) | tiny                                       |
-| GridFS `tradeScreenshots` | One chart screenshot per trade (≤ 5 MB)                                      | GridFS `filename+uploadDate`                                                                                  | Deleted with the trade or screenshot                | ≤ 5 MB per trade                           |
+| GridFS `statements`       | Uploaded statements/charts for AI analysis (≤ 10 MB each)                    | GridFS `filename+uploadDate`, `uploadDate`                                                                    | **7 days** (same daily job)                         | ≤ 200 MB per member                        |
+| GridFS `voiceNotes`       | Temporary voice notes                                                        | GridFS `filename+uploadDate`, `uploadDate`                                                                    | **24 hours** (`scripts/maintenance-voice-notes.js`) | ≤ 50 MB per member                         |
+| GridFS `tradeScreenshots` | One chart screenshot per trade (≤ 5 MB)                                      | GridFS `filename+uploadDate`, `uploadDate`                                                                    | With the trade or screenshot; orphans by daily job  | ≤ 500 MB per member                        |
 | `platformsettings`        | Admin panel API keys/switches (secrets encrypted) and the Premium plan       | `_id` = setting key                                                                                           | Kept                                                | platform-wide, a few KB                    |
 | `adminauditlogs`          | Who changed what in the admin panel (never secret values)                    | `createdAt` TTL                                                                                               | **2 years**                                         | admin only                                 |
 | `subscriptions`           | Premium per member: trial end, paid-until, admin grant, Razorpay id/status   | `_id` = user id, `razorpaySubscriptionId` unique (partial), `razorpayStatus`                                  | Kept                                                | ~0.3 KB                                    |
@@ -123,7 +123,9 @@ this size, and MongoDB 4.2+ builds do not block reads and writes for long. Thing
 - **Daily server backup:** `deploy/backup-mongo.sh` (installed by `deploy/setup-vps.sh`) runs
   `mongodump --gzip --archive` into `/srv/blank/backups`, keeps 14 days, and with `BACKUP_REMOTE`
   copies each archive off the server with rclone (30 days kept; use an encrypted `crypt` remote).
-  `deploy/health-check.sh` alerts when no backup has succeeded for a day.
+  `deploy/health-check.sh` alerts when no backup has succeeded for a day. The dump includes the
+  GridFS files, chart screenshots too (up to 500 MB per member), so every daily archive and the
+  backup disk grow with them.
 - **Restore everything:** `mongorestore --uri="$MONGODB_URI" --gzip --archive=<file> --drop`. Indexes
   are recreated from the dump.
 - **Test a restore** every month into a scratch database instead of the live one:
@@ -135,7 +137,7 @@ this size, and MongoDB 4.2+ builds do not block reads and writes for long. Thing
   authenticators. Store the `.env` in a password manager, not next to the archives.
 - A dump contains personal financial data and password hashes: treat it like the database.
 - **One member:** Settings → Backup exports and restores that member's own data as JSON
-  (`services/journal/backup.js`).
+  (`services/journal/backup.js`). Chart screenshot images are not in it; restored trades have none.
 - **On MongoDB Atlas** use Cloud Backup (snapshots with point-in-time restore) instead of, or as
   well as, `mongodump`.
 
