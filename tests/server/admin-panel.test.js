@@ -753,7 +753,7 @@ describe('Google sign-in', () => {
     forgetPlanCache();
     const visitor = supertest.agent(app);
     expect(await googleRoundTrip(visitor, { email: 'New@Gmail.com' })).toBe('/dashboard');
-    expect((await visitor.get('/api/workspace')).status).toBe(200);
+    expect((await visitor.get('/api/account/export')).status).toBe(200);
     await vi.waitFor(() => expect(mails.at(-1)?.subject).toBe('Welcome to Pirento Blank'));
 
     // The admin sign-in with Google refuses a member and lets an administrator through.

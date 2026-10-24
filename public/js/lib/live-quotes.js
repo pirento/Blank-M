@@ -2,7 +2,10 @@
  * Live Zerodha prices over Server-Sent Events (/api/quotes/stream). Works only
  * when the member's Kite app includes market data; otherwise the server sends
  * `unavailable`, the browser stops asking and the page keeps its own refresh.
+ * A free member is refused (402, live prices are Premium) and told so.
  */
+import { pageData } from '../core/dom.js';
+import { t } from '../core/i18n.js';
 
 /**
  * Calls `onPrice(symbol, price, at)` for each live price (`at`: trade time in ms); returns a
@@ -25,5 +28,24 @@ export function watchLiveQuotes(symbols, onPrice) {
     }
   });
   source.addEventListener('unavailable', () => source.close());
+  // EventSource hides the status: a refused stream is one that closed for good. For a free member
+  // that is the 402 (network drops reconnect instead).
+  source.addEventListener('error', () => {
+    const membership = pageData()?.membership;
+    if (
+      source.readyState === EventSource.CLOSED &&
+      membership?.billingEnabled &&
+      !membership.premium
+    ) {
+      // Loaded on demand: chart code using this module is also loaded without a DOM (Node tests).
+      void import('../core/toast.js').then(({ notify }) =>
+        notify(
+          t(
+            'Live prices are part of Premium, so these prices are delayed. Open Billing to upgrade.',
+          ),
+        ),
+      );
+    }
+  });
   return () => source.close();
 }

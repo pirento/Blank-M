@@ -37,8 +37,8 @@ describe('signed-in devices', () => {
     expect(
       (await laptop.send('post', '/api/account/sessions/revoke', { sessionId: other.id })).status,
     ).toBe(200);
-    expect((await phone.agent.get('/api/workspace')).status).toBe(401);
-    expect((await laptop.agent.get('/api/workspace')).status).toBe(200);
+    expect((await phone.agent.get('/api/account/export')).status).toBe(401);
+    expect((await laptop.agent.get('/api/account/export')).status).toBe(200);
   });
 
   it('signs out every other device at once', async () => {
@@ -46,8 +46,8 @@ describe('signed-in devices', () => {
     const two = await member('member@example.com', one.created);
     const three = await member('member@example.com', one.created);
     expect((await one.send('post', '/api/account/sessions/revoke-others', {})).status).toBe(200);
-    expect((await two.agent.get('/api/workspace')).status).toBe(401);
-    expect((await three.agent.get('/api/workspace')).status).toBe(401);
+    expect((await two.agent.get('/api/account/export')).status).toBe(401);
+    expect((await three.agent.get('/api/account/export')).status).toBe(401);
     expect((await one.agent.get('/api/account/sessions')).body.sessions).toHaveLength(1);
   });
 
@@ -59,7 +59,7 @@ describe('signed-in devices', () => {
       sessionId: ownerSessions[0].id,
     });
     expect(response.status).toBe(404);
-    expect((await owner.agent.get('/api/workspace')).status).toBe(200);
+    expect((await owner.agent.get('/api/account/export')).status).toBe(200);
   });
 });
 
@@ -125,7 +125,7 @@ describe('data backup', () => {
       chatMessages: { added: 1 },
       settings: { added: 1 },
     });
-    const workspace = (await target.agent.get('/api/workspace')).body;
+    const workspace = (await target.agent.get('/api/account/export')).body;
     expect(workspace.trades[0]).toMatchObject({
       symbol: 'INFY',
       charges: backup.trades[0].charges,
@@ -136,11 +136,11 @@ describe('data backup', () => {
     expect(workspace.trades[0].id).not.toBe(backup.trades[0].id);
     expect(workspace.settings.openingBalance).toBe(250000);
     // The source account is untouched.
-    expect((await source.agent.get('/api/workspace')).body.trades).toHaveLength(1);
+    expect((await source.agent.get('/api/account/export')).body.trades).toHaveLength(1);
 
     const again = await restore(target, backup);
     expect(again.body.summary.trades).toMatchObject({ added: 0, skipped: 1 });
-    expect((await target.agent.get('/api/workspace')).body.trades).toHaveLength(1);
+    expect((await target.agent.get('/api/account/export')).body.trades).toHaveLength(1);
   });
 
   it('skips records already in the same account and rejects inconsistent trades', async () => {

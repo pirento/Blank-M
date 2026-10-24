@@ -78,7 +78,7 @@ describe('administration', () => {
       userId: created.user._id,
     });
     expect(revoke.body).toMatchObject({ ok: true, workspaceAccessRevoked: true });
-    expect((await leaver.agent.get('/api/workspace')).status).toBe(401);
+    expect((await leaver.agent.get('/api/account/export')).status).toBe(401);
     const again = await request(app).get('/login');
     const csrf = /name="csrf-token" content="([^"]*)"/.exec(again.text)[1];
     expect(again.status).toBe(200);

@@ -291,7 +291,7 @@
   "Session expired: connect again": "सत्र समाप्त: फिर से जोड़ें",
   "Not available yet": "अभी उपलब्ध नहीं",
   "Status unavailable": "स्थिति उपलब्ध नहीं",
-  "Connections are read-only unless you turn on live orders in Settings. Your funds stay with your broker.": "जब तक आप सेटिंग्स में लाइव ऑर्डर चालू नहीं करते, कनेक्शन केवल पढ़ने के लिए हैं। आपका पैसा आपके ब्रोकर के पास ही रहता है।",
+  "The daily journal import works with all five brokers. Balance, holdings and live orders are Zerodha only, and live orders stay off until you turn them on in Settings. Your funds stay with your broker.": "रोज़ का जर्नल इम्पोर्ट पाँचों ब्रोकर के साथ काम करता है। बैलेंस, होल्डिंग्स और लाइव ऑर्डर सिर्फ़ Zerodha के साथ हैं, और लाइव ऑर्डर तब तक बंद रहते हैं जब तक आप उन्हें सेटिंग्स में चालू नहीं करते। आपका पैसा आपके ब्रोकर के पास ही रहता है।",
   "Report a problem": "समस्या बताएँ",
   "Charts by TradingView Lightweight Charts. Prices are for research and may be delayed; this is not investment advice.": "चार्ट: TradingView Lightweight Charts। कीमतें केवल शोध के लिए हैं और देर से आ सकती हैं; यह निवेश सलाह नहीं है।",
   "Fills are paired into round trips (flat to flat). Charges use your configured rates.": "फ़िल्स को पूरे सौदों (फ़्लैट से फ़्लैट) में जोड़ा जाता है। चार्ज आपकी सेट की गई दरों से लगते हैं।",
@@ -302,5 +302,16 @@
   "Leave a field empty to turn it off. When today’s net loss or number of trades reaches its limit, live orders stop until the next trading day and the dashboard shows it.": "किसी सीमा को बंद करने के लिए उसे खाली छोड़ें। जब आज का शुद्ध घाटा या सौदों की संख्या सीमा तक पहुँचे, तो अगले ट्रेडिंग दिन तक लाइव ऑर्डर रुक जाते हैं और डैशबोर्ड पर दिखता है।",
   "Every browser where your account is signed in. Sign out any you do not recognise.": "हर ब्राउज़र जहाँ आपका खाता साइन इन है। जिसे आप नहीं पहचानते, उससे साइन आउट करें।",
   "A read-only link to your trades, P&L calendar, mistakes and setups. Capital, balances, plans and chat are never shared.": "आपके सौदों, P&L कैलेंडर, गलतियों और सेटअप का केवल पढ़ने वाला लिंक। पूँजी, बैलेंस, प्लान और चैट कभी साझा नहीं होते।",
-  "Log trades from chat (/log INFY LONG 10 1500 1520), get today’s and the week’s P&L, and receive price alerts.": "चैट से सौदे दर्ज करें (/log INFY LONG 10 1500 1520), आज और इस हफ़्ते का P&L पाएँ, और कीमत अलर्ट पाएँ।"
+  "Log trades from chat (/log INFY LONG 10 1500 1520), get today’s and the week’s P&L, and receive price alerts.": "चैट से सौदे दर्ज करें (/log INFY LONG 10 1500 1520), आज और इस हफ़्ते का P&L पाएँ, और कीमत अलर्ट पाएँ।",
+  "Delete account": "खाता हटाएँ",
+  "Delete my account": "मेरा खाता हटाएँ",
+  "Deletes your account, journal, files, broker links and AI data for good. This cannot be undone. Payment records are kept as the law requires.": "आपका खाता, जर्नल, फ़ाइलें, ब्रोकर कनेक्शन और AI डेटा हमेशा के लिए हट जाते हैं। इसे वापस नहीं किया जा सकता। भुगतान के रिकॉर्ड क़ानून के अनुसार रखे जाते हैं।",
+  "Take a backup first if you want to keep your records.": "अगर आप अपने रिकॉर्ड रखना चाहते हैं, तो पहले बैकअप ले लें।",
+  "Download backup": "बैकअप डाउनलोड करें",
+  "Type your email address to confirm: {email}": "पुष्टि के लिए अपना ईमेल पता लिखें: {email}",
+  "Current password": "मौजूदा पासवर्ड",
+  "You sign in with Google: sign in with Google again just before deleting.": "आप Google से साइन इन करते हैं: हटाने से ठीक पहले Google से फिर से साइन इन करें।",
+  "Your account and its data were deleted. Goodbye.": "आपका खाता और उसका डेटा हटा दिया गया है। अलविदा।",
+  "The account could not be deleted.": "खाता हटाया नहीं जा सका।",
+  "Live prices are part of Premium, so these prices are delayed. Open Billing to upgrade.": "लाइव कीमतें Premium में शामिल हैं, इसलिए ये कीमतें देरी से हैं। अपग्रेड करने के लिए बिलिंग खोलें।"
 }

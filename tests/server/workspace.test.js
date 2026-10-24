@@ -83,9 +83,9 @@ describe('trades', () => {
     const owner = await member('owner@example.com');
     const other = await member('other@example.com');
     const { trade } = (await owner.send('post', '/api/trades', TRADE)).body;
-    expect((await other.agent.get('/api/workspace')).body.trades).toEqual([]);
+    expect((await other.agent.get('/api/account/export')).body.trades).toEqual([]);
     expect((await other.send('delete', `/api/trades/${trade.id}`)).status).toBe(404);
-    expect((await owner.agent.get('/api/workspace')).body.trades).toHaveLength(1);
+    expect((await owner.agent.get('/api/account/export')).body.trades).toHaveLength(1);
   });
 
   it('imports idempotently by stable row ID', async () => {
@@ -109,7 +109,7 @@ describe('trades', () => {
       trade: { ...row, pnl: row.pnl + 1 },
     });
     expect(tampered.status).toBe(409);
-    expect((await agent.get('/api/workspace')).body.trades).toHaveLength(1);
+    expect((await agent.get('/api/account/export')).body.trades).toHaveLength(1);
 
     // An option row from a CSV import (segment and option type from the contract name).
     const option = { ...TRADE, symbol: 'NIFTY26OCT24500CE', segment: 'OPT', optionType: 'CE' };
@@ -126,7 +126,7 @@ describe('trades', () => {
       },
     });
     expect(imported.body).toMatchObject({ result: 'inserted' });
-    const saved = (await agent.get('/api/workspace')).body.trades.find(
+    const saved = (await agent.get('/api/account/export')).body.trades.find(
       (trade) => trade.symbol === 'NIFTY26OCT24500CE',
     );
     expect(saved).toMatchObject({ segment: 'OPT', optionType: 'CE' });
@@ -145,7 +145,7 @@ describe('strategies, rules, watchlist, chat and settings', () => {
     ).body;
     await send('post', '/api/trades', { ...TRADE, strategyId: strategy.id });
     expect((await send('delete', `/api/strategies/${strategy.id}`)).status).toBe(200);
-    const { trades, strategies } = (await agent.get('/api/workspace')).body;
+    const { trades, strategies } = (await agent.get('/api/account/export')).body;
     expect(strategies).toEqual([]);
     expect(trades[0].strategyId).toBeNull();
   });
@@ -173,13 +173,13 @@ describe('strategies, rules, watchlist, chat and settings', () => {
       openingBalance: 250000,
       charges: { enabled: false },
     });
-    const workspace = (await agent.get('/api/workspace')).body;
+    const workspace = (await agent.get('/api/account/export')).body;
     expect(workspace.rules).toHaveLength(1);
     expect(workspace.watchlist.map((item) => item.symbol)).toEqual(['TCS']);
     expect(workspace.chatMessages).toHaveLength(1);
-    expect(workspace.portfolioBalance).toBe(250000);
+    expect(workspace.settings.openingBalance).toBe(250000);
     expect((await send('delete', '/api/chat/messages')).status).toBe(200);
-    expect((await agent.get('/api/workspace')).body.chatMessages).toEqual([]);
+    expect((await agent.get('/api/account/export')).body.chatMessages).toEqual([]);
   });
 
   it('claims a username once and allows sign-in with it', async () => {

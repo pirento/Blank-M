@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ session: vi.fn() }));
 import {
   requestBriefing,
-  requestPicks,
   requestPicksWithSources,
   requestResearchHistory,
 } from '../../public/js/lib/ai.js';
@@ -64,7 +63,7 @@ describe('research request client', () => {
       expect.objectContaining({ headers: expect.objectContaining({ Accept: 'application/json' }) }),
     );
   });
-  it('returns both citation levels and preserves the legacy picks-only contract', async () => {
+  it('returns both citation levels', async () => {
     vi.stubGlobal(
       'fetch',
       vi
@@ -72,7 +71,6 @@ describe('research request client', () => {
         .mockImplementation(async () => new Response(JSON.stringify(response), { status: 200 })),
     );
     await expect(requestPicksWithSources(options)).resolves.toEqual(response);
-    await expect(requestPicks(options)).resolves.toEqual(response.picks);
   });
   it('does not dispatch under later authentication after cancellation', async () => {
     let resolve;

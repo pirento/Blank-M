@@ -44,7 +44,7 @@ const WORKSPACE_PAGES = [
   ['/analytics', 'analytics', ['trades', 'strategies', 'rules', 'chatMessages'], [], 'ai'],
   ['/settings', 'settings', ['settings']],
   ['/billing', 'billing', []],
-  ['/chart', 'chart', [], ['lightweight-charts.js']],
+  ['/chart', 'chart', [], ['lightweight-charts.js'], 'livePrices'],
   ['/journal', 'journal', ['trades', 'strategies', 'rules', 'settings']],
   ['/import', 'import', ['trades', 'settings']],
   ['/backtest', 'backtest', ['trades', 'strategies', 'rules', 'settings'], CHARTS, 'backtest'],

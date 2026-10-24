@@ -4,20 +4,11 @@
  * member.
  */
 import * as workspace from '../services/journal/workspace.js';
-import { computeCurrentBalance } from '../shared/pnl.js';
 import { LANGUAGES, LANGUAGE_COOKIE } from '../services/i18n.js';
 import { HttpError } from '../services/errors.js';
 import { env } from '../config/env.js';
 
 /** JSON endpoints for the owner's journal data. Every query is scoped to the session user. */
-
-export async function snapshot(req, res) {
-  const data = await workspace.loadWorkspace(req.member.userId);
-  res.json({
-    ...data,
-    portfolioBalance: computeCurrentBalance(data.settings.openingBalance, data.trades),
-  });
-}
 
 /** POST /api/trades: saves a new trade with P&L at the member's current charge rates (201). */
 export async function createTrade(req, res) {

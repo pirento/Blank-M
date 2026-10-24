@@ -277,11 +277,6 @@ export async function requestChat(options) {
   }
 }
 
-/** Promise of just the research picks from requestPicksWithSources(). */
-export async function requestPicks(options) {
-  return (await requestPicksWithSources(options)).picks;
-}
-
 /** Preserve both per-candidate citations and the provider's research sources. */
 export async function requestPicksWithSources(options, signal) {
   const requestId = options.requestId ?? crypto.randomUUID();

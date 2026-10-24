@@ -605,3 +605,30 @@ export async function updatePassword(user, password) {
     { $set: { acceptedAt: confirmedAt } },
   );
 }
+
+/**
+ * A live session alone (an unattended browser, a stolen cookie) must not be enough to take over or
+ * delete an account. A password account gives its current password; a Google-only account must
+ * have signed in with Google in the last 10 minutes or used its authenticator in this session.
+ * Limited like sign-in per `action`, so a live session cannot be used to guess the password.
+ * Throws HttpError 403, or 429 after too many attempts.
+ */
+export async function confirmAccountOwner(user, signIn, currentPassword, action) {
+  const quota = await reserveAttempts([{ key: `${action}:${user._id}`, limit: 5 }], 15 * 60_000);
+  if (!quota.allowed) throw new HttpError('Too many attempts. Try again in 15 minutes.', 429);
+  if (user.passwordHash) {
+    const current = String(currentPassword ?? '');
+    if (!current || current.length > 128 || !(await bcrypt.compare(current, user.passwordHash))) {
+      throw new HttpError('Your current password is not correct.', 403);
+    }
+    return;
+  }
+  const fresh =
+    signIn?.method === 'oauth' && Date.now() - (signIn.authenticatedAt ?? 0) < 10 * 60_000;
+  if (!fresh && signIn?.aal !== 'aal2') {
+    throw new HttpError(
+      'Sign in with Google again (or use "Forgot password"), then try again.',
+      403,
+    );
+  }
+}

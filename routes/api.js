@@ -163,7 +163,6 @@ router.post('/admin/ai/test', wrap(adminAi.handleTestAiConfig));
 router.all('/invitations/accept', wrap(manualInvitations.handleAcceptManualInvitation));
 
 /* ------------------------------- member workspace ----------------------------- */
-router.get('/workspace', requireApiAuth, wrap(workspace.snapshot));
 router.post('/trades', requireApiAuth, wrap(workspace.createTrade));
 router.post('/trades/import', requireApiAuth, wrap(workspace.importTrade));
 router.put('/trades/:id', requireApiAuth, wrap(workspace.updateTrade));
@@ -215,6 +214,7 @@ router.put('/settings/language', requireApiAuth, wrap(workspace.saveLanguage));
 router.get('/account/sessions', requireApiAuth, wrap(account.listSessions));
 router.post('/account/sessions/revoke', requireApiAuth, wrap(account.revokeSession));
 router.post('/account/sessions/revoke-others', requireApiAuth, wrap(account.revokeOtherSessions));
+router.post('/account/delete', requireApiAuth, wrap(account.deleteAccount));
 router.get('/account/export', requireApiAuth, wrap(account.exportBackup));
 router.post('/account/restore', requireApiAuth, account.backupFile, wrap(account.importBackup));
 router.get('/account/notifications', requireApiAuth, wrap(account.getNotifications));

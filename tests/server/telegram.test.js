@@ -82,7 +82,7 @@ describe('Telegram bot', () => {
 
     await say('/log infy long 10 1500 1520 breakout held');
     expect(lastReply()).toMatch(/^Logged INFY Long 10 @ 1500 → 1520: net \+₹/);
-    const ledger = await send('get', '/api/workspace');
+    const ledger = await send('get', '/api/account/export');
     expect(ledger.body.trades[0]).toMatchObject({
       symbol: 'INFY',
       date: todayInIst(),
@@ -136,7 +136,7 @@ describe('Telegram bot', () => {
         .send(update);
     expect((await deliver()).status).toBe(200);
     expect((await deliver()).status).toBe(200);
-    const ledger = await send('get', '/api/workspace');
+    const ledger = await send('get', '/api/account/export');
     expect(ledger.body.trades).toHaveLength(1);
   });
 });
