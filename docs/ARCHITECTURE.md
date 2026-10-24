@@ -33,7 +33,8 @@ browser fetch ──► routes/api.js ──► middleware ──► controllers
 ## Browser modules
 
 There is no bundler. Pages load native ES modules from `/js/...`, the universal domain code from
-`/shared/...`, and an import map resolves `zod` to the vendored build. Chart.js, jsPDF and
+`/shared/...`, and an import map resolves `zod` to the package's small `zod/v3` build (the server
+uses zod 4; shared schemas stick to the API both understand). Chart.js, jsPDF and
 html-to-image are loaded as vendor scripts only on the pages that need them.
 
 - `public/js/core/` — `dom.js` (`h()` element builder that always inserts text safely, cards,

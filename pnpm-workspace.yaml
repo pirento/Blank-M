@@ -8,3 +8,5 @@ allowBuilds:
 # GHSA-vfj7-8cjw-p6xm. 2.6.0 replaces micromatch with picomatch.
 overrides:
   '@parcel/watcher': 2.6.0
+  # vitest installs happy-dom as a peer even though the tests use jsdom; 21.0.4 fixes GHSA for CVE-2026-33943.
+  happy-dom: ^21.0.4

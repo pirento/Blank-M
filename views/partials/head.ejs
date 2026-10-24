@@ -28,8 +28,9 @@
     document.documentElement.classList.add(theme);
   })();
 </script>
+<%# Browsers load zod's v3 API (10 files) instead of v4 (95 files); the server validates with v4. %>
 <script type="importmap" nonce="<%= cspNonce %>">
-  { "imports": { "zod": "/vendor/zod/index.js" } }
+  { "imports": { "zod": "/vendor/zod/v3/index.js" } }
 </script>
 <link rel="stylesheet" href="/css/app.css" />
 <script type="module" src="/js/core/theme.js" nonce="<%= cspNonce %>"></script>
