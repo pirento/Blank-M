@@ -5,6 +5,7 @@
 import { z } from 'zod';
 import {
   ChatMessage,
+  Counter,
   Strategy,
   Trade,
   TradingRule,
@@ -24,8 +25,11 @@ import { HttpError } from '../errors.js';
 import { MAX_STAGE_HISTORY, STAGE_VALUES } from '../../shared/strategy-stages.js';
 import { parseTradeExecution } from '../../shared/trade-execution.js';
 import { loadAccountSettings } from './account-settings.js';
-import { removeObjects, tradeScreenshotPath, uploadObject } from '../storage.js';
+import { expiredObjects, removeObjects, tradeScreenshotPath, uploadObject } from '../storage.js';
 import { iso } from '../../models/helpers.js';
+import { createLogger, errorName } from '../logger.js';
+
+const log = createLogger('journal');
 
 // Settings live in account-settings.js; re-exported for existing importers.
 export { loadAccountSettings, saveAccountSettings, toAccountSettings } from './account-settings.js';
@@ -432,10 +436,61 @@ export async function deleteTrade(userId, id) {
     { projection: { screenshotPath: 1 } },
   );
   if (!stored) throw new HttpError('This trade is no longer available.', 404);
-  if (stored.screenshotPath) await removeObjects('trade-screenshots', [stored.screenshotPath]);
+  if (stored.screenshotPath) await discardScreenshot(stored.screenshotPath);
 }
 
 /* ------------------------------ trade screenshots ------------------------------ */
+
+/**
+ * Deletes a screenshot file the trade no longer points to. The trade change has already
+ * succeeded, so a failure is only logged; the daily orphan sweep removes the file later.
+ */
+async function discardScreenshot(path) {
+  try {
+    await removeObjects('trade-screenshots', [path]);
+  } catch (error) {
+    log.warn('screenshot delete failed', { error: errorName(error) });
+  }
+}
+
+/** Screenshot files older than this that no trade points to are left over (see discardScreenshot). */
+const ORPHAN_AGE_MS = 24 * 60 * 60 * 1000;
+/** Screenshot files checked per maintenance call. */
+const SWEEP_BATCH = 1000;
+/** Counter holding the upload time the next sweep slice starts from (0: from the oldest file). */
+const SWEEP_POSITION = 'screenshot_sweep';
+
+/**
+ * One slice of the orphan sweep: deletes trade-screenshot files older than a day that no trade
+ * points to, walking the bucket oldest first and resuming where the last slice stopped, so each
+ * call does bounded work. Returns `{ deleted, moreMayRemain }`.
+ */
+export async function removeOrphanScreenshots() {
+  const position = await Counter.findById(SWEEP_POSITION).lean();
+  const files = await expiredObjects(
+    'trade-screenshots',
+    new Date(Date.now() - ORPHAN_AGE_MS),
+    SWEEP_BATCH,
+    new Date(position?.value ?? 0),
+  );
+  // Paths are `<owner>/<trade>/<uuid>`: only that trade can point to the file.
+  const tradeIds = files.map((file) => file.name.split('/')[1]).filter(Boolean);
+  const kept = new Set(
+    (await Trade.find({ _id: { $in: tradeIds } }, { screenshotPath: 1 }).lean()).map(
+      (trade) => trade.screenshotPath,
+    ),
+  );
+  const orphans = files.map((file) => file.name).filter((name) => !kept.has(name));
+  if (orphans.length) await removeObjects('trade-screenshots', orphans);
+  // A full slice resumes from its last file (re-checked, harmless); a short one reached the end.
+  const moreMayRemain = files.length === SWEEP_BATCH;
+  await Counter.updateOne(
+    { _id: SWEEP_POSITION },
+    { $set: { value: moreMayRemain ? Date.parse(files.at(-1).created_at) : 0 } },
+    { upsert: true },
+  );
+  return { deleted: orphans.length, moreMayRemain };
+}
 
 /** Attach (or replace) the chart screenshot of one of the member's trades. */
 export async function attachTradeScreenshot(userId, id, file) {
@@ -457,11 +512,11 @@ export async function attachTradeScreenshot(userId, id, file) {
   ).lean();
   if (!previous) {
     // The trade was deleted while uploading; do not leave the image behind.
-    await removeObjects('trade-screenshots', [path]);
+    await discardScreenshot(path);
     throw new HttpError('This trade is no longer available.', 404);
   }
   if (previous.screenshotPath && previous.screenshotPath !== path) {
-    await removeObjects('trade-screenshots', [previous.screenshotPath]);
+    await discardScreenshot(previous.screenshotPath);
   }
   return toTrade({ ...previous, screenshotPath: path });
 }
@@ -483,7 +538,7 @@ export async function removeTradeScreenshot(userId, id) {
     { $set: { screenshotPath: null } },
   ).lean();
   if (!stored) throw new HttpError('This trade is no longer available.', 404);
-  if (stored.screenshotPath) await removeObjects('trade-screenshots', [stored.screenshotPath]);
+  if (stored.screenshotPath) await discardScreenshot(stored.screenshotPath);
   return toTrade({ ...stored, screenshotPath: null });
 }
 

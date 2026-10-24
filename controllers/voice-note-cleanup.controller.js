@@ -1,12 +1,14 @@
 /**
  * Scheduled job endpoint that deletes temporary uploads: voice notes after 24
  * hours and statements/charts sent to the AI after 7 days (they are only read
- * when the member sends them, and can hold private bank details).
+ * when the member sends them, and can hold private bank details). It also
+ * sweeps trade screenshots that no trade points to any more.
  */
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 import { requireMethod } from '../services/http.js';
 import { expiredObjects, removeObjects } from '../services/storage.js';
+import { removeOrphanScreenshots } from '../services/journal/workspace.js';
 import { isSafeOwnerStoragePath } from '../services/storage-path.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -72,6 +74,9 @@ export async function handleVoiceNoteCleanup(req, res) {
       deleted += batch.deleted;
       moreMayRemain ||= batch.moreMayRemain;
     }
+    const sweep = await removeOrphanScreenshots();
+    deleted += sweep.deleted;
+    moreMayRemain ||= sweep.moreMayRemain;
     res.status(200).json({ deleted, batchLimit: BATCH_SIZE, moreMayRemain });
   } catch {
     // A failed provider response may follow partial removal. Retrying selects

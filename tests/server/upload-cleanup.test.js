@@ -3,7 +3,13 @@ import { randomUUID } from 'node:crypto';
 import mongoose from 'mongoose';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { request, resetDatabase, startTestApp, stopTestApp } from '../helpers/app.js';
-import { statementPath, uploadObject, voiceNotePath } from '../../services/storage.js';
+import {
+  statementPath,
+  tradeScreenshotPath,
+  uploadObject,
+  voiceNotePath,
+} from '../../services/storage.js';
+import { Trade } from '../../models/index.js';
 
 const SECRET = 'c'.repeat(40);
 const PNG = Buffer.from('89504e470d0a1a0a0000000d49484452', 'hex');
@@ -55,5 +61,29 @@ describe('upload cleanup', () => {
     expect(response.body).toMatchObject({ deleted: 2, moreMayRemain: false });
     const left = await mongoose.connection.db.collection('statements.files').find().toArray();
     expect(left.map((file) => file.filename)).toEqual([newStatement]);
+  });
+
+  it('sweeps screenshot files older than a day that no trade points to', async () => {
+    const user = randomUUID();
+    const tradeId = randomUUID();
+    const shot = (trade) =>
+      uploadObject('trade-screenshots', tradeScreenshotPath(user, trade), user, {
+        mimetype: 'image/png',
+        buffer: PNG,
+      });
+    const current = await shot(tradeId);
+    const replaced = await shot(tradeId);
+    const deletedTrade = await shot(randomUUID());
+    const fresh = await shot(randomUUID());
+    // Only the fields the sweep reads.
+    await Trade.collection.insertOne({ _id: tradeId, userId: user, screenshotPath: current });
+    for (const path of [current, replaced, deletedTrade]) await age('tradeScreenshots', path, 2);
+
+    const response = await request(app)
+      .post('/api/maintenance/voice-notes')
+      .set('Authorization', `Bearer ${SECRET}`);
+    expect(response.body).toMatchObject({ deleted: 2, moreMayRemain: false });
+    const left = await mongoose.connection.db.collection('tradeScreenshots.files').find().toArray();
+    expect(left.map((file) => file.filename).sort()).toEqual([current, fresh].sort());
   });
 });
