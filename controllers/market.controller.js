@@ -17,7 +17,7 @@ import {
   refreshInstruments,
 } from '../services/market/index.js';
 import { authenticateRequest, requireAdmin } from '../services/auth/request-auth.js';
-import { ServerConfigurationError } from '../services/errors.js';
+import { HttpError, ServerConfigurationError } from '../services/errors.js';
 import { isDatabaseConnected } from '../config/database.js';
 import { resolveAiConfig } from '../services/ai/config.js';
 import { hasOpenAiKey } from '../services/ai/openai-key.js';
@@ -26,8 +26,22 @@ import { isMailConfigured } from '../services/mailer.js';
 import { createLogger, errorName } from '../services/logger.js';
 import { subscribeLiveQuotes } from '../services/market/kite/ticker.js';
 import { subscribeVendorQuotes } from '../services/market/vendor-quotes.js';
+import { reserveAttempts } from '../services/rate-window.js';
 
 const log = createLogger('market');
+
+/**
+ * Quotes and history come from outside sources that rate limit the whole site, so each member
+ * gets a share. Generous: the Watchlist asks for one quote per row on every load.
+ */
+async function meterPriceRequest(userId) {
+  const quota = await reserveAttempts([{ key: `prices:${userId}`, limit: 240 }], 60_000);
+  if (!quota.allowed) {
+    throw new HttpError('Too many price requests. Try again in a minute.', 429, {
+      retryAfter: quota.retryAfterSeconds,
+    });
+  }
+}
 
 /**
  * Reports which optional integrations are configured, without leaking values,
@@ -74,8 +88,13 @@ function marketFailure(res, error, label) {
     res.status(error.status).json({ error: error.message });
     return;
   }
-  if (error instanceof Error && 'status' in error && error.status === 409) {
-    res.status(409).json({ error: error.message });
+  if (
+    error instanceof Error &&
+    'status' in error &&
+    (error.status === 409 || error.status === 429)
+  ) {
+    if (error.retryAfter) res.setHeader('Retry-After', String(error.retryAfter));
+    res.status(error.status).json({ error: error.message });
     return;
   }
   log.error('unexpected failure', { endpoint: label, error: errorName(error) });
@@ -97,6 +116,7 @@ export async function quote(req, res) {
     // Passing the raw value also rejects repeated query parameters.
     const symbol = assertValidSymbol(req.query?.symbol);
     const { user } = await authenticateRequest(req);
+    await meterPriceRequest(user.id);
     res.status(200).json(await getQuote(symbol, user.id));
   } catch (error) {
     marketFailure(res, error, 'quote');
@@ -125,6 +145,7 @@ export async function history(req, res) {
     assertValidHistoryRange(from, to);
     assertBoundedIntradayRange(from, to, interval);
     const { user } = await authenticateRequest(req);
+    await meterPriceRequest(user.id);
     res.status(200).json(await getHistory(symbol, from, to, interval, user.id));
   } catch (error) {
     marketFailure(res, error, 'history');

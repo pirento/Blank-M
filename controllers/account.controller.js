@@ -82,6 +82,16 @@ export async function revokeOtherSessions(req, res) {
 
 /** GET /api/account/export: downloads everything the member owns as one dated JSON backup file. */
 export async function exportBackup(req, res) {
+  // A backup reads every record the member owns: a few an hour is plenty.
+  const quota = await reserveAttempts(
+    [{ key: `export:${req.member.userId}`, limit: 5 }],
+    60 * 60_000,
+  );
+  if (!quota.allowed) {
+    throw new HttpError('Too many backup downloads. Try again later.', 429, {
+      retryAfter: quota.retryAfterSeconds,
+    });
+  }
   const backup = await buildBackup(req.member.userId, req.member.user.email);
   res.setHeader('Cache-Control', 'private, no-store');
   res.setHeader(
