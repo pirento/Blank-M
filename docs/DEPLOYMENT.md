@@ -30,7 +30,7 @@ Copy `.env.example` to `.env` on the server and set at least:
 | `APP_URL`        | Your public HTTPS address, e.g. `https://blank.example.com`                                                             |
 | `MONGODB_URI`    | Connection string                                                                                                       |
 | `SESSION_SECRET` | 32+ random characters: `openssl rand -base64 48`. Changing it signs everyone out and invalidates authenticator secrets. |
-| `TRUST_PROXY`    | `true` behind Nginx / a load balancer / Hostinger's proxy                                                               |
+| `TRUST_PROXY`    | `true` behind Nginx or Hostinger's proxy; the number of proxies (e.g. `2`) when a load balancer sits in front of Nginx  |
 | `CRON_SECRET`    | 32+ random characters, for the scheduled jobs                                                                           |
 
 Optional: `OPENAI_API_KEY` (AI features), `SMTP_*` (email invitations, password reset email, weekly

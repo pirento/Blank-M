@@ -31,7 +31,7 @@ export function createApp({ sessionStore } = {}) {
   app.disable('x-powered-by');
   app.set('view engine', 'ejs');
   app.set('views', path.join(root, 'views'));
-  if (env.trustProxy) app.set('trust proxy', 1);
+  if (env.trustProxy) app.set('trust proxy', env.trustProxy);
 
   app.use(securityHeaders);
 
