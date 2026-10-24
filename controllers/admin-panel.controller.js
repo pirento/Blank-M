@@ -342,7 +342,6 @@ const businessSchema = z
     gstin: z.string().trim().max(15),
     sac: z.string().trim().max(20),
     rate: z.number(),
-    pricesIncludeGst: z.boolean(),
     invoicePrefix: z.string().trim().max(4),
     supportEmail: z.string().trim().max(200),
   })

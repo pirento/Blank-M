@@ -21,7 +21,6 @@ export async function loadBusiness() {
     gstin: '',
     sac: '',
     rate: 18,
-    pricesIncludeGst: true,
     invoicePrefix: 'PB',
     supportEmail: process.env.SUPPORT_EMAIL?.trim() || '',
     ...(row?.value && typeof row.value === 'object' ? row.value : {}),

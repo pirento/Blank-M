@@ -242,12 +242,6 @@ function businessCard() {
     step: '0.01',
     value: String(business.rate),
   });
-  const inclusive = checkbox(
-    'biz-inclusive',
-    business.pricesIncludeGst,
-    'Prices include GST',
-    'On: the plan price is the total and GST is worked out of it. Off: invoices add GST on top, but Razorpay still charges the plan price, so raise the price yourself.',
-  );
   const prefix = text('biz-prefix', business.invoicePrefix, 4);
   const email = text('biz-email', business.supportEmail, 200, { type: 'email' });
   return card(
@@ -258,7 +252,7 @@ function businessCard() {
       h(
         'p',
         { class: 'text-sm text-muted' },
-        'Every captured payment gets an invoice with these details. Changes apply to future invoices only. Without a GSTIN members get a payment receipt with no GST.',
+        'Every captured payment gets an invoice with these details. Changes apply to future invoices only. The amount paid always includes GST (₹499 at 18% is ₹422.88 + ₹76.12 GST), so set the plan price with GST in it. Without a GSTIN members get a payment receipt with no GST.',
       ),
       h(
         'div',
@@ -283,7 +277,6 @@ function businessCard() {
         ),
         field('Support email on invoices', 'biz-email', email),
       ),
-      inclusive.element,
       button('Save invoice details', {
         onclick: async () => {
           try {
@@ -297,7 +290,6 @@ function businessCard() {
                 gstin: gstin.value,
                 sac: sac.value,
                 rate: Number(rate.value),
-                pricesIncludeGst: inclusive.box.checked,
                 invoicePrefix: prefix.value,
                 supportEmail: email.value,
               },

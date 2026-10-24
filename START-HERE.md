@@ -215,14 +215,13 @@ email ke link se kholta hai, "Print / Save as PDF" se PDF banata hai. Admin pane
 Recent payments mein har payment ke saamne uska invoice link hai.
 
 1. Admin panel → Plans & billing → **Invoice details** bhariye: legal name, trade name (agar ho),
-   poora address, state, GSTIN, SAC code, GST rate (default 18%), "Prices include GST", invoice
-   prefix (1–4 akshar/ank, default `PB`) aur support email → Save. SAC code aur rate apne CA se
-   poochiye (online software service ke liye aksar 998314 ya 998439).
+   poora address, state, GSTIN, SAC code, GST rate (default 18%), invoice prefix (1–4 akshar/ank,
+   default `PB`) aur support email → Save. SAC code aur rate apne CA se poochiye (online software
+   service ke liye aksar 998314 ya 998439).
 2. GSTIN khaali ho to "Payment receipt" banti hai (koi GST nahi). GSTIN daalte hi agle payment se
    "Tax invoice" (CGST + SGST same state mein, doosre state mein IGST).
-3. "Prices include GST" on rakhiye: plan ka price hi total hai aur GST usi mein se nikalta hai. Off
-   karne par invoice GST upar se jodta hai, par Razorpay phir bhi plan ka price hi charge karta hai —
-   to price khud badhaiye.
+3. Invoice ka total hamesha wahi hota hai jo member ne pay kiya — GST usi mein se nikalta hai
+   (₹499 par 18% = ₹422.88 + ₹76.12 GST). Isliye plan ka price GST jod kar rakhiye.
 4. Member Billing page par apna naam, state, GSTIN (business ho to input tax credit ke liye) aur
    address bhar sakta hai.
 

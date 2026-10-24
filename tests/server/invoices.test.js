@@ -10,11 +10,11 @@ import {
   startTestApp,
   stopTestApp,
 } from '../helpers/app.js';
-import { AdminAuditLog, Invoice, Payment } from '../../models/index.js';
+import { AdminAuditLog, Counter, Invoice, Payment } from '../../models/index.js';
 import { gstinCheckChar, gstinProblem } from '../../shared/gst.js';
 import { toIst } from '../../shared/market.js';
 import { financialYearOf } from '../../shared/tax-report.js';
-import { amountInWords, invoiceAmounts } from '../../services/billing/invoices.js';
+import { amountInWords, invoiceAmounts, issueInvoice } from '../../services/billing/invoices.js';
 import { forgetPlanCache } from '../../services/billing/plan.js';
 import { setMailTransport } from '../../services/mailer.js';
 
@@ -58,8 +58,8 @@ describe('GSTIN check', () => {
 });
 
 describe('invoice amounts', () => {
-  it('takes GST out of an inclusive price, split exactly into CGST and SGST', () => {
-    expect(invoiceAmounts({ amount: 499, rate: 18, inclusive: true, interState: false })).toEqual({
+  it('always takes GST out of the amount paid, split exactly into CGST and SGST', () => {
+    expect(invoiceAmounts({ amount: 499, rate: 18, interState: false })).toEqual({
       taxableValue: 422.88,
       cgst: 38.06,
       sgst: 38.06,
@@ -67,36 +67,29 @@ describe('invoice amounts', () => {
       total: 499,
     });
     // 500 / 1.18 = 423.728… → 423.73; the odd paisa of 76.27 goes to CGST.
-    expect(invoiceAmounts({ amount: 500, rate: 18, inclusive: true, interState: false })).toEqual({
+    expect(invoiceAmounts({ amount: 500, rate: 18, interState: false })).toEqual({
       taxableValue: 423.73,
       cgst: 38.14,
       sgst: 38.13,
       igst: 0,
       total: 500,
     });
-    expect(invoiceAmounts({ amount: 500, rate: 18, inclusive: true, interState: true })).toEqual({
+    expect(invoiceAmounts({ amount: 500, rate: 18, interState: true })).toEqual({
       taxableValue: 423.73,
       cgst: 0,
       sgst: 0,
       igst: 76.27,
       total: 500,
     });
-  });
-
-  it('adds GST on top of an exclusive price, rounded to the paisa', () => {
-    expect(invoiceAmounts({ amount: 499, rate: 18, inclusive: false, interState: false })).toEqual({
-      taxableValue: 499,
-      cgst: 44.91,
-      sgst: 44.91,
-      igst: 0,
-      total: 588.82,
-    });
-    // 101 × 5% = 5.05 → 2.53 + 2.52; 99.99 × 18% = 17.9982 → 18.00.
-    expect(invoiceAmounts({ amount: 101, rate: 5, inclusive: false, interState: false })).toEqual(
-      expect.objectContaining({ cgst: 2.53, sgst: 2.52, total: 106.05 }),
+    // 101 / 1.05 = 96.190… → 96.19, GST 4.81; 99.99 / 1.18 = 84.737… → 84.74, GST 15.25.
+    expect(invoiceAmounts({ amount: 101, rate: 5, interState: false })).toEqual(
+      expect.objectContaining({ taxableValue: 96.19, cgst: 2.41, sgst: 2.4, total: 101 }),
     );
-    expect(invoiceAmounts({ amount: 99.99, rate: 18, inclusive: false, interState: true })).toEqual(
-      expect.objectContaining({ igst: 18, total: 117.99 }),
+    expect(invoiceAmounts({ amount: 99.99, rate: 18, interState: true })).toEqual(
+      expect.objectContaining({ taxableValue: 84.74, igst: 15.25, total: 99.99 }),
+    );
+    expect(invoiceAmounts({ amount: 499, rate: 0, interState: false })).toEqual(
+      expect.objectContaining({ taxableValue: 499, cgst: 0, sgst: 0, total: 499 }),
     );
   });
 
@@ -121,7 +114,6 @@ describe('GST invoices', () => {
     gstin: '27AAPFU0939F1ZV',
     sac: '998314',
     rate: 18,
-    pricesIncludeGst: true,
     invoicePrefix: 'pb',
     supportEmail: 'help@pirento.test',
   };
@@ -325,5 +317,36 @@ describe('GST invoices', () => {
     const invoice = await Invoice.findOne({ paymentId: 'pay_inv1' }).lean();
     expect(invoice).toMatchObject({ type: 'receipt', total: 499 });
     expect(billing.payments[0].invoice).toBe(invoice.number);
+  });
+
+  it('issues one invoice and takes one number when two callers race, and takes over stale claims', async () => {
+    const { user } = await createMember();
+    const due = (id, invoiceClaimedAt = null) =>
+      Payment.create({
+        _id: id,
+        userId: user._id,
+        amount: 499,
+        status: 'captured',
+        paidAt: new Date(),
+        invoiceDue: true,
+        invoiceClaimedAt,
+      });
+    const counter = async () =>
+      (await Counter.findById(`invoice:${financialYearOf(toIst(new Date()).date)}`).lean())?.value;
+
+    await due('pay_race');
+    const [first, second] = await Promise.all([issueInvoice('pay_race'), issueInvoice('pay_race')]);
+    expect(await Invoice.countDocuments({ paymentId: 'pay_race' })).toBe(1);
+    expect(await counter()).toBe(1);
+    expect([first, second].filter(Boolean).map((invoice) => invoice.number)).toContain(
+      `PB/${year()}/00001`,
+    );
+
+    // Another caller is issuing it right now: wait. Its claim is ten minutes old: take over.
+    await due('pay_busy', new Date());
+    expect(await issueInvoice('pay_busy')).toBeNull();
+    await due('pay_stale', new Date(Date.now() - 10 * 60_000));
+    expect((await issueInvoice('pay_stale')).number).toBe(`PB/${year()}/00002`);
+    expect(await counter()).toBe(2);
   });
 });

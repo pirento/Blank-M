@@ -14,16 +14,18 @@ import { loadBusiness } from './business.js';
 import { loadPlan } from './plan.js';
 
 const log = createLogger('invoices');
+/** A claim to issue an invoice this old was left by a crashed attempt and may be taken over. */
+const CLAIM_MS = 5 * 60_000;
 
 /**
- * Invoice amounts in rupees (two decimals) for `amount` at `rate`% GST, worked in whole paise so
- * CGST + SGST is exactly the tax. `inclusive`: the amount already includes GST; otherwise GST is
- * added on top. `interState`: IGST instead of CGST + SGST.
+ * Invoice amounts in rupees (two decimals) for `amount` paid at `rate`% GST. The amount paid always
+ * includes GST, so the invoice totals exactly what Razorpay charged. Worked in whole paise so
+ * CGST + SGST is exactly the tax. `interState`: IGST instead of CGST + SGST.
  */
-export function invoiceAmounts({ amount, rate, inclusive, interState }) {
+export function invoiceAmounts({ amount, rate, interState }) {
   const paid = Math.round(amount * 100);
-  const taxable = inclusive ? Math.round((paid * 100) / (100 + rate)) : paid;
-  const tax = inclusive ? paid - taxable : Math.round((taxable * rate) / 100);
+  const taxable = Math.round((paid * 100) / (100 + rate));
+  const tax = paid - taxable;
   const sgst = interState ? 0 : Math.floor(tax / 2);
   return {
     taxableValue: taxable / 100,
@@ -75,14 +77,44 @@ export function amountInWords(amount) {
 }
 
 /**
- * The invoice of a payment, issued once if the captured payment needs one (`invoiceDue`); null
- * when it needs none. Seller and buyer details are copied in as they are now.
+ * The invoice of a payment, issued once if the captured payment needs one (`invoiceDue`). Null
+ * when it needs none, or while another caller is issuing it. Seller and buyer details are copied
+ * in as they are now.
  */
 export async function issueInvoice(paymentId) {
   const existing = await Invoice.findOne({ paymentId }).lean();
   if (existing) return existing;
-  const payment = await Payment.findById(paymentId).lean();
-  if (!payment?.invoiceDue || !payment.userId) return null;
+  // Claim the payment first, so only one caller (webhook or page view) takes a number.
+  const claimedAt = new Date();
+  const payment = await Payment.findOneAndUpdate(
+    {
+      _id: paymentId,
+      invoiceDue: true,
+      userId: { $ne: null },
+      $or: [
+        { invoiceClaimedAt: null },
+        { invoiceClaimedAt: { $lt: new Date(claimedAt.getTime() - CLAIM_MS) } },
+      ],
+    },
+    { $set: { invoiceClaimedAt: claimedAt } },
+    { new: true },
+  ).lean();
+  if (!payment) return Invoice.findOne({ paymentId }).lean();
+  try {
+    return await createInvoice(payment);
+  } catch (error) {
+    // Let the next view of the payments try again at once.
+    await Payment.updateOne(
+      { _id: paymentId, invoiceClaimedAt: claimedAt },
+      { $set: { invoiceClaimedAt: null } },
+    ).catch(() => undefined);
+    throw error;
+  }
+}
+
+/** Takes the next number and creates the invoice of a payment this caller has claimed. */
+async function createInvoice(payment) {
+  const paymentId = payment._id;
   const [seller, plan, user, settings] = await Promise.all([
     loadBusiness(),
     loadPlan(),
@@ -97,12 +129,13 @@ export async function issueInvoice(paymentId) {
     ? invoiceAmounts({
         amount: payment.amount,
         rate: seller.rate,
-        inclusive: seller.pricesIncludeGst,
         interState: Boolean(buyerState) && buyerState.code !== seller.state,
       })
     : { taxableValue: payment.amount, total: payment.amount };
   const issuedAt = new Date();
   const financialYear = financialYearOf(toIst(issuedAt).date);
+  // shortcut: a crash or failed write after this leaves a gap in the series; keep the taken number
+  // on the payment and reuse it on the retry if gaps ever matter.
   const sequence = await nextSequence(`invoice:${financialYear}`);
   const number = `${seller.invoicePrefix}/${financialYear.slice(2)}/${String(sequence).padStart(5, '0')}`;
   // Rule 46 allows 16 characters: a 4-character prefix leaves room for 99,999 invoices a year.
@@ -139,8 +172,7 @@ export async function issueInvoice(paymentId) {
     });
     return invoice.toObject();
   } catch (error) {
-    // shortcut: a webhook racing a page view for the same payment burns one number (a gap in the
-    // series); claim the payment before taking a number if gaps ever matter.
+    // Taking over a stale claim can lose to the original attempt finishing late.
     const winner = error?.code === 11000 ? await Invoice.findOne({ paymentId }).lean() : null;
     if (winner) return winner;
     throw error;
