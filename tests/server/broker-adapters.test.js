@@ -267,6 +267,7 @@ describe('broker registry', () => {
         capabilities: { portfolio: true, balance: true, orders: true, stopTarget: true },
       },
       expect.objectContaining({ provider: 'upstox', label: 'Upstox', connected: false }),
+      expect.objectContaining({ provider: 'fyers', label: 'Fyers', connected: false }),
     ]);
   });
 });

@@ -1,6 +1,7 @@
 /**
- * Fyers (API v3) connection over OAuth, used read-only to bring today's fills
- * into the journal. The platform app comes from FYERS_APP_ID (like XXXX-100)
+ * Fyers (API v3) connection over OAuth, used to bring today's fills into the
+ * journal and, through adapters/fyers.js, for the portfolio, balance and live
+ * orders. The platform app comes from FYERS_APP_ID (like XXXX-100)
  * and FYERS_SECRET_ID; the redirect URI <APP_URL origin>/api/fyers/callback is
  * registered with the app. Fyers tokens last the trading day; ours is treated
  * as expired at 05:00 IST, before Fyers' own early-morning cut-off.
@@ -193,15 +194,33 @@ export function fyersCarried(positions, holdings) {
   return carried;
 }
 
-async function fyersList(token, path, field, what) {
+/** Row mapping shared with the broker adapter (adapters/fyers.js). */
+export { instrument as fyersInstrument, product as fyersProduct };
+
+/**
+ * Calls a Fyers path with the member's token: a GET, or a POST of `body` as JSON. A reply with a
+ * token error code throws tokenRejectedError; any other reply is returned as it is.
+ */
+export async function fyersRequest(token, path, body) {
   const payload = await brokerRequest(LABEL, `${API_BASE}${path}`, {
-    headers: { Authorization: `${appId()}:${token}` },
+    method: body ? 'POST' : 'GET',
+    headers: {
+      Authorization: `${appId()}:${token}`,
+      ...(body && { 'Content-Type': 'application/json' }),
+    },
+    body: body && JSON.stringify(body),
     rejected: REJECTED,
   });
-  if (payload?.s !== 'ok') {
-    if (TOKEN_CODES.has(Number(payload?.code))) throw tokenRejectedError(REJECTED);
-    throw new HttpError(`Fyers returned an invalid ${what}.`, 502);
+  if (payload?.s !== 'ok' && TOKEN_CODES.has(Number(payload?.code))) {
+    throw tokenRejectedError(REJECTED);
   }
+  return payload;
+}
+
+/** The `field` rows of a Fyers GET (see brokerRows); a reply that is not ok is 502. */
+export async function fyersList(token, path, field, what) {
+  const payload = await fyersRequest(token, path);
+  if (payload?.s !== 'ok') throw new HttpError(`Fyers returned an invalid ${what}.`, 502);
   return brokerRows(LABEL, payload[field], what);
 }
 
