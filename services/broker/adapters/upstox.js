@@ -243,8 +243,16 @@ export default {
           slice: false,
         });
       } catch (error) {
-        // Refused for sure: the token, the rate limit, or a 4xx with Upstox's reason.
-        if (error.tokenRejected || error.status === 429) throw error;
+        // The profile read just accepted this token, so a 401/403 is about the order, not the
+        // token: refused, and the connection stays linked.
+        if (error.tokenRejected) {
+          throw new HttpError(
+            "Upstox refused the order. Check that this server's static IP is registered in your Upstox account and the app may place orders.",
+            403,
+          );
+        }
+        // Also refused for sure: the rate limit, or a 4xx with Upstox's reason.
+        if (error.status === 429) throw error;
         if (error.httpStatus >= 400 && error.httpStatus < 500) {
           const reason = brokerMessage(error.body);
           throw new HttpError(

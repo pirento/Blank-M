@@ -335,6 +335,8 @@ beforeEach(async () => {
     upstox.calls.push({ url: String(url), options });
     if (url === MASTER_URL) return new Response(masterBody());
     if (url === ORDER_URL) return upstox.place(options);
+    if (pathname === '/v2/user/profile' && upstox.profileStatus)
+      return new Response('{}', { status: upstox.profileStatus });
     const data = {
       '/v2/user/profile': profile(upstox.userId),
       '/v2/portfolio/long-term-holdings': holdings,
@@ -599,7 +601,7 @@ describe('Upstox orders', () => {
     }
   });
 
-  it('reports a refusal with Upstox’s reason, and a refused token as expired', async () => {
+  it('reports a refusal with Upstox’s reason', async () => {
     upstox.place = () =>
       Response.json(
         {
@@ -620,13 +622,31 @@ describe('Upstox orders', () => {
     expect(refused.message).toBe(
       'Upstox rejected the order: Access to this API is blocked due to static IP restrictions.',
     );
+  });
 
-    upstox.place = () => new Response('{}', { status: 401 });
-    const expired = await place().catch((error) => error);
-    expect(expired).toMatchObject({ status: 401, tokenRejected: true });
-    expect(expired.outcome).toBeUndefined();
-    const row = await BrokerConnection.findOne({ userId: USER, provider: 'upstox' }).lean();
-    expect(row.expiresAt.getTime()).toBe(0);
+  it('treats a 401/403 on the order itself as a refusal and keeps the connection linked', async () => {
+    const linked = async () =>
+      (await BrokerConnection.findOne({ userId: USER, provider: 'upstox' }).lean()).expiresAt;
+    const before = await linked();
+    for (const status of [401, 403]) {
+      upstox.place = () => new Response('{}', { status });
+      const refused = await place().catch((error) => error);
+      expect(refused).toMatchObject({ status: 403 });
+      expect(refused.message).toMatch(
+        /Upstox refused the order\. Check that this server's static IP/,
+      );
+      expect(refused.outcome).toBeUndefined();
+      expect(refused.tokenRejected).toBeUndefined();
+      expect(await linked()).toEqual(before);
+    }
+    // Still connected: the next read goes through with the same token.
+    expect((await readBalance(USER, 'upstox')).liveBalance).toBe(15507.46);
+
+    // A token the profile check refuses is still marked expired, and no order is sent.
+    upstox.profileStatus = 401;
+    await expect(place()).rejects.toMatchObject({ status: 401, tokenRejected: true });
+    expect((await linked()).getTime()).toBe(0);
+    expect(upstox.calls.filter((call) => call.url === ORDER_URL)).toHaveLength(2);
   });
 
   it('maps order statuses: complete only when completely filled', async () => {
