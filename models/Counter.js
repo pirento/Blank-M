@@ -1,7 +1,12 @@
 /** Atomic, monotonic counters (for example the order-plan server revision). */
 import mongoose from 'mongoose';
 
-const counterSchema = new mongoose.Schema({ _id: String, value: { type: Number, default: 0 } });
+const counterSchema = new mongoose.Schema({
+  _id: String,
+  value: { type: Number, default: 0 },
+  // Only the screenshot sweep's position in S3 (a file name; services/journal/workspace.js).
+  after: String,
+});
 
 export const Counter = mongoose.models.Counter || mongoose.model('Counter', counterSchema);
 

@@ -468,12 +468,15 @@ async function discardScreenshot(path) {
 const ORPHAN_AGE_MS = 24 * 60 * 60 * 1000;
 /** Screenshot files checked per maintenance call. */
 const SWEEP_BATCH = 1000;
-/** Counter holding the upload time the next sweep slice starts from (0: from the oldest file). */
+/**
+ * Counter holding where the next sweep slice starts: the upload time in GridFS (0: from the oldest
+ * file) or, in S3, which lists by name, the last name checked.
+ */
 const SWEEP_POSITION = 'screenshot_sweep';
 
 /**
  * One slice of the orphan sweep: deletes trade-screenshot files older than a day that no trade
- * points to, walking the bucket oldest first and resuming where the last slice stopped, so each
+ * points to, walking the bucket oldest first (by name in S3) and resuming where the last slice stopped, so each
  * call does bounded work. Returns `{ deleted, moreMayRemain }`.
  */
 export async function removeOrphanScreenshots() {
@@ -483,6 +486,7 @@ export async function removeOrphanScreenshots() {
     new Date(Date.now() - ORPHAN_AGE_MS),
     SWEEP_BATCH,
     new Date(position?.value ?? 0),
+    position?.after,
   );
   // Paths are `<owner>/<trade>/<uuid>`: only that trade can point to the file.
   const tradeIds = files.map((file) => file.name.split('/')[1]).filter(Boolean);
@@ -497,7 +501,12 @@ export async function removeOrphanScreenshots() {
   const moreMayRemain = files.length === SWEEP_BATCH;
   await Counter.updateOne(
     { _id: SWEEP_POSITION },
-    { $set: { value: moreMayRemain ? Date.parse(files.at(-1).created_at) : 0 } },
+    {
+      $set: {
+        value: moreMayRemain ? Date.parse(files.at(-1).created_at) : 0,
+        after: moreMayRemain ? files.at(-1).name : '',
+      },
+    },
     { upsert: true },
   );
   return { deleted: orphans.length, moreMayRemain };

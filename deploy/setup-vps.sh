@@ -2,7 +2,7 @@
 # One-time setup of a fresh Ubuntu 22.04/24.04 VPS for Pirento Blank.
 # Usage (as a sudo user, from the unpacked code folder):
 #   sudo bash deploy/setup-vps.sh blank.example.com you@example.com
-# Installs Node.js 22, pnpm, PM2, Nginx, Certbot and MongoDB 8, copies the code
+# Installs Node.js 22, pnpm, PM2, Nginx, Certbot and MongoDB 8 (a one-node replica set), copies the code
 # to /srv/blank, creates .env with fresh secrets, builds, starts the app and
 # requests an HTTPS certificate. Safe to re-run: existing .env is kept, and on an
 # existing install the database is backed up before the new code goes in.
@@ -37,7 +37,19 @@ if ! command -v mongod >/dev/null; then
   apt-get update -y
   apt-get install -y mongodb-org
 fi
+# A new install runs MongoDB as a one-node replica set (rs0), so more nodes can join later without
+# changing the app. An existing standalone install is left as it is: docs/DEPLOYMENT.md →
+# "Running on more than one server" has the one-time switch.
+if [ ! -f "$APP_DIR/.env" ] && ! grep -q '^replication:' /etc/mongod.conf; then
+  printf '\nreplication:\n  replSetName: rs0\n' >> /etc/mongod.conf
+  systemctl restart mongod
+fi
 systemctl enable --now mongod
+if grep -q 'replSetName: rs0' /etc/mongod.conf; then
+  for _ in $(seq 30); do mongosh --quiet --eval 'db.adminCommand("ping")' >/dev/null 2>&1 && break; sleep 1; done
+  # Once only: rs.status() fails until the set is initiated.
+  mongosh --quiet --eval 'try { rs.status() } catch (e) { rs.initiate({ _id: "rs0", members: [{ _id: 0, host: "127.0.0.1:27017" }] }) }' >/dev/null
+fi
 
 echo "==> Firewall: SSH and web only (the app and MongoDB stay on localhost)"
 ufw allow OpenSSH
@@ -68,6 +80,9 @@ if [ ! -f .env ]; then
   done < /tmp/blank-secrets
   rm -f /tmp/blank-secrets
   sed -i "s|https://blank.example.com|https://${DOMAIN}|g" .env
+  if grep -q 'replSetName: rs0' /etc/mongod.conf; then
+    sed -i 's|^MONGODB_URI=.*|MONGODB_URI="mongodb://127.0.0.1:27017/blank?replicaSet=rs0"|' .env
+  fi
   sed -i "s|mailto:you@example.com|mailto:${EMAIL}|" .env
   chown "$APP_USER":"$APP_USER" .env
   chmod 600 .env
