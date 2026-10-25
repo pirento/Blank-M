@@ -5,6 +5,7 @@
  * gtt/orders/sync, orders, tradebook, positions, holdings, funds, profile).
  */
 import { BrokerConnection } from '../../../models/index.js';
+import { HttpError } from '../../errors.js';
 import { MarketDataError } from '../../market/types.js';
 import { brokerMessage, withBrokerToken } from '../broker-api.js';
 import { istToIso } from '../fill-mapping.js';
@@ -171,7 +172,15 @@ async function place(token, path, body, what) {
   try {
     payload = await fyersRequest(token, path, body);
   } catch (error) {
-    if (error.tokenRejected || error.status === 429) throw error;
+    // The profile just accepted this token, so a 401/403 here refuses the request, not the login
+    // (an unregistered static IP or a missing permission): the connection stays linked.
+    if (error.tokenRejected) {
+      throw new HttpError(
+        `Fyers refused the ${what}. Check that this server's static IP is registered in your Fyers account and the app has the Order Placement permission.`,
+        403,
+      );
+    }
+    if (error.status === 429) throw error;
     // Only a 4xx carrying Fyers' JSON reason is a sure refusal.
     if (!error.body || !(error.httpStatus < 500)) throw unknownOutcome(what);
     payload = error.body;

@@ -528,12 +528,59 @@ describe('Fyers adapter', () => {
     expect(rejected.outcome).toBeUndefined();
     expect((await attempt({ s: 'error', code: -429, message: 'Limit' })).status).toBe(429);
 
-    // A token Fyers refuses expires the connection so the member reconnects.
-    const expired = await attempt({ s: 'error', code: -16, message: 'Could not authenticate' });
+    // A token the profile check refuses expires the connection so the member reconnects.
+    api.replies['GET /api/v3/profile'] = {
+      s: 'error',
+      code: -16,
+      message: 'Could not authenticate',
+    };
+    const expired = await attempt({ s: 'ok', code: 1101, id: '1' });
     expect(expired).toMatchObject({ status: 401 });
     expect(expired.outcome).toBeUndefined();
     const row = await BrokerConnection.findOne({ userId: USER, provider: 'fyers' }).lean();
     expect(row.expiresAt.getTime()).toBe(0);
+  });
+
+  it('keeps the connection linked when the order or GTT call itself is refused', async () => {
+    const order = {
+      symbol: 'SBIN',
+      exchange: 'NSE',
+      side: 'BUY',
+      product: 'CNC',
+      quantity: 1,
+      price: 800,
+      tag: 'blank',
+    };
+    const gtt = { symbol: 'SBIN', exchange: 'NSE', quantity: 1, stopLoss: 760, target: 840 };
+    const refusals = [
+      async () =>
+        Response.json({ s: 'error', code: -16, message: 'IP not allowed' }, { status: 401 }),
+      async () => new Response('Forbidden', { status: 403 }),
+      // A token code in the body after the profile accepted the same token.
+      { s: 'error', code: -16, message: 'Could not authenticate' },
+    ];
+    for (const reply of refusals) {
+      api.replies['POST /api/v3/orders/sync'] = reply;
+      api.replies['POST /api/v3/gtt/orders/sync'] = reply;
+      for (const [what, send] of [
+        ['order', () => fyers.placeLimitOrder(USER, order)],
+        ['GTT', () => fyers.placeStopTarget(USER, gtt)],
+      ]) {
+        const error = await send().catch((caught) => caught);
+        expect(error).toMatchObject({
+          status: 403,
+          message: `Fyers refused the ${what}. Check that this server's static IP is registered in your Fyers account and the app has the Order Placement permission.`,
+        });
+        expect(error.outcome).toBeUndefined();
+        expect(error.tokenRejected).toBeUndefined();
+      }
+    }
+    const row = await BrokerConnection.findOne({ userId: USER, provider: 'fyers' }).lean();
+    expect(row.expiresAt.getTime()).toBeGreaterThan(Date.now());
+    expect(row.brokerUserId).toBe('XA12345');
+    // Still usable: the next read goes through with the same token.
+    api.replies['GET /api/v3/orders'] = ok({ orderBook: [orderRow()] });
+    expect((await fyers.readOrder(USER, '23080444447604')).status).toBe('complete');
   });
 
   it('maps order statuses: complete only when fully filled', async () => {
