@@ -1,10 +1,11 @@
 /** Encrypted broker access token, bound to one broker identity per account. */
 import mongoose from 'mongoose';
+import { BROKER_PROVIDERS } from '../shared/broker-portfolio.js';
 
 const brokerConnectionSchema = new mongoose.Schema(
   {
     userId: { type: String, required: true },
-    provider: { type: String, enum: ['kite', 'dhan', 'upstox', 'fyers', 'angel'], default: 'kite' },
+    provider: { type: String, enum: BROKER_PROVIDERS, default: 'kite' },
     accessTokenCiphertext: { type: String, default: '' },
     accessTokenIv: { type: String, default: '' },
     accessTokenTag: { type: String, default: '' },

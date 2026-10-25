@@ -7,6 +7,7 @@ import { computeCurrentBalance } from '../shared/pnl.js';
 import { env } from '../config/env.js';
 import { hasOpenAiKey } from '../services/ai/openai-key.js';
 import { isKiteConfigured } from '../services/market/index.js';
+import { adaptersFor } from '../services/broker/adapters/index.js';
 import { isMailConfigured } from '../services/mailer.js';
 import { NAV_LINKS, ADMIN_NAV_GROUP } from '../config/nav.js';
 import { createHash } from 'node:crypto';
@@ -84,6 +85,10 @@ export function workspacePage(
       vendor,
       workspace: data,
       health,
+      // What each broker supports here, for the dashboard's broker card.
+      brokerCapabilities: Object.fromEntries(
+        (await adaptersFor()).map((adapter) => [adapter.provider, adapter.capabilities]),
+      ),
       pageData: {
         accountId: userId,
         sessionId: req.member.session.sessionId,

@@ -1,5 +1,6 @@
 /** Per-user account settings. Balance is always derived from trades, never stored. */
 import mongoose from 'mongoose';
+import { BROKER_PROVIDERS } from '../shared/broker-portfolio.js';
 
 const accountSettingsSchema = new mongoose.Schema(
   {
@@ -32,6 +33,8 @@ const accountSettingsSchema = new mongoose.Schema(
     liveTradingEnabled: { type: Boolean, default: false },
     /** Details for the member's GST invoices: { name, state, gstin, address } (Billing page). */
     billingDetails: { type: mongoose.Schema.Types.Mixed, default: null },
+    /** The broker live orders go to; only a connected broker that supports orders can be chosen. */
+    liveOrderBroker: { type: String, enum: BROKER_PROVIDERS, default: 'kite' },
   },
   { timestamps: { createdAt: false, updatedAt: 'updatedAt' }, minimize: false },
 );

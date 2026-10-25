@@ -40,6 +40,7 @@ const { calculateRiskPlan } = await import('../../shared/risk-calculator.js');
 const { DEFAULT_CHARGES } = await import('../../shared/types.js');
 const { currentStep, totpCode } = await import('../../services/auth/totp.js');
 const { placePendingAutoGtts } = await import('../../services/broker/live-orders.js');
+const { BrokerConnection } = await import('../../models/index.js');
 
 let app;
 beforeAll(async () => {
@@ -95,6 +96,14 @@ beforeEach(async () => {
 
 async function trader({ mfa = true, optIn = true } = {}) {
   const created = await createMember({ email: 'trader@example.com' });
+  // A linked Zerodha account: live orders go only to a connected broker.
+  await BrokerConnection.create({
+    userId: created.user._id,
+    provider: 'kite',
+    accessTokenCiphertext: 'sealed',
+    expiresAt: new Date(Date.now() + 60 * 60_000),
+    brokerUserId: 'AB1234',
+  });
   const session = await signIn(app, { email: 'trader@example.com', password: created.password });
   const send = (method, path, body) =>
     session.agent[method](path).set('X-CSRF-Token', session.csrf).send(body);

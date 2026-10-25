@@ -3,6 +3,8 @@
  */
 import { z } from 'zod';
 
+/** Every broker a member can link, in the order defaults are picked (Zerodha first). */
+export const BROKER_PROVIDERS = ['kite', 'dhan', 'upstox', 'fyers', 'angel'];
 export const BROKER_PORTFOLIO_MAX_ROWS = 5000;
 export const BROKER_PORTFOLIO_MAX_BYTES = 4 * 1024 * 1024;
 const label = z
@@ -69,7 +71,7 @@ export const brokerTradeSchema = z.object({
   filledAt: timestamp.nullable(),
 });
 export const brokerPortfolioSchema = z.object({
-  source: z.literal('kite'),
+  source: z.enum(BROKER_PROVIDERS),
   currency: z.literal('INR'),
   startedAt: timestamp,
   fetchedAt: timestamp,

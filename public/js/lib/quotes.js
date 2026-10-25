@@ -63,11 +63,15 @@ export async function completeBrokerConnect() {
   }
 }
 
-/** Promise of the live Zerodha INR balance payload; throws if any field fails validation. */
+/**
+ * Promise of the live INR balance payload from the member's default balance broker (`label` names
+ * it); throws if any field fails validation.
+ */
 export async function fetchBrokerBalance() {
   const payload = await getJson('/api/kite/balance', { timeout: 30_000 });
   if (
-    payload?.source !== 'kite' ||
+    typeof payload?.source !== 'string' ||
+    typeof payload.label !== 'string' ||
     payload.currency !== 'INR' ||
     typeof payload.liveBalance !== 'number' ||
     !Number.isFinite(payload.liveBalance) ||
@@ -92,7 +96,7 @@ function statusError(status) {
   if (status === 401) return 'Sign in again before refreshing broker records.';
   if (status === 403) return 'Your account cannot read broker records. Check workspace access.';
   if (status === 409)
-    return 'Connect or reconnect Zerodha in Settings, then refresh broker records.';
+    return 'Connect or reconnect your broker in Settings, then refresh broker records.';
   if (status === 429) return 'Too many broker requests. Wait a moment, then refresh again.';
   if (status === 503) return 'Broker access is not configured or is temporarily unavailable.';
   return 'Could not read a complete broker snapshot. Try refreshing again.';
@@ -100,8 +104,11 @@ function statusError(status) {
 
 const PORTFOLIO_MAX_BYTES = 4 * 1024 * 1024;
 
-/** A user-triggered portfolio read with a bounded body and no browser cache. */
-export async function fetchBrokerPortfolio(schema, signal) {
+/**
+ * A user-triggered portfolio read with a bounded body and no browser cache, from `provider`
+ * (default: the member's first connected broker with a portfolio).
+ */
+export async function fetchBrokerPortfolio(schema, signal, provider) {
   const controller = new AbortController();
   const cancel = () => controller.abort();
   signal?.addEventListener('abort', cancel, { once: true });
@@ -110,7 +117,8 @@ export async function fetchBrokerPortfolio(schema, signal) {
     30_000,
   );
   try {
-    const response = await fetch('/api/kite/portfolio', {
+    const query = provider ? `?provider=${encodeURIComponent(provider)}` : '';
+    const response = await fetch(`/api/kite/portfolio${query}`, {
       headers: requestHeaders(false),
       credentials: 'same-origin',
       cache: 'no-store',

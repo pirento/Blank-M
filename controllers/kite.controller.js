@@ -1,7 +1,7 @@
 /**
  * Zerodha Kite endpoints: start and complete the broker login, connection
- * status, balance, read-only portfolio, today's fills as journal trades and
- * disconnect.
+ * status, today's fills as journal trades and disconnect; plus the balance and
+ * read-only portfolio of any broker whose adapter offers them (`?provider=`).
  */
 import {
   MarketDataError,
@@ -11,8 +11,9 @@ import {
   isKiteConfigured,
   saveConnection,
 } from '../services/market/index.js';
-import { disconnectBrokerSession, readBrokerBalance } from '../services/market/kite.js';
-import { readBrokerPortfolio } from '../services/broker/portfolio.js';
+import { disconnectBrokerSession } from '../services/market/kite.js';
+import { readBalance, readBrokerPortfolio } from '../services/broker/portfolio.js';
+import { BROKER_PROVIDERS } from '../services/broker/adapters/index.js';
 import { importFills, previewFills } from '../services/broker/fills-journal.js';
 import {
   beginBrokerFlow,
@@ -30,7 +31,7 @@ import { HttpError, ServerConfigurationError } from '../services/errors.js';
 
 function readFailure(res, error, fallback) {
   const status =
-    error instanceof MarketDataError
+    error instanceof MarketDataError || error instanceof HttpError
       ? error.status
       : error instanceof ServerConfigurationError
         ? 503
@@ -41,10 +42,20 @@ function readFailure(res, error, fallback) {
           : 500;
   res.status(status).json({
     error:
-      error instanceof MarketDataError || (status < 500 && error instanceof Error)
+      error instanceof MarketDataError ||
+      error instanceof HttpError ||
+      (status < 500 && error instanceof Error)
         ? error.message
         : fallback,
   });
+}
+
+/** The optional `?provider=` broker; undefined picks the member's default. */
+function providerParam(req) {
+  const provider = req.query?.provider;
+  if (provider === undefined) return undefined;
+  if (!BROKER_PROVIDERS.includes(provider)) throw new HttpError('Unknown broker.', 400);
+  return provider;
 }
 
 function getOnly(req, res) {
@@ -156,7 +167,7 @@ export async function balance(req, res) {
   if (!getOnly(req, res)) return;
   try {
     const { user } = await authenticateRequest(req);
-    res.status(200).json(await readBrokerBalance(user.id));
+    res.status(200).json(await readBalance(user.id, providerParam(req)));
   } catch (error) {
     readFailure(
       res,
@@ -172,7 +183,7 @@ export async function portfolio(req, res) {
   if (!getOnly(req, res)) return;
   try {
     const { auth, assertAccess } = await sessionGuard(req);
-    const snapshot = await readBrokerPortfolio(auth.user.id, assertAccess);
+    const snapshot = await readBrokerPortfolio(auth.user.id, assertAccess, providerParam(req));
     await assertAccess();
     res.status(200).json(snapshot);
   } catch (error) {

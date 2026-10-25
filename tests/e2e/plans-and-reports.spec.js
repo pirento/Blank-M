@@ -132,6 +132,7 @@ test('a filled CNC live order offers a stop & target GTT', async ({ page }) => {
   });
   const order = {
     id: 'live-1',
+    provider: 'kite',
     planId,
     status: 'placed',
     symbol: 'RELIANCE',
@@ -144,8 +145,17 @@ test('a filled CNC live order offers a stop & target GTT', async ({ page }) => {
     gtt: null,
   };
   let gttRequest = null;
+  const zerodha = {
+    provider: 'kite',
+    label: 'Zerodha',
+    connected: true,
+    capabilities: { portfolio: true, balance: true, orders: true, stopTarget: true },
+  };
   const state = {
     enabled: true,
+    serverEnabled: true,
+    broker: zerodha,
+    brokers: [zerodha],
     accountEnabled: true,
     mfaVerified: true,
     marketOpen: true,

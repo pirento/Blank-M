@@ -5,6 +5,7 @@
  * broker gets the same handlers from brokerHandlers(provider).
  */
 import { authenticatedApi } from '../middleware/auth.js';
+import { memberBrokers } from '../services/broker/adapters/index.js';
 import { angelStatus, connectAngel } from '../services/broker/angel.js';
 import { forgetBrokerToken } from '../services/broker/broker-api.js';
 import { importFills, previewFills } from '../services/broker/fills-journal.js';
@@ -60,6 +61,12 @@ async function connectQuota(provider, userId) {
     60 * 60_000,
   );
   if (!quota.allowed) throw new HttpError('Too many connection attempts. Try again later.', 429);
+}
+
+/** GET /api/brokers: each broker with an adapter, what it supports here and whether it is connected. */
+export async function listBrokers(req, res) {
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.json({ brokers: await memberBrokers(req.member.userId) });
 }
 
 /** The route handlers for one broker (`upstox`, `fyers` or `angel`). */
