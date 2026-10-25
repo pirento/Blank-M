@@ -4,6 +4,7 @@ import {
   $,
   h,
   badge,
+  select,
   card,
   cardHeader,
   cardTitle,
@@ -15,8 +16,9 @@ import { api, errorMessage } from '../../core/api.js';
 import { cardDescription, statusLine } from './shared.js';
 
 /**
- * Mounts the live orders card: loads live order state and toggles it for the account via
- * PUT /api/account/live-trading. Enabling needs the server feature and verified MFA.
+ * Mounts the live orders card: loads live order state, toggles it for the account via
+ * PUT /api/account/live-trading (enabling needs the server feature and verified MFA) and
+ * chooses the broker orders go to via PUT /api/account/live-order-broker.
  */
 export function mountLiveTrading() {
   const state = { live: null, busy: false, message: '' };
@@ -36,7 +38,40 @@ export function mountLiveTrading() {
       class: 'mt-1 h-4 w-4 accent-accent',
       checked: Boolean(live?.accountEnabled),
       disabled:
-        !live || state.busy || (!live.accountEnabled && (!live.enabled || !live.mfaVerified)),
+        !live || state.busy || (!live.accountEnabled && (!live.serverEnabled || !live.mfaVerified)),
+    });
+    // Only connected brokers that take orders can be chosen; the current one stays listed.
+    const choices = (live?.brokers ?? []).filter(
+      (broker) =>
+        broker.provider === live.broker.provider ||
+        (broker.connected && broker.capabilities.orders),
+    );
+    const brokerPicker = select(
+      { id: 'live-order-broker', disabled: state.busy || choices.length < 2 },
+      choices.map((broker) => ({
+        value: broker.provider,
+        selected: broker.provider === live.broker.provider,
+        label: broker.connected ? broker.label : `${broker.label} (not connected)`,
+      })),
+    );
+    brokerPicker.addEventListener('change', async () => {
+      state.busy = true;
+      state.message = '';
+      paint();
+      try {
+        state.live = (
+          await api('/api/account/live-order-broker', {
+            method: 'PUT',
+            body: { broker: brokerPicker.value },
+          })
+        ).state;
+        state.message = `Live orders now go to ${state.live.broker.label}.`;
+      } catch (error) {
+        state.message = errorMessage(error, 'Could not change the live order broker.');
+      } finally {
+        state.busy = false;
+        paint();
+      }
     });
     toggle.addEventListener('change', async () => {
       state.busy = true;
@@ -70,12 +105,12 @@ export function mountLiveTrading() {
             {},
             cardTitle(t('Live orders')),
             cardDescription(
-              t('Send reviewed plans to Zerodha as real LIMIT orders from Order review.'),
+              t('Send reviewed plans to your broker as real LIMIT orders from Order review.'),
             ),
           ),
           !live
             ? badge('Checking', 'neutral')
-            : live.enabled
+            : live.serverEnabled
               ? badge('Available', 'caution')
               : badge('Off on this server', 'neutral'),
         ),
@@ -83,13 +118,36 @@ export function mountLiveTrading() {
           'space-y-4',
           !live
             ? statusLine(t('Checking live order availability…'))
-            : !live.enabled
+            : !live.serverEnabled
               ? h(
                   'p',
                   { class: 'text-sm text-muted' },
                   'Live trading is turned off on this server. An administrator can enable it with LIVE_TRADING_ENABLED=true once Zerodha is configured. Until then, plans stay for review only.',
                 )
               : [
+                  h(
+                    'div',
+                    { class: 'max-w-sm' },
+                    h(
+                      'label',
+                      {
+                        for: 'live-order-broker',
+                        class: 'mb-1.5 block text-xs font-medium text-muted',
+                      },
+                      t('Live order broker'),
+                    ),
+                    brokerPicker,
+                  ),
+                  live.enabled
+                    ? null
+                    : h(
+                        'p',
+                        {
+                          role: 'note',
+                          class: 'border border-caution bg-caution-soft px-3 py-2 text-sm text-fg',
+                        },
+                        `Connect ${live.broker.label} in Settings before placing live orders.`,
+                      ),
                   h(
                     'dl',
                     { class: 'preference-ledger' },

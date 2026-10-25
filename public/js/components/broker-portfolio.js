@@ -1,5 +1,6 @@
 /**
- * Zerodha portfolio panel: holdings, positions, orders and fills (read-only).
+ * Broker portfolio panel: holdings, positions, orders and fills (read-only), from
+ * any connected broker that offers them (a picker when there is more than one).
  */
 import {
   h,
@@ -15,6 +16,7 @@ import {
 } from '../core/dom.js';
 import { brokerPortfolioSchema } from '../../../shared/broker-portfolio.js';
 import { formatPlanningPrice } from '../../../shared/risk-calculator.js';
+import { api } from '../core/api.js';
 import { fetchBrokerPortfolio } from '../lib/quotes.js';
 import { openFillsToJournal } from './fills-to-journal.js';
 
@@ -90,11 +92,26 @@ function rowsFor(snapshot, section, page) {
 }
 
 /**
- * Read-only, explicitly refreshed Zerodha holdings, positions, orders and fills.
+ * Read-only, explicitly refreshed broker holdings, positions, orders and fills.
  * With `onFillsJournaled`, also offers to add today's fills to the journal.
  */
 export function createBrokerPortfolio({ available = true, onFillsJournaled } = {}) {
-  const state = { snapshot: null, error: null, busy: false, section: 'holdings', page: 0 };
+  const state = {
+    snapshot: null,
+    error: null,
+    busy: false,
+    section: 'holdings',
+    page: 0,
+    // Connected brokers with a portfolio; until loaded the server picks (Zerodha first).
+    brokers: [],
+    provider: null,
+  };
+  const current = () => state.provider ?? state.brokers[0]?.provider ?? 'kite';
+  const labelOf = (provider) =>
+    state.brokers.find((broker) => broker.provider === provider)?.label ??
+    (provider === 'kite' ? 'Zerodha' : provider);
+  const subtitle = h('p', { class: 'mt-1 text-xs text-muted' });
+  const pickerSlot = h('div');
   const refreshButton = button('', {
     variant: 'outline',
     className: 'max-w-full whitespace-normal text-left',
@@ -104,15 +121,11 @@ export function createBrokerPortfolio({ available = true, onFillsJournaled } = {
     { 'aria-label': 'Broker portfolio', className: 'min-w-0' },
     cardHeader(
       'flex-wrap',
-      h(
-        'div',
-        { class: 'min-w-0' },
-        cardTitle('Broker portfolio'),
-        h('p', { class: 'mt-1 text-xs text-muted' }, 'Zerodha Kite · read-only snapshot'),
-      ),
+      h('div', { class: 'min-w-0' }, cardTitle('Broker portfolio'), subtitle),
       h(
         'div',
         { class: 'flex flex-wrap gap-2' },
+        pickerSlot,
         refreshButton,
         onFillsJournaled && available
           ? button([icon('book-open', 14, 'mr-2 shrink-0'), 'Add today’s fills to journal'], {
@@ -150,7 +163,11 @@ export function createBrokerPortfolio({ available = true, onFillsJournaled } = {
     Object.assign(state, { busy: true, snapshot: null, error: null, page: 0 });
     paint();
     try {
-      state.snapshot = await fetchBrokerPortfolio(brokerPortfolioSchema, controller.signal);
+      state.snapshot = await fetchBrokerPortfolio(
+        brokerPortfolioSchema,
+        controller.signal,
+        state.provider ?? undefined,
+      );
     } catch (reason) {
       state.error = reason instanceof Error ? reason.message : 'Could not read broker records.';
     } finally {
@@ -161,8 +178,32 @@ export function createBrokerPortfolio({ available = true, onFillsJournaled } = {
   }
   refreshButton.addEventListener('click', () => void refresh());
 
+  let picker = null;
+  async function loadBrokers() {
+    try {
+      const { brokers } = await api('/api/brokers');
+      state.brokers = brokers.filter((broker) => broker.connected && broker.capabilities.portfolio);
+    } catch {
+      // Without the list the server still reads the default broker.
+    }
+    if (state.brokers.length > 1) {
+      picker = select(
+        { id: 'broker-portfolio-provider', 'aria-label': 'Broker' },
+        state.brokers.map((broker) => ({ value: broker.provider, label: broker.label })),
+      );
+      picker.addEventListener('change', () => {
+        Object.assign(state, { provider: picker.value, snapshot: null, error: null, page: 0 });
+        paint();
+      });
+      render(pickerSlot, picker);
+    }
+    paint();
+  }
+
   function paint() {
     refreshButton.disabled = !available || state.busy;
+    if (picker) picker.disabled = state.busy;
+    subtitle.textContent = `${labelOf(current())} · read-only snapshot`;
     render(
       refreshButton,
       icon('refresh-cw', 14, 'mr-2 shrink-0'),
@@ -214,7 +255,7 @@ export function createBrokerPortfolio({ available = true, onFillsJournaled } = {
         h(
           'p',
           { role: 'status', class: 'break-words text-xs leading-5 text-muted' },
-          `Source: Zerodha Kite · snapshot started ${time(snapshot.startedAt)} · completed ${time(snapshot.fetchedAt)}. Orders and fills cover ${snapshot.tradingDate} (IST) only. Refresh for newer records.`,
+          `Source: ${labelOf(snapshot.source)} · snapshot started ${time(snapshot.startedAt)} · completed ${time(snapshot.fetchedAt)}. Orders and fills cover ${snapshot.tradingDate} (IST) only. Refresh for newer records.`,
         ),
         h(
           'div',
@@ -290,5 +331,6 @@ export function createBrokerPortfolio({ available = true, onFillsJournaled } = {
     render(body, parts);
   }
   paint();
+  if (available) void loadBrokers();
   return element;
 }

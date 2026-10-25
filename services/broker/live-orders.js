@@ -1,27 +1,36 @@
 /**
- * Live orders through Zerodha: the server-wide switch and limits, the member's
- * opt-in, and placing one guarded DAY LIMIT order for a reviewed plan.
+ * Live orders through the member's chosen broker (its adapter in ./adapters/):
+ * the server-wide switch and limits, the member's opt-in, and placing one
+ * guarded DAY LIMIT order for a reviewed plan. Every check here runs the same
+ * whichever broker the order goes to.
  */
 import { AccountSettings, LiveOrder, OrderPlanRecord, Trade, User } from '../../models/index.js';
 import { riskStatus, toRiskLimits } from '../../shared/risk-limits.js';
 import { getMarketStatus, todayInIst } from '../../shared/market.js';
-import { getQuote, isKiteConfigured } from '../market/index.js';
-import { placeKiteGtt, placeKiteLimitOrder, readKiteOrder } from '../market/kite.js';
+import { getQuote } from '../market/index.js';
+import { adaptersFor, brokerAdapter, memberBrokers } from './adapters/index.js';
 import { applyPlatformSettings } from '../platform/settings.js';
 import { HttpError } from '../errors.js';
 import { accessProblem } from '../auth/accounts.js';
 import { hasFeature } from '../billing/membership.js';
 import { sendToMember } from '../telegram/bot.js';
 
+export { toTick } from './instruments.js';
+
 const positiveNumber = (value, fallback) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 };
 
-/** Server-wide switch and limits. Live trading is off unless explicitly enabled. */
-export function liveTradingConfig() {
+/**
+ * Server-wide switch and limits. Live trading is off unless explicitly enabled and some broker
+ * that can take orders is configured on this server.
+ */
+export async function liveTradingConfig() {
   return {
-    enabled: process.env.LIVE_TRADING_ENABLED === 'true' && isKiteConfigured(),
+    enabled:
+      process.env.LIVE_TRADING_ENABLED === 'true' &&
+      (await adaptersFor('orders')).some((adapter) => adapter.configured()),
     maxOrderValue: positiveNumber(process.env.LIVE_ORDER_MAX_VALUE, 50_000),
     maxQuantity: Math.floor(positiveNumber(process.env.LIVE_ORDER_MAX_QUANTITY, 1_000)),
     dailyLimit: Math.floor(positiveNumber(process.env.LIVE_ORDER_DAILY_LIMIT, 5)),
@@ -36,14 +45,25 @@ function mfaVerified(user, session) {
 /**
  * The server limits plus the member's live-order state: their opt-in, MFA (aal2) status, whether
  * the market is open, today's live orders still counted against the daily limit, and today's
- * risk-limit status.
+ * risk-limit status. `broker` is the member's live-order broker and `brokers` every broker with
+ * an adapter; `enabled` also needs that broker connected and able to take orders, while
+ * `serverEnabled` is the server switch alone.
  */
 export async function liveTradingState(user, session) {
   const settings = await AccountSettings.findById(user._id, {
     liveTradingEnabled: 1,
     riskLimits: 1,
+    liveOrderBroker: 1,
   }).lean();
-  const config = liveTradingConfig();
+  const config = await liveTradingConfig();
+  const brokers = await memberBrokers(user._id);
+  const chosen = settings?.liveOrderBroker ?? 'kite';
+  const broker = brokers.find((item) => item.provider === chosen) ?? {
+    provider: chosen,
+    label: 'your broker',
+    connected: false,
+    capabilities: {},
+  };
   const today = todayInIst();
   const todaysTrades = await Trade.find(
     { userId: user._id, tradeDate: today },
@@ -56,6 +76,10 @@ export async function liveTradingState(user, session) {
   });
   return {
     ...config,
+    enabled: config.enabled && broker.connected && Boolean(broker.capabilities.orders),
+    serverEnabled: config.enabled,
+    broker,
+    brokers,
     accountEnabled: Boolean(settings?.liveTradingEnabled),
     mfaVerified: mfaVerified(user, session),
     marketOpen: getMarketStatus() === 'open',
@@ -74,7 +98,7 @@ export async function liveTradingState(user, session) {
 /** The member's own opt-in. Turning it on requires a verified authenticator. */
 export async function setLiveTrading(user, session, enabled) {
   if (enabled) {
-    if (!liveTradingConfig().enabled) {
+    if (!(await liveTradingConfig()).enabled) {
       throw new HttpError('Live trading is not enabled on this server.', 403);
     }
     if (!mfaVerified(user, session)) {
@@ -87,6 +111,20 @@ export async function setLiveTrading(user, session, enabled) {
   await AccountSettings.updateOne(
     { _id: user._id },
     { $set: { liveTradingEnabled: Boolean(enabled) } },
+    { upsert: true },
+  );
+  return liveTradingState(user, session);
+}
+
+/** The broker the member's live orders go to: only a connected one whose adapter takes orders. */
+export async function setLiveOrderBroker(user, session, provider) {
+  const broker = (await memberBrokers(user._id)).find((item) => item.provider === provider);
+  if (!broker?.connected || !broker.capabilities.orders) {
+    throw new HttpError('Choose a connected broker that supports live orders.', 400);
+  }
+  await AccountSettings.updateOne(
+    { _id: user._id },
+    { $set: { liveOrderBroker: provider } },
     { upsert: true },
   );
   return liveTradingState(user, session);
@@ -117,6 +155,7 @@ async function reviewedPlan(userId, planId) {
 export function toLiveOrder(row) {
   return {
     id: row._id,
+    provider: row.provider ?? 'kite',
     planId: row.planId,
     status: row.status,
     symbol: row.symbol,
@@ -149,29 +188,31 @@ export async function listLiveOrders(userId) {
 }
 
 /**
- * Zerodha accepts an order (and returns its id) before its risk checks run, so an order saved as
+ * Brokers accept an order (and return its id) before their risk checks run, so an order saved as
  * "placed" can be rejected moments later (for example for margin). Today's placed orders are
  * re-read and marked rejected, so the plan can be sent again and the daily limit is not used up.
  */
 async function settleRejectedOrders(userId) {
   const placed = await LiveOrder.find(
     { userId, status: 'placed', tradingDate: todayInIst(), brokerOrderId: { $ne: null } },
-    { brokerOrderId: 1 },
+    { brokerOrderId: 1, provider: 1 },
   )
     .limit(20)
     .lean();
   for (const order of placed) {
     try {
-      const broker = await readKiteOrder(userId, order.brokerOrderId);
+      const adapter = await brokerAdapter(order.provider ?? 'kite');
+      const broker = await adapter.readOrder(userId, order.brokerOrderId);
       const dead =
-        broker.status === 'REJECTED' || (broker.status === 'CANCELLED' && !broker.filledQuantity);
+        broker.status === 'rejected' || (broker.status === 'cancelled' && !broker.filledQuantity);
       if (dead) {
+        const reason = broker.message ? `: ${String(broker.message).slice(0, 300)}` : '.';
         await LiveOrder.updateOne(
           { _id: order._id, status: 'placed' },
           {
             $set: {
               status: 'rejected',
-              error: `Zerodha ${broker.status.toLowerCase()} the order.`,
+              error: `${adapter.label} ${broker.status} the order${reason}`,
             },
           },
         );
@@ -183,9 +224,9 @@ async function settleRejectedOrders(userId) {
 }
 
 /**
- * Send one reviewed plan to Zerodha as a regular DAY LIMIT order at the plan's
- * entry price. Every safety check runs on the server against the frozen plan;
- * the browser only names the plan and confirms its symbol.
+ * Send one reviewed plan to the member's live-order broker as a regular DAY LIMIT
+ * order at the plan's entry price. Every safety check runs on the server against
+ * the frozen plan; the browser only names the plan and confirms its symbol.
  */
 export async function placeLiveOrder({
   user,
@@ -199,7 +240,7 @@ export async function placeLiveOrder({
   await applyPlatformSettings();
   await settleRejectedOrders(user._id);
   const state = await liveTradingState(user, session);
-  if (!state.enabled) throw new HttpError('Live trading is not enabled on this server.', 403);
+  if (!state.serverEnabled) throw new HttpError('Live trading is not enabled on this server.', 403);
   if (!state.accountEnabled) throw new HttpError('Enable live orders in Settings first.', 403);
   if (!state.mfaVerified) {
     throw new HttpError('Verify your authenticator before placing live orders.', 403);
@@ -222,6 +263,13 @@ export async function placeLiveOrder({
     status: { $in: ['submitting', 'placed', 'unknown'] },
   }).lean();
   if (active) throw new HttpError('An order was already sent for this plan.', 409);
+  const { broker } = state;
+  if (!state.enabled) {
+    throw new HttpError(
+      `Connect your ${broker.label} account in Settings before placing live orders.`,
+      409,
+    );
+  }
 
   if (!state.marketOpen)
     throw new HttpError('Live orders can be placed only while the market is open.', 409);
@@ -256,6 +304,12 @@ export async function placeLiveOrder({
     throw new HttpError('The plan entry price is not a valid limit price.', 400);
   }
   if (autoStopTarget) {
+    if (!broker.capabilities.stopTarget) {
+      throw new HttpError(
+        `An automatic stop-loss and target is not available with ${broker.label}.`,
+        400,
+      );
+    }
     // The GTT sells a delivery holding; checked now so the member knows before the order goes.
     if (product !== 'CNC' || side !== 'BUY') {
       throw new HttpError(
@@ -296,6 +350,7 @@ export async function placeLiveOrder({
     record = await LiveOrder.create({
       _id: idempotencyKey,
       userId: user._id,
+      provider: broker.provider,
       planId,
       status: 'submitting',
       symbol,
@@ -325,12 +380,14 @@ export async function placeLiveOrder({
   }
 
   try {
-    const { orderId } = await placeKiteLimitOrder(user._id, {
+    const adapter = await brokerAdapter(broker.provider);
+    const { orderId } = await adapter.placeLimitOrder(user._id, {
       symbol,
+      exchange: 'NSE',
       side,
       product,
       quantity,
-      price,
+      price: priceValue,
       tag: 'blank',
     });
     record.status = 'placed';
@@ -345,43 +402,18 @@ export async function placeLiveOrder({
 
 /* ------------------------------ stop-loss / target GTT ------------------------------ */
 
-/** Kite needs each trigger at least this far (percent) from the last price. */
+/** Each trigger at least this far (percent) from the last price (Kite's minimum, for every broker). */
 const GTT_MIN_DISTANCE_PERCENT = 0.25;
-/** The stop leg's limit price sits this far (percent) below its trigger, to help it fill. */
-const STOP_LIMIT_BUFFER_PERCENT = 0.5;
-/**
- * NSE cash-market tick in paise for a price (price bands from April 2025): ₹0.05 up to ₹1,000
- * (also valid for the ₹0.01 band below ₹250), ₹0.10 to ₹5,000, ₹0.50 to ₹10,000, ₹1 to ₹20,000,
- * then ₹5. NSE reviews ticks monthly, so Kite stays the final check.
- */
-function tickPaise(price) {
-  if (price <= 1000) return 5;
-  if (price <= 5000) return 10;
-  if (price <= 10000) return 50;
-  if (price <= 20000) return 100;
-  return 500;
-}
 
 /**
- * Rounds a price to its NSE tick. Works in whole paise: dividing rupees by 0.05 is inexact
- * (100.05 / 0.05 = 2000.9999…) and would drop a tick.
- */
-export function toTick(value, roundUp) {
-  const paise = Math.round(value * 100);
-  const tick = tickPaise(value);
-  const ticks = roundUp ? Math.ceil(paise / tick) : Math.floor(paise / tick);
-  return (ticks * tick) / 100;
-}
-
-/**
- * Places the plan's stop-loss and target on Zerodha as one GTT (one cancels the
- * other) for a filled delivery (CNC) buy placed from the plan. Same guards as
- * live orders, plus: the entry must be completely filled, the symbol typed to
- * confirm, and each trigger far enough from the current price.
+ * Places the plan's stop-loss and target with the order's broker as one GTT (one
+ * cancels the other) for a filled delivery (CNC) buy placed from the plan. Same
+ * guards as live orders, plus: the entry must be completely filled, the symbol
+ * typed to confirm, and each trigger far enough from the current price.
  */
 export async function placeStopTargetGtt({ user, session, orderId, confirmSymbol }) {
   const state = await liveTradingState(user, session);
-  if (!state.enabled) throw new HttpError('Live trading is not enabled on this server.', 403);
+  if (!state.serverEnabled) throw new HttpError('Live trading is not enabled on this server.', 403);
   if (!state.accountEnabled) throw new HttpError('Enable live orders in Settings first.', 403);
   if (!state.mfaVerified) {
     throw new HttpError('Verify your authenticator before placing a GTT.', 403);
@@ -391,9 +423,16 @@ export async function placeStopTargetGtt({ user, session, orderId, confirmSymbol
   if (order.status !== 'placed' || !order.brokerOrderId) {
     throw new HttpError('Only a placed order can get a stop-loss and target.', 409);
   }
+  const adapter = await brokerAdapter(order.provider);
+  if (!adapter?.capabilities.stopTarget) {
+    throw new HttpError(
+      `A stop-loss and target cannot be placed with ${adapter?.label ?? 'this broker'} here. Place the stop in your broker app.`,
+      409,
+    );
+  }
   if (order.product !== 'CNC' || order.side !== 'BUY') {
     throw new HttpError(
-      'Zerodha GTTs work for delivery (CNC) holdings, so intraday (MIS) orders cannot get one. Place the stop manually in Kite.',
+      `A stop-loss and target here protects a delivery (CNC) holding, so intraday (MIS) orders cannot get one. Place the stop manually in ${adapter.label}.`,
       409,
     );
   }
@@ -407,15 +446,15 @@ export async function placeStopTargetGtt({ user, session, orderId, confirmSymbol
   ) {
     throw new HttpError('Type the symbol exactly to confirm the GTT.', 400);
   }
-  return sendStopTargetGtt(user, order);
+  return sendStopTargetGtt(user, order, adapter);
 }
 
 /**
- * The GTT itself, after the caller's checks: the entry must be completely
- * filled (HttpError with `pending` while it is still working) and each trigger
- * far enough from the current price.
+ * The GTT itself through the order's `adapter`, after the caller's checks: the
+ * entry must be completely filled (HttpError with `pending` while it is still
+ * working) and each trigger far enough from the current price.
  */
-async function sendStopTargetGtt(user, order) {
+async function sendStopTargetGtt(user, order, adapter) {
   const plan = await reviewedPlan(user._id, order.planId);
   const stop = Number(plan.inputs?.stopLoss);
   const target = plan.inputs?.takeProfit ? Number(plan.inputs.takeProfit) : null;
@@ -423,20 +462,20 @@ async function sendStopTargetGtt(user, order) {
 
   let broker;
   try {
-    broker = await readKiteOrder(user._id, order.brokerOrderId);
+    broker = await adapter.readOrder(user._id, order.brokerOrderId);
   } catch (error) {
     throw new HttpError(
-      error instanceof Error ? error.message : 'The order could not be read from Zerodha.',
+      error instanceof Error ? error.message : `The order could not be read from ${adapter.label}.`,
       error?.status === 401 ? 401 : 503,
     );
   }
-  if (broker.status !== 'COMPLETE' || broker.filledQuantity !== order.quantity) {
+  if (broker.status !== 'complete' || broker.filledQuantity !== order.quantity) {
     const error = new HttpError(
       `The entry order is not completely filled yet (${broker.filledQuantity} of ${order.quantity}, ${broker.status || 'unknown status'}).`,
       409,
     );
     // Still working at the exchange: the automatic GTT tries again on the next check.
-    error.pending = !['CANCELLED', 'REJECTED'].includes(broker.status);
+    error.pending = !['cancelled', 'rejected'].includes(broker.status);
     throw error;
   }
 
@@ -462,14 +501,6 @@ async function sendStopTargetGtt(user, order) {
       409,
     );
   }
-  const legs = [
-    // Triggers are sent on the tick too; the stop rounds down, the target up.
-    {
-      trigger: toTick(stop, false),
-      price: toTick(stop * (1 - STOP_LIMIT_BUFFER_PERCENT / 100), false),
-    },
-    ...(target !== null ? [{ trigger: toTick(target, true), price: toTick(target, true) }] : []),
-  ];
 
   // Claim the order atomically so two requests can never send two GTTs.
   const claimed = await LiveOrder.findOneAndUpdate(
@@ -481,13 +512,13 @@ async function sendStopTargetGtt(user, order) {
     throw new HttpError('A GTT was already sent for this order.', 409, { claimLost: true });
   }
   try {
-    const { triggerId } = await placeKiteGtt(user._id, {
+    const { triggerId } = await adapter.placeStopTarget(user._id, {
       symbol: order.symbol,
-      side: 'SELL',
-      product: 'CNC',
+      exchange: 'NSE',
       quantity: order.quantity,
+      stopLoss: stop,
+      target,
       lastPrice,
-      legs,
     });
     claimed.gttStatus = 'placed';
     claimed.gttTriggerId = triggerId;
@@ -512,7 +543,7 @@ const AUTO_GTT_WINDOW_MS = 3 * 24 * 60 * 60_000;
 export async function placePendingAutoGtts({ limit = 100 } = {}) {
   // The admin's live-trading switch may have changed on another process a moment ago.
   await applyPlatformSettings();
-  const config = liveTradingConfig();
+  const config = await liveTradingConfig();
   if (!config.enabled) return { checked: 0, placed: 0, failed: 0, waiting: 0, enabled: false };
   const orders = await LiveOrder.find({
     autoGtt: true,
@@ -526,19 +557,23 @@ export async function placePendingAutoGtts({ limit = 100 } = {}) {
   for (const order of orders) {
     const user = await User.findById(order.userId);
     const settings = await AccountSettings.findById(order.userId, { liveTradingEnabled: 1 }).lean();
+    const adapter = await brokerAdapter(order.provider ?? 'kite');
+    const label = adapter?.label ?? 'your broker';
     let problem = null;
     if (!user || (await accessProblem(user))) problem = 'Blank access is not active.';
     else if (!settings?.liveTradingEnabled) problem = 'Live orders were turned off in Settings.';
     else if (!(await hasFeature(user, 'liveOrders', { startTrial: false })))
       problem = 'Premium has ended.';
+    else if (!adapter?.capabilities.stopTarget)
+      problem = `${label} cannot take a stop-loss and target here.`;
     let result = null;
     if (!problem) {
       try {
-        result = await sendStopTargetGtt(user, order);
+        result = await sendStopTargetGtt(user, order, adapter);
       } catch (error) {
         // Another run (or the member by hand) is already placing this GTT: nothing to report.
         if (error?.claimLost) continue;
-        // Still filling, or Zerodha/the quote briefly unreachable: try on the next check.
+        // Still filling, or the broker/the quote briefly unreachable: try on the next check.
         if (error?.pending || error?.status === 503) {
           counts.waiting += 1;
           continue;
@@ -559,8 +594,8 @@ export async function placePendingAutoGtts({ limit = 100 } = {}) {
     await sendToMember(
       order.userId,
       placed
-        ? `Stop-loss ₹${result.gtt.stop}${result.gtt.target ? ` and target ₹${result.gtt.target}` : ''} placed on Zerodha for ${order.symbol} (GTT ${result.gtt.triggerId}).`
-        : `The automatic stop-loss for ${order.symbol} was NOT placed: ${problem ?? result?.gtt?.error ?? 'unknown outcome, check Kite'}. Place it in Kite now.`,
+        ? `Stop-loss ₹${result.gtt.stop}${result.gtt.target ? ` and target ₹${result.gtt.target}` : ''} placed on ${label} for ${order.symbol} (GTT ${result.gtt.triggerId}).`
+        : `The automatic stop-loss for ${order.symbol} was NOT placed: ${problem ?? result?.gtt?.error ?? `unknown outcome, check ${label}`}. Place it in ${label} now.`,
     );
   }
   return counts;

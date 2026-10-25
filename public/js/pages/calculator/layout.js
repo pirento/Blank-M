@@ -15,7 +15,7 @@ export const refreshQuote = button([icon('refresh-cw', 13, 'mr-2'), ' Refresh qu
   className: 'mt-2',
   onclick: () => void loadQuote(),
 });
-export const syncButton = button('Sync Zerodha balance', {
+export const syncButton = button('Sync broker balance', {
   variant: 'outline',
   disabled: !accountId,
   onclick: () => void syncBalance(),

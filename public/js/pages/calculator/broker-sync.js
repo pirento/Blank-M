@@ -1,5 +1,5 @@
 /**
- * Syncs the trading capital from the linked Zerodha balance.
+ * Syncs the trading capital from the linked broker balance.
  */
 import { formatIstDateTime } from '../../core/dom.js';
 import { fetchBrokerBalance } from '../../lib/quotes.js';
@@ -7,7 +7,7 @@ import { paintEstimate, paintSync } from './painting.js';
 import { fields, inputs, state } from './shared.js';
 
 /**
- * Reads the Zerodha available balance and copies it into account size and available
+ * Reads the broker's available balance and copies it into account size and available
  * capital. Skips the update if the user edited those fields while the request was out.
  */
 export async function syncBalance() {
@@ -32,7 +32,7 @@ export async function syncBalance() {
     fields.availableCapital = String(balance.liveBalance);
     inputs.accountSize.value = fields.accountSize;
     inputs.availableCapital.value = fields.availableCapital;
-    state.syncMessage = `Zerodha INR balance read ${formatIstDateTime(balance.fetchedAt)} IST. This snapshot does not verify margin for a planned order.`;
+    state.syncMessage = `${balance.label} INR balance read ${formatIstDateTime(balance.fetchedAt)} IST. This snapshot does not verify margin for a planned order.`;
   } catch (error) {
     state.syncMessage =
       error instanceof Error

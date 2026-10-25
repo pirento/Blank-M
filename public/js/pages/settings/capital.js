@@ -74,7 +74,7 @@ export function mountCapital() {
       if (result.liveBalance <= 0)
         throw new Error('Broker balance is not positive. Manual planning capital was not changed.');
       capital.value = result.liveBalance.toFixed(2);
-      state.message = `Broker balance ${formatCurrency(result.liveBalance)} read at ${formatIstDateTime(result.fetchedAt)} IST. Save planning capital to apply it.`;
+      state.message = `${result.label} balance ${formatCurrency(result.liveBalance)} read at ${formatIstDateTime(result.fetchedAt)} IST. Save planning capital to apply it.`;
     } catch (error) {
       state.message = errorMessage(error, 'Could not read broker balance.');
     } finally {
@@ -99,7 +99,7 @@ export function mountCapital() {
         h(
           'p',
           { class: 'text-sm text-muted' },
-          'Manual planning capital never changes broker funds. Live balance is read only on request from your verified Zerodha account.',
+          'Manual planning capital never changes broker funds. Live balance is read only on request from your verified broker account.',
         ),
         available ? null : statusLine(t('Saved planning capital could not be loaded.')),
         messageSlot,

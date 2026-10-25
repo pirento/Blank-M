@@ -1,7 +1,8 @@
 /**
- * Order review dialogs that reach Zerodha: placing a reviewed plan as a live
- * LIMIT order, and the stop-loss/target GTT for a filled delivery buy. Each
- * asks the member to type the symbol; `onDone` reloads the live order state.
+ * Order review dialogs that reach the member's broker: placing a reviewed plan
+ * as a live LIMIT order, and the stop-loss/target GTT for a filled delivery buy.
+ * Each names the broker (`broker`: { label, capabilities } from the live order
+ * state), asks the member to type the symbol, and `onDone` reloads the state.
  */
 import { t } from '../../core/i18n.js';
 import { h, button, input, label, formatCurrency } from '../../core/dom.js';
@@ -11,16 +12,18 @@ import { notify } from '../../core/toast.js';
 import { formatPlanningPrice } from '../../../../shared/risk-calculator.js';
 
 /**
- * Opens the live Zerodha order dialog for a plan. The user must retype the symbol and tick
- * the acknowledgement before it POSTs to /api/live-orders; then calls `onDone`.
+ * Opens the live order dialog for a plan and the member's live-order broker. The user must
+ * retype the symbol and tick the acknowledgement before it POSTs to /api/live-orders; then
+ * calls `onDone`.
  */
-export function openLiveOrder(plan, { onDone }) {
+export function openLiveOrder(plan, { broker, onDone }) {
+  const { label: brokerName } = broker;
   const side = plan.direction === 'Short' ? 'SELL' : 'BUY';
   const quantity = plan.estimate.quantity;
   const value = quantity * Number(plan.inputs.entryPrice);
   const idempotencyKey = crypto.randomUUID();
   openModal({
-    title: t('Place live order with Zerodha'),
+    title: t('Place live order with {broker}', { broker: brokerName }),
     description: t('This sends a real order to your broker account.'),
     content: (close) => {
       const confirmField = input({
@@ -29,9 +32,12 @@ export function openLiveOrder(plan, { onDone }) {
         placeholder: plan.symbol,
       });
       const acknowledge = h('input', { type: 'checkbox', class: 'mt-1' });
-      // Zerodha GTTs sell delivery holdings, so the automatic stop is for CNC buys.
+      // The stop/target order sells a delivery holding, so the automatic stop is for CNC buys.
       const canAutoGtt =
-        plan.product === 'CNC' && side === 'BUY' && Number(plan.inputs.stopLoss) > 0;
+        Boolean(broker.capabilities?.stopTarget) &&
+        plan.product === 'CNC' &&
+        side === 'BUY' &&
+        Number(plan.inputs.stopLoss) > 0;
       const autoGtt = h('input', { type: 'checkbox', class: 'mt-1', checked: canAutoGtt });
       const submit = button(t('Place order'), { variant: 'destructive', disabled: true });
       const message = h('p', { role: 'alert', class: 'text-sm text-negative', hidden: true });
@@ -58,7 +64,7 @@ export function openLiveOrder(plan, { onDone }) {
           });
           close();
           if (order.status === 'placed')
-            notify(`Order placed with Zerodha (order ${order.brokerOrderId}).`, 'success');
+            notify(`Order placed with ${brokerName} (order ${order.brokerOrderId}).`, 'success');
           else notify(order.error || 'The order was not placed.', 'error');
           await onDone();
         } catch (error) {
@@ -81,6 +87,7 @@ export function openLiveOrder(plan, { onDone }) {
         h(
           'dl',
           {},
+          row('Broker', brokerName),
           row('Instrument', `NSE · ${plan.symbol}`),
           row('Side', side),
           row('Product', plan.product),
@@ -93,8 +100,8 @@ export function openLiveOrder(plan, { onDone }) {
           'p',
           { class: 'text-xs leading-5 text-muted' },
           canAutoGtt
-            ? 'Prices can move before the order reaches the exchange; Zerodha may reject the order for margin, price band or other reasons.'
-            : 'Only the entry order is sent. Your planned stop and target are NOT placed automatically (that works for delivery buys only) — set them in Zerodha yourself. Prices can move before the order reaches the exchange; Zerodha may reject the order for margin, price band or other reasons.',
+            ? `Prices can move before the order reaches the exchange; ${brokerName} may reject the order for margin, price band or other reasons.`
+            : `Only the entry order is sent. Your planned stop and target are NOT placed automatically (that works for delivery buys only) — set them in ${brokerName} yourself. Prices can move before the order reaches the exchange; ${brokerName} may reject the order for margin, price band or other reasons.`,
         ),
         canAutoGtt
           ? h(
@@ -104,7 +111,7 @@ export function openLiveOrder(plan, { onDone }) {
               h(
                 'span',
                 {},
-                `Place my stop-loss ${formatPlanningPrice(plan.inputs.stopLoss)}${plan.inputs.takeProfit ? ` and target ${formatPlanningPrice(plan.inputs.takeProfit)}` : ''} on Zerodha as soon as this order fills`,
+                `Place my stop-loss ${formatPlanningPrice(plan.inputs.stopLoss)}${plan.inputs.takeProfit ? ` and target ${formatPlanningPrice(plan.inputs.takeProfit)}` : ''} on ${brokerName} as soon as this order fills`,
                 h(
                   'span',
                   { class: 'block text-xs text-muted' },
@@ -142,14 +149,16 @@ export function openLiveOrder(plan, { onDone }) {
 }
 
 /**
- * Opens the dialog that places a stop/target GTT for a filled order. The user must retype
- * the symbol before it POSTs to /api/live-orders/:id/gtt; then calls `onDone`.
+ * Opens the dialog that places a stop/target GTT for a filled order with the order's broker.
+ * The user must retype the symbol before it POSTs to /api/live-orders/:id/gtt; then calls
+ * `onDone`.
  */
-export function openGtt(plan, order, { onDone }) {
+export function openGtt(plan, order, { broker, onDone }) {
   openModal({
-    title: t('Place stop & target on Zerodha'),
+    title: t('Place stop & target on {broker}', { broker: broker.label }),
     description: t(
-      'A GTT that sells the filled quantity at your stop or your target; when one triggers, Zerodha cancels the other.',
+      'A GTT that sells the filled quantity at your stop or your target; when one triggers, {broker} cancels the other.',
+      { broker: broker.label },
     ),
     content: (close) => {
       const confirmField = input({
@@ -174,7 +183,7 @@ export function openGtt(plan, order, { onDone }) {
           });
           close();
           if (result.order.gtt?.status === 'placed')
-            notify(`GTT placed with Zerodha (${result.order.gtt.triggerId}).`, 'success');
+            notify(`GTT placed with ${broker.label} (${result.order.gtt.triggerId}).`, 'success');
           else notify(result.order.gtt?.error || 'The GTT was not placed.', 'error');
           await onDone();
         } catch (error) {
@@ -210,7 +219,7 @@ export function openGtt(plan, order, { onDone }) {
         h(
           'p',
           { class: 'text-xs leading-5 text-muted' },
-          'The stop leg is a LIMIT order 0.5% below its trigger to help it fill; in a fast fall it may still not fill. The entry must be completely filled first. GTTs stay active until triggered, cancelled in Kite or expired (one year).',
+          `The stop leg is a LIMIT order a little below its trigger to help it fill; in a fast fall it may still not fill. The entry must be completely filled first. It stays active until triggered, cancelled in ${broker.label} or expired.`,
         ),
         h(
           'div',

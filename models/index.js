@@ -15,6 +15,7 @@ export { WatchlistItem } from './WatchlistItem.js';
 export { ChatMessage } from './ChatMessage.js';
 export { Instrument } from './Instrument.js';
 export { BrokerConnection, BrokerOAuthState } from './BrokerConnection.js';
+export { BrokerInstrument } from './BrokerInstrument.js';
 export { AiUsageEvent, AiConfiguration, JournalEmbedding } from './Ai.js';
 export { ResearchRun } from './ResearchRun.js';
 export { OrderPlanRecord } from './OrderPlanRecord.js';

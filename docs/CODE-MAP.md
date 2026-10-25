@@ -179,6 +179,7 @@ Common browser helpers live in `public/js/core/` (`dom.js` element builder, card
 | `AllowedUser.js`      | The invite-only allowlist.                                                                         |
 | `AuthToken.js`        | Single-use emailed links                                                                           |
 | `BrokerConnection.js` | Encrypted broker access token, bound to one broker identity per account.                           |
+| `BrokerInstrument.js` | Each broker's cached instrument master (exchange + symbol → the broker's token).                   |
 | `ChatMessage.js`      | A message in the member's AI chat history.                                                         |
 | `Counter.js`          | Atomic, monotonic counters (for example the order-plan server revision).                           |
 | `Instrument.js`       | Zerodha instrument master (NSE equities), refreshed from the public CSV.                           |
@@ -478,8 +479,10 @@ The admin panel's browser modules (one per page in `views/admin/`, plus `shell.j
 | `fyers.js`        | Fyers (API v3) OAuth connection and today's fills, read-only                                                                       |
 | `angel.js`        | Angel One (SmartAPI) login with the member's own API key and today's fills, read-only; PIN/TOTP never stored                       |
 | `daily-import.js` | After the close: today's Zerodha/Dhan/Upstox/Fyers/Angel One fills into the journal for opted-in members, with a Telegram summary. |
-| `live-orders.js`  | Live orders through Zerodha                                                                                                        |
-| `portfolio.js`    | Reads the member's Zerodha holdings, positions, orders and trades into the shape shared/broker-portfolio.js validates.             |
+| `live-orders.js`  | Live orders through the member's chosen broker's adapter; every safety check is shared                                             |
+| `portfolio.js`    | Broker portfolio and balance through the broker's adapter; shared validation and limits (shared/broker-portfolio.js)               |
+| `adapters/`       | One file per broker (`kite.js`, …) found by name; `index.js` documents the adapter contract and is the registry                    |
+| `instruments.js`  | Each broker's cached instrument master (BrokerInstrument), refreshed at most daily; the NSE tick rule                              |
 
 ### `services/journal/`
 
