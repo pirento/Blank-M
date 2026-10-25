@@ -33,8 +33,10 @@ import {
   liveTradingState,
   placeLiveOrder,
   placeStopTargetGtt,
+  setLiveOrderBroker,
   setLiveTrading,
 } from '../services/broker/live-orders.js';
+import { BROKER_PROVIDERS } from '../shared/broker-portfolio.js';
 import { HttpError } from '../services/errors.js';
 import { submitProblemReport } from '../services/admin/problem-reports.js';
 import { todayInIst } from '../shared/market.js';
@@ -280,8 +282,20 @@ export async function saveLiveTrading(req, res) {
 }
 
 /**
+ * PUT /api/account/live-order-broker { broker }: where live orders go; only a connected broker
+ * whose adapter takes orders (400 otherwise).
+ */
+export async function saveLiveOrderBroker(req, res) {
+  const parsed = z.object({ broker: z.enum(BROKER_PROVIDERS) }).safeParse(req.body);
+  if (!parsed.success) throw new HttpError('Choose a broker for live orders.', 400);
+  res.json({
+    state: await setLiveOrderBroker(req.member.user, req.member.session, parsed.data.broker),
+  });
+}
+
+/**
  * POST /api/live-orders { planId, confirmSymbol, idempotencyKey, autoStopTarget? }: sends a
- * reviewed plan to Zerodha (with autoStopTarget, its stop/target GTT follows once filled).
+ * reviewed plan to the member's live-order broker (with autoStopTarget, its stop/target GTT follows once filled).
  * 201 when newly placed, 200 for a replay or any other order status.
  */
 export async function createLiveOrder(req, res) {

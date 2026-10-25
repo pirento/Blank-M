@@ -7,6 +7,7 @@ import { computeCurrentBalance } from '../shared/pnl.js';
 import { env } from '../config/env.js';
 import { hasOpenAiKey } from '../services/ai/openai-key.js';
 import { isKiteConfigured } from '../services/market/index.js';
+import { adaptersFor } from '../services/broker/adapters/index.js';
 import { isMailConfigured } from '../services/mailer.js';
 import { NAV_LINKS, ADMIN_NAV_GROUP } from '../config/nav.js';
 import { createHash } from 'node:crypto';
@@ -14,6 +15,7 @@ import { openShareLink } from '../services/journal/share-links.js';
 import { reserveAttempts } from '../services/rate-window.js';
 import { allowFeature, membershipFor } from '../services/billing/membership.js';
 import { featureLabel, loadPlan, publicPlan } from '../services/billing/plan.js';
+import { amountInWords, invoiceFor } from '../services/billing/invoices.js';
 
 const TITLES = Object.fromEntries(
   [...NAV_LINKS, ...ADMIN_NAV_GROUP.items].map((link) => [link.path, link.name]),
@@ -83,6 +85,10 @@ export function workspacePage(
       vendor,
       workspace: data,
       health,
+      // What each broker supports here, for the dashboard's broker card.
+      brokerCapabilities: Object.fromEntries(
+        (await adaptersFor()).map((adapter) => [adapter.provider, adapter.capabilities]),
+      ),
       pageData: {
         accountId: userId,
         sessionId: req.member.session.sessionId,
@@ -190,6 +196,20 @@ export async function legal(req, res) {
       address: process.env.BUSINESS_ADDRESS?.trim() || '',
       grievanceOfficer: process.env.GRIEVANCE_OFFICER?.trim() || '',
     },
+  });
+}
+
+/**
+ * GET /billing/invoices/:number: a printable invoice (or receipt), only for its member or an
+ * administrator; anyone else gets the 404 page.
+ */
+export async function invoice(req, res, next) {
+  const found = await invoiceFor(req.params[0], req.member.user);
+  if (!found) return next();
+  res.render('pages/invoice', {
+    title: found.type === 'tax-invoice' ? 'Tax invoice' : 'Payment receipt',
+    invoice: found,
+    words: amountInWords(found.total),
   });
 }
 

@@ -96,4 +96,4 @@ and scaling: [DATABASE.md](DATABASE.md).
 | `strategyevidences`, `…reviews`                       | Immutable backtest evidence and owner decisions      |
 | `researchruns`, `aiusageevents`, …                    | AI research archive, usage limits, model config      |
 | `brokerconnections`, `instruments`                    | Encrypted Kite/Dhan tokens, NSE instrument master    |
-| GridFS `statements`, `voiceNotes`, `tradeScreenshots` | Uploads, temporary audio, chart screenshots          |
+| GridFS `statements`, `voiceNotes`, `tradeScreenshots` | Uploads, temporary audio, chart screenshots (or S3)  |

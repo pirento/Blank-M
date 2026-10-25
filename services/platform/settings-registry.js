@@ -181,6 +181,47 @@ export const PLATFORM_SETTINGS = [
     max: 65535,
   },
 
+  // Trade screenshots in an S3-compatible bucket instead of MongoDB (docs/DEPLOYMENT.md).
+  {
+    key: 'S3_BUCKET',
+    group: 'Screenshot storage (S3)',
+    label: 'Bucket name',
+    type: 'text',
+    help: 'A private bucket. Once the bucket and both keys are set, new chart screenshots go there; then copy the old ones with pnpm run maintenance:screenshots-to-s3.',
+  },
+  {
+    key: 'S3_REGION',
+    group: 'Screenshot storage (S3)',
+    label: 'Region',
+    type: 'text',
+    help: 'e.g. ap-south-1 (AWS Mumbai) or auto (Cloudflare R2). Empty: auto with an endpoint URL, otherwise ap-south-1.',
+  },
+  {
+    key: 'S3_ENDPOINT',
+    group: 'Screenshot storage (S3)',
+    label: 'Endpoint URL (not needed for AWS)',
+    type: 'url',
+    help: 'Cloudflare R2, DigitalOcean Spaces, Wasabi or MinIO, e.g. https://<account>.r2.cloudflarestorage.com',
+  },
+  {
+    key: 'S3_ACCESS_KEY_ID',
+    group: 'Screenshot storage (S3)',
+    label: 'Access key ID',
+    type: 'text',
+  },
+  {
+    key: 'S3_SECRET_ACCESS_KEY',
+    group: 'Screenshot storage (S3)',
+    label: 'Secret access key',
+    type: 'secret',
+  },
+  {
+    key: 'S3_FORCE_PATH_STYLE',
+    group: 'Screenshot storage (S3)',
+    label: 'Path-style addresses (MinIO)',
+    type: 'boolean',
+  },
+
   // Business details shown on the public Terms, Privacy, Refund and Contact pages
   // (Razorpay checks these pages before it activates live payments).
   {

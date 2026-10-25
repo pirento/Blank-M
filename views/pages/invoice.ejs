@@ -1,0 +1,121 @@
+<%
+  const taxed = invoice.type === 'tax-invoice';
+  const seller = invoice.seller;
+  const interState = taxed && invoice.placeOfSupply?.code !== seller.state?.code;
+  const buyer = invoice.buyer;
+  const stateText = (state) => (state ? `${state.name} (${state.code})` : '—');
+  const date = new Date(invoice.issuedAt).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium' });
+%>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="color-scheme" content="light" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <title><%= title %> <%= invoice.number %></title>
+    <style>
+      @page { size: A4; margin: 14mm; }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: #f3f4f6; color: #111827; font: 14px/1.5 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+      .sheet { max-width: 210mm; margin: 24px auto; background: #fff; padding: 32px; border: 1px solid #e5e7eb; }
+      h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; }
+      h2 { margin: 0 0 4px; font-size: 12px; font-weight: 600; text-transform: uppercase; color: #6b7280; letter-spacing: 0.04em; }
+      .row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 24px; }
+      .row > div { flex: 1 1 240px; }
+      .block { margin-top: 24px; }
+      .seller-name { font-size: 18px; font-weight: 600; }
+      .muted { color: #4b5563; }
+      .right { text-align: right; }
+      table { width: 100%; border-collapse: collapse; margin-top: 24px; }
+      th, td { padding: 8px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+      th { text-align: left; font-size: 12px; font-weight: 600; color: #4b5563; background: #f9fafb; }
+      .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+      .total td { font-weight: 600; border-top: 2px solid #111827; border-bottom: 0; }
+      .notes { margin-top: 24px; font-size: 13px; }
+      .notes p { margin: 4px 0; }
+      .actions { max-width: 210mm; margin: 24px auto 0; display: flex; justify-content: space-between; gap: 12px; padding: 0 4px; }
+      .actions a { color: #1d4ed8; }
+      button { font: inherit; padding: 8px 16px; border: 1px solid #111827; background: #111827; color: #fff; border-radius: 6px; cursor: pointer; }
+      button:focus-visible, a:focus-visible { outline: 2px solid #1d4ed8; outline-offset: 2px; }
+      @media print {
+        body { background: #fff; }
+        .sheet { margin: 0; padding: 0; border: 0; max-width: none; }
+        .actions { display: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="actions">
+      <a href="/billing">← Billing</a>
+      <button type="button" data-print>Print / Save as PDF</button>
+    </div>
+    <main class="sheet">
+      <div class="row">
+        <div>
+          <div class="seller-name"><%= seller.tradeName || seller.legalName || 'Pirento Blank' %></div>
+          <% if (seller.tradeName && seller.legalName) { %><div><%= seller.legalName %></div><% } %>
+          <div class="muted"><%= seller.address %></div>
+          <% if (seller.state) { %><div class="muted">State: <%= stateText(seller.state) %></div><% } %>
+          <% if (seller.gstin) { %><div>GSTIN: <strong><%= seller.gstin %></strong></div><% } %>
+          <% if (seller.supportEmail) { %><div class="muted"><%= seller.supportEmail %></div><% } %>
+        </div>
+        <div class="right">
+          <h1><%= title %></h1>
+          <div>No. <strong><%= invoice.number %></strong></div>
+          <div>Date: <%= date %></div>
+          <div class="muted">Payment: <%= invoice.paymentId %></div>
+        </div>
+      </div>
+
+      <div class="row block">
+        <div>
+          <h2>Billed to</h2>
+          <div><strong><%= buyer.name || buyer.email %></strong></div>
+          <% if (buyer.name && buyer.email) { %><div class="muted"><%= buyer.email %></div><% } %>
+          <% if (buyer.address) { %><div class="muted"><%= buyer.address %></div><% } %>
+          <div class="muted">State: <%= stateText(buyer.state) %></div>
+          <% if (buyer.gstin) { %><div>GSTIN: <strong><%= buyer.gstin %></strong></div><% } %>
+        </div>
+        <div class="right">
+          <h2>Place of supply</h2>
+          <div><%= stateText(invoice.placeOfSupply) %></div>
+        </div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Description</th>
+            <th scope="col">SAC</th>
+            <th scope="col" class="num"><%= taxed ? 'Taxable value' : 'Amount' %></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><%= invoice.description %></td>
+            <td><%= invoice.sac || '—' %></td>
+            <td class="num"><%= formatCurrency(invoice.taxableValue) %></td>
+          </tr>
+          <% if (interState) { %>
+          <tr><td colspan="2" class="right">IGST @ <%= invoice.rate %>%</td><td class="num"><%= formatCurrency(invoice.igst) %></td></tr>
+          <% } else if (taxed) { %>
+          <tr><td colspan="2" class="right">CGST @ <%= invoice.rate / 2 %>%</td><td class="num"><%= formatCurrency(invoice.cgst) %></td></tr>
+          <tr><td colspan="2" class="right">SGST @ <%= invoice.rate / 2 %>%</td><td class="num"><%= formatCurrency(invoice.sgst) %></td></tr>
+          <% } %>
+          <tr class="total"><td colspan="2" class="right">Total (<%= invoice.currency %>)</td><td class="num"><%= formatCurrency(invoice.total) %></td></tr>
+        </tbody>
+      </table>
+
+      <div class="notes">
+        <p><strong>Amount in words:</strong> <%= words %></p>
+        <% if (taxed) { %><p>Whether tax is payable on reverse charge: No</p><% } %>
+        <p class="muted">This is a computer-generated <%= taxed ? 'invoice' : 'receipt' %> and needs no signature.</p>
+      </div>
+    </main>
+    <script nonce="<%= cspNonce %>">
+      document.querySelector('[data-print]').addEventListener('click', () => window.print());
+    </script>
+  </body>
+</html>

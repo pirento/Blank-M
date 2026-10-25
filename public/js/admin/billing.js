@@ -1,7 +1,8 @@
 /**
  * Admin → Plans & billing: switch billing on, set the Premium price, free
- * trial and which features need Premium, open or close public sign-up, and
- * see recent payments. Razorpay keys are set in Integrations.
+ * trial and which features need Premium, open or close public sign-up, the
+ * seller details on GST invoices, and see recent payments with their invoices.
+ * Razorpay keys are set in Integrations.
  */
 import {
   $,
@@ -10,6 +11,8 @@ import {
   button,
   input,
   label,
+  select,
+  textarea,
   statusLine,
   card,
   cardHeader,
@@ -20,6 +23,7 @@ import {
 import { api, errorMessage } from '../core/api.js';
 import { notify } from '../core/toast.js';
 import { mfaNotice, money, when } from './shared.js';
+import { GST_STATES } from '../../../shared/gst.js';
 
 const root = $('[data-admin-billing]');
 const state = { billing: null, payments: [] };
@@ -200,6 +204,107 @@ function planCard() {
   );
 }
 
+const field = (text, id, control, hint) =>
+  h(
+    'div',
+    {},
+    label(text, id),
+    control,
+    hint ? h('p', { class: 'mt-1 text-xs text-muted' }, hint) : null,
+  );
+
+/** Seller details printed on every new GST invoice (issued invoices keep theirs). */
+function businessCard() {
+  const business = state.billing.business;
+  const text = (id, value, maxlength, extra = {}) =>
+    input({ id, value, maxlength: String(maxlength), ...extra });
+  const legalName = text('biz-legal', business.legalName, 100);
+  const tradeName = text('biz-trade', business.tradeName, 100);
+  const address = textarea({ id: 'biz-address', maxlength: '300', value: business.address });
+  const stateSelect = select({ id: 'biz-state' }, [
+    { value: '', label: 'Choose…', selected: !business.state },
+    ...GST_STATES.map((item) => ({
+      value: item.code,
+      label: `${item.name} (${item.code})`,
+      selected: item.code === business.state,
+    })),
+  ]);
+  const gstin = text('biz-gstin', business.gstin, 15, {
+    autocapitalize: 'characters',
+    spellcheck: 'false',
+  });
+  const sac = text('biz-sac', business.sac, 20);
+  const rate = input({
+    id: 'biz-rate',
+    type: 'number',
+    min: '0',
+    max: '40',
+    step: '0.01',
+    value: String(business.rate),
+  });
+  const prefix = text('biz-prefix', business.invoicePrefix, 4);
+  const email = text('biz-email', business.supportEmail, 200, { type: 'email' });
+  return card(
+    {},
+    cardHeader('', cardTitle('Invoice details')),
+    cardContent(
+      'space-y-4',
+      h(
+        'p',
+        { class: 'text-sm text-muted' },
+        'Every captured payment gets an invoice with these details. Changes apply to future invoices only. The amount paid always includes GST (₹499 at 18% is ₹422.88 + ₹76.12 GST), so set the plan price with GST in it. Without a GSTIN members get a payment receipt with no GST.',
+      ),
+      h(
+        'div',
+        { class: 'grid gap-4 sm:grid-cols-2' },
+        field('Legal name', 'biz-legal', legalName, 'As on your PAN / GST registration.'),
+        field('Trade name (optional)', 'biz-trade', tradeName),
+        h('div', { class: 'sm:col-span-2' }, field('Full address', 'biz-address', address)),
+        field('State', 'biz-state', stateSelect),
+        field('GSTIN (optional)', 'biz-gstin', gstin, 'Leave empty if not registered for GST.'),
+        field(
+          'SAC code (optional)',
+          'biz-sac',
+          sac,
+          'Ask your CA; often 998314/998439 for online software services.',
+        ),
+        field('GST rate (%)', 'biz-rate', rate),
+        field(
+          'Invoice number prefix',
+          'biz-prefix',
+          prefix,
+          '1–4 letters or digits, e.g. PB → PB/26-27/00001.',
+        ),
+        field('Support email on invoices', 'biz-email', email),
+      ),
+      button('Save invoice details', {
+        onclick: async () => {
+          try {
+            await api('/api/admin/billing/business', {
+              method: 'PUT',
+              body: {
+                legalName: legalName.value,
+                tradeName: tradeName.value,
+                address: address.value,
+                state: stateSelect.value,
+                gstin: gstin.value,
+                sac: sac.value,
+                rate: Number(rate.value),
+                invoicePrefix: prefix.value,
+                supportEmail: email.value,
+              },
+            });
+            notify('Invoice details saved.', 'success');
+            await load();
+          } catch (error) {
+            notify(errorMessage(error, 'The invoice details could not be saved.'), 'error');
+          }
+        },
+      }),
+    ),
+  );
+}
+
 function paymentsCard() {
   const rows = state.payments;
   return card(
@@ -220,7 +325,7 @@ function paymentsCard() {
                 h(
                   'tr',
                   { class: 'text-xs text-muted' },
-                  ...['When (IST)', 'Member', 'Amount', 'Status', 'Method'].map((text) =>
+                  ...['When (IST)', 'Member', 'Amount', 'Status', 'Method', 'Invoice'].map((text) =>
                     h('th', { scope: 'col', class: 'py-2 pr-4 font-normal' }, text),
                   ),
                 ),
@@ -248,6 +353,22 @@ function paymentsCard() {
                       ),
                     ),
                     h('td', { class: 'py-2 pr-4' }, payment.method ?? '—'),
+                    h(
+                      'td',
+                      { class: 'py-2 pr-4 whitespace-nowrap' },
+                      payment.invoice
+                        ? h(
+                            'a',
+                            {
+                              href: `/billing/invoices/${payment.invoice}`,
+                              class: 'text-accent underline',
+                              target: '_blank',
+                              rel: 'noopener',
+                            },
+                            payment.invoice,
+                          )
+                        : '—',
+                    ),
                   ),
                 ),
               ),
@@ -266,7 +387,11 @@ async function load() {
     ]);
     state.billing = billing;
     state.payments = payments.payments;
-    render(root, mfaNotice(), h('div', { class: 'grid gap-4' }, planCard(), paymentsCard()));
+    render(
+      root,
+      mfaNotice(),
+      h('div', { class: 'grid gap-4' }, planCard(), businessCard(), paymentsCard()),
+    );
   } catch (error) {
     render(
       root,

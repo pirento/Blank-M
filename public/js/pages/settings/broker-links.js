@@ -31,7 +31,7 @@ const BROKERS = () => [
     title: t('Upstox'),
     oauth: true,
     description: t(
-      'Read-only: brings today’s Upstox fills into the journal. You log in on Upstox’s own page; the access token is stored encrypted and lasts until 3:30 am IST.',
+      'Brings today’s Upstox fills into the journal and shows your holdings; orders go out only if you turn on live orders. You log in on Upstox’s own page; the access token is stored encrypted and lasts until 3:30 am IST.',
     ),
     missingKeys: t('The administrator has not set Upstox app keys yet.'),
     connect: t('Connect Upstox'),
@@ -43,7 +43,7 @@ const BROKERS = () => [
     title: t('Fyers'),
     oauth: true,
     description: t(
-      'Read-only: brings today’s Fyers fills into the journal. You log in on Fyers’ own page; the access token is stored encrypted and lasts for the trading day.',
+      'Brings today’s Fyers fills into the journal and shows your holdings; orders go out only if you turn on live orders. You log in on Fyers’ own page; the access token is stored encrypted and lasts for the trading day.',
     ),
     missingKeys: t('The administrator has not set Fyers app keys yet.'),
     connect: t('Connect Fyers'),
@@ -55,7 +55,7 @@ const BROKERS = () => [
     title: t('Angel One'),
     oauth: false,
     description: t(
-      'Read-only: brings today’s Angel One fills into the journal. Create a SmartAPI app at smartapi.angelbroking.com for your API key. Your PIN and authenticator code are sent to Angel One once and never stored; the session lasts until midnight IST.',
+      'Brings today’s Angel One fills into the journal and shows your holdings; orders go out only if you turn on live orders. Create a SmartAPI app at smartapi.angelbroking.com for your API key. Your PIN and authenticator code are sent to Angel One once and never stored; the session lasts until midnight IST.',
     ),
     connect: t('Connect Angel One'),
     add: t('Add today’s Angel One fills to journal'),

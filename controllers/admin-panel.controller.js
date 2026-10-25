@@ -26,6 +26,7 @@ import { recordAdminAction } from '../services/admin/audit.js';
 import { isPushConfigured } from '../services/notifications/push.js';
 import { checkKeys, isRazorpayConfigured } from '../services/billing/razorpay.js';
 import { PREMIUM_FEATURES, loadPlan, publicPlan, savePlan } from '../services/billing/plan.js';
+import { loadBusiness, saveBusiness } from '../services/billing/business.js';
 import {
   billingMetrics,
   grantPremium,
@@ -268,10 +269,14 @@ export async function setTelegramWebhookHandler(req, res) {
 
 /* ------------------------------------- billing ------------------------------------- */
 
-/** GET /api/admin/billing: the plan, the feature list and whether Razorpay is set up. */
+/**
+ * GET /api/admin/billing: the plan, the feature list, whether Razorpay is set up and the invoice
+ * details.
+ */
 export async function getBilling(_req, res) {
-  const plan = await loadPlan();
+  const [plan, business] = await Promise.all([loadPlan(), loadBusiness()]);
   res.json({
+    business,
     plan: {
       ...publicPlan(plan),
       features: plan.features,
@@ -328,7 +333,28 @@ export async function saveBilling(req, res) {
   res.json({ plan: { ...publicPlan(plan), features: plan.features } });
 }
 
-/** GET /api/admin/payments: the latest payments across all members. */
+const businessSchema = z
+  .object({
+    legalName: z.string().trim().max(100),
+    tradeName: z.string().trim().max(100),
+    address: z.string().trim().max(300),
+    state: z.string().max(2),
+    gstin: z.string().trim().max(15),
+    sac: z.string().trim().max(20),
+    rate: z.number(),
+    invoicePrefix: z.string().trim().max(4),
+    supportEmail: z.string().trim().max(200),
+  })
+  .strict();
+
+/** PUT /api/admin/billing/business { …every field }: the seller details for future invoices. */
+export async function saveInvoiceBusiness(req, res) {
+  const parsed = businessSchema.safeParse(req.body ?? {});
+  if (!parsed.success) throw new HttpError('Send valid invoice details.', 400);
+  res.json({ business: await saveBusiness({ user: actorOf(req) }, parsed.data) });
+}
+
+/** GET /api/admin/payments: the latest payments across all members, with their invoice numbers. */
 export async function listPayments(_req, res) {
   res.json({ payments: await recentPayments() });
 }

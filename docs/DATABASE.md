@@ -58,7 +58,7 @@ Sizes are rough figures for an active member, to plan disk and RAM, not limits.
 | `instruments`             | NSE instrument master (shared, not per member)                               | `exchange+tradingSymbol`, `instrumentToken` unique (sparse)                                                   | Refreshed                                           | ~3 MB in total                             |
 | GridFS `statements`       | Uploaded statements/charts for AI analysis (≤ 10 MB each)                    | GridFS `filename+uploadDate`, `uploadDate`                                                                    | **7 days** (same daily job)                         | ≤ 200 MB per member                        |
 | GridFS `voiceNotes`       | Temporary voice notes                                                        | GridFS `filename+uploadDate`, `uploadDate`                                                                    | **24 hours** (`scripts/maintenance-voice-notes.js`) | ≤ 50 MB per member                         |
-| GridFS `tradeScreenshots` | One chart screenshot per trade (≤ 5 MB)                                      | GridFS `filename+uploadDate`, `uploadDate`                                                                    | With the trade or screenshot; orphans by daily job  | ≤ 500 MB per member                        |
+| GridFS `tradeScreenshots` | One chart screenshot per trade (≤ 5 MB), unless stored in S3 (below)         | GridFS `filename+uploadDate`, `uploadDate`                                                                    | With the trade or screenshot; orphans by daily job  | ≤ 500 MB per member                        |
 | `platformsettings`        | Admin panel API keys/switches (secrets encrypted) and the Premium plan       | `_id` = setting key                                                                                           | Kept                                                | platform-wide, a few KB                    |
 | `adminauditlogs`          | Who changed what in the admin panel (never secret values)                    | `createdAt` TTL                                                                                               | **2 years**                                         | admin only                                 |
 | `subscriptions`           | Premium per member: trial end, paid-until, admin grant, Razorpay id/status   | `_id` = user id, `razorpaySubscriptionId` unique (partial), `razorpayStatus`                                  | Kept                                                | ~0.3 KB                                    |
@@ -125,7 +125,7 @@ this size, and MongoDB 4.2+ builds do not block reads and writes for long. Thing
   copies each archive off the server with rclone (30 days kept; use an encrypted `crypt` remote).
   `deploy/health-check.sh` alerts when no backup has succeeded for a day. The dump includes the
   GridFS files, chart screenshots too (up to 500 MB per member), so every daily archive and the
-  backup disk grow with them.
+  backup disk grow with them, unless the screenshots are stored in S3 (below).
 - **Restore everything:** `mongorestore --uri="$MONGODB_URI" --gzip --archive=<file> --drop`. Indexes
   are recreated from the dump.
 - **Test a restore** every month into a scratch database instead of the live one:
@@ -141,21 +141,35 @@ this size, and MongoDB 4.2+ builds do not block reads and writes for long. Thing
 - **On MongoDB Atlas** use Cloud Backup (snapshots with point-in-time restore) instead of, or as
   well as, `mongodump`.
 
+## Storing screenshots in S3
+
+With `S3_BUCKET`, `S3_ACCESS_KEY_ID` and `S3_SECRET_ACCESS_KEY` set (admin panel → Integrations →
+Screenshot storage), `services/storage.js` keeps trade screenshots in that S3-compatible bucket
+under the same `<userId>/<tradeId>/<uuid>` names; statements and voice notes stay in GridFS.
+Screenshots not copied yet are still read from GridFS, and deleting a screenshot or a member removes
+both copies. `scripts/migrate-screenshots-to-s3.js` copies the GridFS files (re-runnable) and, with
+`--delete`, removes them; the steps are in docs/DEPLOYMENT.md → "Storing screenshots in S3".
+**S3 objects are not in `mongodump`:** enable bucket versioning or the provider's backups. The
+orphan sweep keeps its S3 position (a file name) in `counters._id = 'screenshot_sweep'`.
+
 ## Scaling
 
 - **Thousands of members:** one MongoDB server is enough. Give it RAM for the indexes plus the hot
   data (the WiredTiger cache uses about half the RAM); watch for slow queries with
   `db.setProfilingLevel(1, { slowms: 100 })` or Atlas Performance Advisor, and check
   `db.<collection>.aggregate([{ $indexStats: {} }])` for unused indexes.
-- **Before taking payments:** move to a three-node **replica set** (Atlas M10 or larger, or your own)
-  for automatic failover and point-in-time backups. Multi-document transactions also need one.
-  Only `MONGODB_URI` changes.
+- **Replica set:** `deploy/setup-vps.sh` and Docker Compose run MongoDB as a one-node replica set
+  `rs0` (`?replicaSet=rs0` in `MONGODB_URI`; older installs can switch once, see
+  docs/DEPLOYMENT.md). **Before taking payments**, grow it to three nodes (or Atlas M10 or larger)
+  for automatic failover and point-in-time backups; only `MONGODB_URI` changes. The driver retries
+  writes and a replica set's default write concern is majority, and `tests/server/replica-set.test.js`
+  runs the app on one. Steps: docs/DEPLOYMENT.md → "Running on more than one server".
 - **Sharding** is only worth it when one replica set can no longer hold the data or the writes
   (roughly beyond 1–2 TB or sustained write saturation), far beyond thousands of members. Every
   member query filters by `userId`, so `{ userId: 'hashed' }` would be the shard key for member
   collections.
-- **Connections:** each app process keeps a Mongoose pool (100 by default). With PM2 in cluster mode
-  or several servers, keep processes × pool under the server's connection limit.
+- **Connections:** each app process keeps a Mongoose pool of up to 50 (`config/database.js`). With
+  PM2 in cluster mode or several servers, keep processes × pool under the server's connection limit.
 
 ## Known follow-ups
 

@@ -10,7 +10,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
-      MONGODB_URI: mongodb://mongo:27017/blank
+      MONGODB_URI: mongodb://mongo:27017/blank?replicaSet=rs0
       # The app listens on localhost only; put Nginx (HTTPS) in front of it.
       # Production session cookies are Secure, so sign-in needs HTTPS.
       TRUST_PROXY: 'true'
@@ -29,7 +29,7 @@ services:
     env_file: .env
     environment:
       NODE_ENV: production
-      MONGODB_URI: mongodb://mongo:27017/blank
+      MONGODB_URI: mongodb://mongo:27017/blank?replicaSet=rs0
     # The image's health check calls the web server, which this container does not run.
     healthcheck:
       disable: true
@@ -37,13 +37,22 @@ services:
       mongo:
         condition: service_healthy
 
+  # A one-node replica set (rs0), so more nodes can join later. The health check initiates it once
+  # (also on an existing standalone volume) and is healthy only when this node is the primary.
+  # Its member name "mongo" resolves inside the Compose network, where the app connects.
   mongo:
     image: mongo:7
     restart: unless-stopped
+    command: ['--replSet', 'rs0']
     volumes:
       - mongo-data:/data/db
     healthcheck:
-      test: ['CMD', 'mongosh', '--quiet', '--eval', 'db.adminCommand("ping").ok']
+      test:
+        - CMD
+        - mongosh
+        - --quiet
+        - --eval
+        - "try { rs.status() } catch (e) { rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: 'mongo:27017' }] }) } quit(db.hello().isWritablePrimary ? 0 : 1)"
       interval: 10s
       timeout: 5s
       retries: 10

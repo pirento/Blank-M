@@ -78,7 +78,7 @@ Common browser helpers live in `public/js/core/` (`dom.js` element builder, card
 | Weekly report email                                  | `services/journal/weekly-report.js`, `scripts/send-weekly-reports.js`                                                      |
 | Quotes and price history                             | `services/market/` (Kite first, Yahoo fallback)                                                                            |
 | Zerodha login, balance, portfolio                    | `services/market/kite/`, `services/broker/`, `controllers/kite.controller.js`                                              |
-| Dhan fills → journal                                 | `services/broker/dhan.js`, `services/broker/fills-journal.js`, `public/js/pages/settings/dhan.js`                          |
+| Dhan fills, portfolio, balance, live orders          | `services/broker/{dhan,adapters/dhan,fills-journal}.js`, `public/js/pages/settings/dhan.js`                                |
 | Upstox / Fyers / Angel One fills → journal           | `services/broker/{upstox,fyers,angel}.js`, `controllers/brokers.controller.js`, `public/js/pages/settings/broker-links.js` |
 | Live orders                                          | `services/broker/live-orders.js`, `public/js/pages/orders.js`                                                              |
 | AI prompts and endpoints                             | `controllers/ai/`, `services/ai/openai.js`                                                                                 |
@@ -179,6 +179,7 @@ Common browser helpers live in `public/js/core/` (`dom.js` element builder, card
 | `AllowedUser.js`      | The invite-only allowlist.                                                                         |
 | `AuthToken.js`        | Single-use emailed links                                                                           |
 | `BrokerConnection.js` | Encrypted broker access token, bound to one broker identity per account.                           |
+| `BrokerInstrument.js` | Each broker's cached instrument master (exchange + symbol → the broker's token).                   |
 | `ChatMessage.js`      | A message in the member's AI chat history.                                                         |
 | `Counter.js`          | Atomic, monotonic counters (for example the order-plan server revision).                           |
 | `Instrument.js`       | Zerodha instrument master (NSE equities), refreshed from the public CSV.                           |
@@ -404,19 +405,20 @@ The admin panel's browser modules (one per page in `views/admin/`, plus `shell.j
 
 ### `scripts/`
 
-| File                         | What it does                                         |
-| ---------------------------- | ---------------------------------------------------- |
-| `create-admin.js`            | Bootstrap the first administrator.                   |
-| `admin-setup-code.js`        | Code for an admin's first authenticator (no email).  |
-| `maintenance-signups.js`     | Daily: delete sign-ups unconfirmed after 7 days.     |
-| `delete-member.js`           | Delete a member and all their data (on request).     |
-| `billing-reminders.js`       | Daily: "your trial ends soon" emails.                |
-| `market-feed.js`             | The TrueData live feed process (PM2 app).            |
-| `dev-memory.js`              | Local preview without installing MongoDB             |
-| `daily-import.js`            | Scheduled daily automatic journal (after the close). |
-| `premarket-plan.js`          | Scheduled pre-market plan on Telegram (07:30 IST).   |
-| `maintenance-voice-notes.js` | Scheduled voice-note cleanup (run daily from cron).  |
-| `send-weekly-reports.js`     | Scheduled weekly report emails.                      |
+| File                           | What it does                                         |
+| ------------------------------ | ---------------------------------------------------- |
+| `create-admin.js`              | Bootstrap the first administrator.                   |
+| `admin-setup-code.js`          | Code for an admin's first authenticator (no email).  |
+| `maintenance-signups.js`       | Daily: delete sign-ups unconfirmed after 7 days.     |
+| `delete-member.js`             | Delete a member and all their data (on request).     |
+| `billing-reminders.js`         | Daily: "your trial ends soon" emails.                |
+| `market-feed.js`               | The TrueData live feed process (PM2 app).            |
+| `dev-memory.js`                | Local preview without installing MongoDB             |
+| `daily-import.js`              | Scheduled daily automatic journal (after the close). |
+| `premarket-plan.js`            | Scheduled pre-market plan on Telegram (07:30 IST).   |
+| `maintenance-voice-notes.js`   | Scheduled voice-note cleanup (run daily from cron).  |
+| `send-weekly-reports.js`       | Scheduled weekly report emails.                      |
+| `migrate-screenshots-to-s3.js` | Copy trade screenshots from GridFS to S3 (once).     |
 
 ### `services/`
 
@@ -430,7 +432,7 @@ The admin panel's browser modules (one per page in `views/admin/`, plus `shell.j
 | `mailer.js`       | Outgoing email over SMTP, text plus branded HTML (replaceable in tests).         |
 | `rate-window.js`  | Durable fixed-window rate limits shared by all server processes.                 |
 | `storage-path.js` | Storage download interpolates object paths into a URL under service credentials. |
-| `storage.js`      | File storage in MongoDB GridFS                                                   |
+| `storage.js`      | File storage in MongoDB GridFS (trade screenshots in S3 when configured)         |
 
 ### `services/admin/`
 
@@ -474,12 +476,14 @@ The admin panel's browser modules (one per page in `views/admin/`, plus `shell.j
 | `broker-api.js`   | Shared broker JSON requests (timeout, size limit, error mapping) and the encrypted token row per broker                            |
 | `fill-mapping.js` | Broker rows → journal fills and carried-in map; NSE/BSE symbols and Kite-style F&O names                                           |
 | `oauth.js`        | Single-use OAuth state for the Upstox and Fyers logins                                                                             |
-| `upstox.js`       | Upstox (API v2) OAuth connection and today's fills, read-only                                                                      |
+| `upstox.js`       | Upstox (API v2) OAuth connection, today's fills, and the request helpers of `adapters/upstox.js`                                   |
 | `fyers.js`        | Fyers (API v3) OAuth connection and today's fills, read-only                                                                       |
-| `angel.js`        | Angel One (SmartAPI) login with the member's own API key and today's fills, read-only; PIN/TOTP never stored                       |
+| `angel.js`        | Angel One (SmartAPI) login with the member's own API key, today's fills and SmartAPI calls for its adapter; PIN/TOTP never stored  |
 | `daily-import.js` | After the close: today's Zerodha/Dhan/Upstox/Fyers/Angel One fills into the journal for opted-in members, with a Telegram summary. |
-| `live-orders.js`  | Live orders through Zerodha                                                                                                        |
-| `portfolio.js`    | Reads the member's Zerodha holdings, positions, orders and trades into the shape shared/broker-portfolio.js validates.             |
+| `live-orders.js`  | Live orders through the member's chosen broker's adapter; every safety check is shared                                             |
+| `portfolio.js`    | Broker portfolio and balance through the broker's adapter; shared validation and limits (shared/broker-portfolio.js)               |
+| `adapters/`       | One file per broker (`kite.js`, `angel.js`) found by name; `index.js` documents the adapter contract and is the registry           |
+| `instruments.js`  | Each broker's cached instrument master (BrokerInstrument), refreshed at most daily; the NSE tick rule                              |
 
 ### `services/journal/`
 

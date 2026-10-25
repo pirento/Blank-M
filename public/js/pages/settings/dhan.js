@@ -104,7 +104,7 @@ export function mountDhan() {
             cardTitle(t('Dhan')),
             cardDescription(
               t(
-                'Read-only: brings today’s Dhan fills into the journal. Create an access token at web.dhan.co → My Profile → DhanHQ Trading APIs. It is stored encrypted and never shown again.',
+                'Brings today’s Dhan fills into the journal and shows your holdings; orders go out only if you turn on live orders. Create an access token at web.dhan.co → My Profile → DhanHQ Trading APIs. It is stored encrypted and never shown again.',
               ),
             ),
           ),

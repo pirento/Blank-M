@@ -8,7 +8,11 @@ mongoose.set('strictQuery', true);
 
 let connecting = null;
 
-/** One shared connection per process. Models are registered on import. */
+/**
+ * One shared connection per process. Models are registered on import. A standalone and a replica
+ * set URI work alike: the driver retries writes by default and a replica set's default write
+ * concern is majority (tests/server/replica-set.test.js), so no extra options are needed.
+ */
 export async function connectDatabase(uri = env.mongoUri) {
   if (mongoose.connection.readyState === 1) return mongoose.connection;
   connecting ??= mongoose
@@ -57,7 +61,10 @@ export async function disconnectDatabase() {
   await mongoose.disconnect();
 }
 
-/** True while the Mongoose connection is open (readyState 1). */
+/**
+ * True while the Mongoose connection is open (readyState 1). On a replica set it is false while
+ * there is no primary (a failover), so /api/health answers 503 until the election ends.
+ */
 export function isDatabaseConnected() {
   return mongoose.connection.readyState === 1;
 }

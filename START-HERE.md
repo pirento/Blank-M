@@ -190,7 +190,7 @@ confirm nahi karte, unke sign-up roz apne aap hat jaate hain (`scripts/maintenan
 mein link). Razorpay KYC mein inke link maangta hai. Text ek achha shuruaati draft hai — Business
 details bharne ke baad bechne se pehle apne CA/lawyer se padhwa lijiye (`views/pages/legal.ejs`).
 
-**Zaroori:** GST/invoice ki zaroorat apne CA se pooch lijiye. AI picks/research ko advice ki tarah bechne par SEBI Research Analyst registration lag sakta
+**Zaroori:** GST registration aur invoice ki details apne CA se pooch lijiye (neeche "GST invoices"). AI picks/research ko advice ki tarah bechne par SEBI Research Analyst registration lag sakta
 hai — kisi expert se confirm kariye.
 
 ### Free limit, Billing page aur emails
@@ -206,6 +206,28 @@ hai — kisi expert se confirm kariye.
 - **Announcement:** admin panel → Announcements se sab members (ya sirf Premium / free) ko ek email.
   Jo member Settings mein "Emails from the team" band kare, use nahi jaata. Email (SMTP) set hona
   chahiye.
+
+### GST invoices
+
+Har captured Razorpay payment par apne aap ek invoice banta hai (number jaise `PB/26-27/00001`, har
+financial year April–March mein 00001 se dobara). Member use **Billing** page aur "Payment received"
+email ke link se kholta hai, "Print / Save as PDF" se PDF banata hai. Admin panel → Plans & billing →
+Recent payments mein har payment ke saamne uska invoice link hai.
+
+1. Admin panel → Plans & billing → **Invoice details** bhariye: legal name, trade name (agar ho),
+   poora address, state, GSTIN, SAC code, GST rate (default 18%), invoice prefix (1–4 akshar/ank,
+   default `PB`) aur support email → Save. SAC code aur rate apne CA se poochiye (online software
+   service ke liye aksar 998314 ya 998439).
+2. GSTIN khaali ho to "Payment receipt" banti hai (koi GST nahi). GSTIN daalte hi agle payment se
+   "Tax invoice" (CGST + SGST same state mein, doosre state mein IGST).
+3. Invoice ka total hamesha wahi hota hai jo member ne pay kiya — GST usi mein se nikalta hai
+   (₹499 par 18% = ₹422.88 + ₹76.12 GST). Isliye plan ka price GST jod kar rakhiye.
+4. Member Billing page par apna naam, state, GSTIN (business ho to input tax credit ke liye) aur
+   address bhar sakta hai.
+
+Ye details **sirf aage ke invoices** par lagti hain — bana hua invoice kabhi nahi badalta. Purane
+payments (is feature se pehle wale) ka invoice nahi banta. **Refund par credit note apne aap nahi
+banta** — refund kiya to CA se credit note banwaiye.
 
 ### Google se login
 

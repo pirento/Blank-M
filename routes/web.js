@@ -74,6 +74,8 @@ for (const [path, view, data, vendor, feature] of WORKSPACE_PAGES) {
     wrap(pages.workspacePage(view, { data, vendor, feature, tradeNotes })),
   );
 }
+// Invoice numbers contain slashes: /billing/invoices/PB/26-27/00001.
+router.get('/billing/invoices/*', requirePageAuth, wrap(pages.invoice));
 // Member management moved to the admin panel.
 router.get('/users', (_req, res) => res.redirect(301, '/admin/members'));
 

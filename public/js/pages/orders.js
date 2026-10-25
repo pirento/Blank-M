@@ -1,6 +1,6 @@
 /**
  * Order review page: saved order plans, review status, cloud sync and (when
- * enabled) guarded live order placement through Zerodha.
+ * enabled) guarded live order placement through the member's chosen broker.
  */
 import { t } from '../core/i18n.js';
 import {
@@ -32,11 +32,18 @@ let store = null;
 const live = { state: null, orders: [], error: '' };
 const ACTIVE = new Set(['submitting', 'placed', 'unknown']);
 const STATUS_LABELS = {
-  submitting: 'Sending to Zerodha',
-  placed: 'Placed with Zerodha',
-  rejected: 'Rejected',
-  unknown: 'Outcome unknown — check Zerodha',
+  submitting: (label) => `Sending to ${label}`,
+  placed: (label) => `Placed with ${label}`,
+  rejected: () => 'Rejected',
+  unknown: (label) => `Outcome unknown — check ${label}`,
 };
+/** A broker from the live order state: { provider, label, connected, capabilities }. */
+const brokerOf = (provider) =>
+  live.state?.brokers?.find((broker) => broker.provider === provider) ?? {
+    provider,
+    label: 'your broker',
+    capabilities: {},
+  };
 
 async function loadLive() {
   try {
@@ -54,10 +61,11 @@ async function loadLive() {
 function liveBlocker(plan) {
   const state = live.state;
   if (!state) return live.error || 'Checking live order availability…';
-  if (!state.enabled)
+  if (!state.serverEnabled)
     return 'Live trading is turned off on this server. Plans stay for review only.';
   if (!state.accountEnabled)
-    return 'Enable live orders in Settings to place this plan with Zerodha.';
+    return `Enable live orders in Settings to place this plan with ${state.broker.label}.`;
+  if (!state.enabled) return `Connect ${state.broker.label} in Settings to place live orders.`;
   if (!state.mfaVerified) return 'Verify your authenticator to place live orders.';
   if (state.risk?.blocked) return `${state.risk.reasons[0]} Live orders are paused for today.`;
   if (live.orders.some((order) => order.planId === plan.id && ACTIVE.has(order.status)))
@@ -91,7 +99,7 @@ function liveOrderLine(plan) {
         'li',
         { class: 'flex flex-wrap items-center gap-2' },
         badge(
-          STATUS_LABELS[order.status] ?? order.status,
+          STATUS_LABELS[order.status]?.(brokerOf(order.provider).label) ?? order.status,
           order.status === 'placed'
             ? 'positive'
             : order.status === 'rejected'
@@ -111,14 +119,19 @@ function liveOrderLine(plan) {
 }
 
 const GTT_LABELS = {
-  placed: 'Stop & target GTT placed',
-  rejected: 'GTT rejected',
-  unknown: 'GTT outcome unknown — check Kite',
+  placed: () => 'Stop & target GTT placed',
+  rejected: () => 'GTT rejected',
+  unknown: (label) => `GTT outcome unknown — check ${label}`,
 };
 
-/** GTT status for a live order, and the button to place one when it applies. */
+/** GTT status for a live order, and the button to place one when its broker supports it. */
 function gttLine(plan, order) {
-  const eligible = order.status === 'placed' && order.product === 'CNC' && order.side === 'BUY';
+  const broker = brokerOf(order.provider);
+  const eligible =
+    order.status === 'placed' &&
+    order.product === 'CNC' &&
+    order.side === 'BUY' &&
+    Boolean(broker.capabilities.stopTarget);
   if (!eligible && !order.gtt) return null;
   const gtt = order.gtt;
   return h(
@@ -127,7 +140,7 @@ function gttLine(plan, order) {
     gtt
       ? [
           badge(
-            GTT_LABELS[gtt.status] ?? gtt.status,
+            GTT_LABELS[gtt.status]?.(broker.label) ?? gtt.status,
             gtt.status === 'placed'
               ? 'positive'
               : gtt.status === 'rejected'
@@ -150,7 +163,7 @@ function gttLine(plan, order) {
       ? button(t('Place stop & target (GTT)'), {
           variant: 'outline',
           size: 'sm',
-          onclick: () => openGtt(plan, order, { onDone: loadLive }),
+          onclick: () => openGtt(plan, order, { broker, onDone: loadLive }),
         })
       : null,
   );
@@ -327,7 +340,7 @@ function planCard(plan) {
             class: buttonClass(),
             disabled: Boolean(liveBlocker(plan)),
             'aria-describedby': `execution-${plan.id}`,
-            onclick: () => openLiveOrder(plan, { onDone: loadLive }),
+            onclick: () => openLiveOrder(plan, { broker: live.state.broker, onDone: loadLive }),
           },
           'Place live order',
         ),

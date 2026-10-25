@@ -2,7 +2,7 @@
  * Deleting a member for good (the privacy policy promises it on request) and
  * removing what keeps working for a member whose access was revoked.
  *
- * Kept on purpose after deletion: payments (financial records the law requires),
+ * Kept on purpose after deletion: payments and invoices (financial records the law requires),
  * the trial claim (one trial per person) and the admin audit log.
  */
 import {

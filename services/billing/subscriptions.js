@@ -12,9 +12,10 @@
  */
 import { AdminAuditLog, BillingEvent, Payment, Subscription, User } from '../../models/index.js';
 import { HttpError } from '../errors.js';
-import { createLogger } from '../logger.js';
+import { createLogger, errorName } from '../logger.js';
 import { computeMembership, membershipFor } from './membership.js';
 import { billingEventEmail } from '../notifications/emails.js';
+import { invoiceNumbers, issueInvoice } from './invoices.js';
 import { loadPlan, rememberRazorpayPlan } from './plan.js';
 import {
   cancelSubscription,
@@ -248,10 +249,17 @@ async function applyWebhookEvent(event) {
           status: String(payment.status ?? 'unknown'),
           method: payment.method ?? null,
           paidAt: new Date((payment.created_at ?? Date.now() / 1000) * 1000),
+          ...(payment.status === 'captured' ? { invoiceDue: true } : {}),
         },
       },
       { upsert: true },
     );
+    // The payment counts even if this fails: the invoice is issued when payments are next viewed.
+    if (payment.status === 'captured') {
+      await issueInvoice(payment.id).catch((error) =>
+        log.error('invoice not issued', { paymentId: payment.id, error: errorName(error) }),
+      );
+    }
   }
   log.info('razorpay webhook', { event: event.event, matched: Boolean(record) });
   // Each event id is applied once (handleWebhook), so the member gets one email per event. Not
@@ -305,6 +313,7 @@ export async function endSubscriptionNow(userId) {
 /** The member's last 24 payments, newest first. */
 export async function paymentHistory(userId) {
   const rows = await Payment.find({ userId }).sort({ paidAt: -1 }).limit(24).lean();
+  const invoices = await invoiceNumbers(rows);
   return rows.map((row) => ({
     id: row._id,
     amount: row.amount,
@@ -312,6 +321,7 @@ export async function paymentHistory(userId) {
     status: row.status,
     method: row.method,
     paidAt: row.paidAt.toISOString(),
+    invoice: invoices.get(row._id) ?? null,
   }));
 }
 
@@ -379,6 +389,7 @@ export async function billingMetrics(now = Date.now()) {
 /** Recent payments across all members for the admin billing page. */
 export async function recentPayments(limit = 100) {
   const rows = await Payment.find().sort({ paidAt: -1 }).limit(limit).lean();
+  const invoices = await invoiceNumbers(rows);
   const emails = new Map(
     (
       await User.find(
@@ -395,6 +406,7 @@ export async function recentPayments(limit = 100) {
     status: row.status,
     method: row.method,
     paidAt: row.paidAt.toISOString(),
+    invoice: invoices.get(row._id) ?? null,
   }));
 }
 

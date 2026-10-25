@@ -1,6 +1,7 @@
 /**
- * Dhan (DhanHQ v2) connection with a personal access token, used read-only to
- * bring today's fills into the journal. Dhan issues the token in its web
+ * Dhan (DhanHQ v2) connection with a personal access token: today's fills for
+ * the journal, and the request helpers of the Dhan broker adapter
+ * (adapters/dhan.js, which also places orders). Dhan issues the token in its web
  * console (no OAuth app is needed); it is stored encrypted like Zerodha's and
  * is never sent back to the browser.
  */
@@ -18,7 +19,7 @@ const MAX_TRADES = MAX_ROWS;
 const DEFAULT_VALIDITY_MS = 24 * 60 * 60_000;
 
 /** Dhan exchange segments → exchanges the journal understands (others are skipped later). */
-const EXCHANGES = { NSE_EQ: 'NSE', BSE_EQ: 'BSE', NSE_FNO: 'NFO', BSE_FNO: 'BFO' };
+export const EXCHANGES = { NSE_EQ: 'NSE', BSE_EQ: 'BSE', NSE_FNO: 'NFO', BSE_FNO: 'BFO' };
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 
 /**
@@ -39,10 +40,41 @@ export function dhanTokenClaims(token) {
   }
 }
 
-function dhanGet(path, token) {
+const REJECTED = 'Dhan rejected the access token. Create a new one and reconnect.';
+
+/** A Dhan API GET; failures as brokerRequest throws them. */
+export function dhanGet(path, token) {
   return brokerRequest('Dhan', `${API_BASE}${path}`, {
     headers: { 'access-token': token },
-    rejected: 'Dhan rejected the access token. Create a new one and reconnect.',
+    rejected: REJECTED,
+  });
+}
+
+/** A Dhan API POST of a JSON body; failures as brokerRequest throws them. */
+export function dhanPost(path, token, body) {
+  return brokerRequest('Dhan', `${API_BASE}${path}`, {
+    method: 'POST',
+    headers: { 'access-token': token, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    rejected: REJECTED,
+  });
+}
+
+/**
+ * The member's demat holdings. Dhan answers an empty demat with its own error reply, and only
+ * that means "no holdings": a timeout, rate limit or outage must not turn a delivery sale into a
+ * short.
+ */
+export function dhanHoldings(token) {
+  return dhanGet('/holdings', token).catch((error) => {
+    const emptyDemat =
+      error.body &&
+      (error.body.errorCode === 'DH-1111' ||
+        error.httpStatus < 500 ||
+        /holding/i.test(JSON.stringify(error.body)));
+    if (error.tokenRejected || !emptyDemat) throw error;
+    log.info('dhan holdings empty', { error: errorName(error) });
+    return [];
   });
 }
 
@@ -153,7 +185,7 @@ export function contractSymbol(trade) {
 }
 
 /** The journal's symbol for a Dhan trade-book or position row (F&O as a Kite-style contract). */
-function journalSymbol(row, exchange) {
+export function journalSymbol(row, exchange) {
   return exchange === 'NFO' || exchange === 'BFO'
     ? contractSymbol(row)
     : String(row.tradingSymbol ?? '')
@@ -189,7 +221,7 @@ export function dhanCarried(positions, holdings) {
 }
 
 /** Dhan's unzoned timestamps are IST. */
-function istToIso(value) {
+export function istToIso(value) {
   if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(String(value ?? ''))) return null;
   const date = new Date(`${value.replace(' ', 'T')}+05:30`);
   return Number.isFinite(date.getTime()) ? date.toISOString() : null;
@@ -243,18 +275,7 @@ export async function readDhanFills(userId) {
     [payload, positions, holdings] = await Promise.all([
       dhanGet('/trades', connection.token),
       dhanGet('/positions', connection.token),
-      // Dhan answers an empty demat with its own error reply. Only that means "no holdings":
-      // a timeout, rate limit or outage must not turn today's delivery sale into a short.
-      dhanGet('/holdings', connection.token).catch((error) => {
-        const emptyDemat =
-          error.body &&
-          (error.body.errorCode === 'DH-1111' ||
-            error.httpStatus < 500 ||
-            /holding/i.test(JSON.stringify(error.body)));
-        if (error.tokenRejected || !emptyDemat) throw error;
-        log.info('dhan holdings empty', { error: errorName(error) });
-        return [];
-      }),
+      dhanHoldings(connection.token),
     ]);
   } catch (error) {
     if (error.tokenRejected) {

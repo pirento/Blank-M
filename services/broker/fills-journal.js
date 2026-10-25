@@ -55,7 +55,7 @@ const SOURCES = {
   kite: {
     label: 'Zerodha',
     read: async (userId, assertAccess) => {
-      const snapshot = await readBrokerPortfolio(userId, assertAccess);
+      const snapshot = await readBrokerPortfolio(userId, assertAccess, 'kite');
       return { ...snapshot, carried: carriedFromSnapshot(snapshot) };
     },
   },

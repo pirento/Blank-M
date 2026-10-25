@@ -4,11 +4,14 @@
  * attempts stay in the log and the plan may be sent again.
  */
 import mongoose from 'mongoose';
+import { BROKER_PROVIDERS } from '../shared/broker-portfolio.js';
 
 const liveOrderSchema = new mongoose.Schema(
   {
     _id: String, // client idempotency key (UUID)
     userId: { type: String, required: true },
+    /** The broker the order went to (rows from before multi-broker support are Zerodha). */
+    provider: { type: String, enum: BROKER_PROVIDERS, default: 'kite' },
     planId: { type: String, required: true },
     status: { type: String, enum: ['submitting', 'placed', 'rejected', 'unknown'], required: true },
     symbol: { type: String, required: true },

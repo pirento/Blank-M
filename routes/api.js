@@ -8,7 +8,7 @@ import { requirePremium } from '../services/billing/membership.js';
 import * as market from '../controllers/market.controller.js';
 import * as kite from '../controllers/kite.controller.js';
 import * as dhan from '../controllers/dhan.controller.js';
-import { brokerHandlers } from '../controllers/brokers.controller.js';
+import { brokerHandlers, listBrokers } from '../controllers/brokers.controller.js';
 import * as ai from '../controllers/ai.controller.js';
 import * as adminAi from '../controllers/admin-ai.controller.js';
 import * as admin from '../controllers/admin.controller.js';
@@ -81,6 +81,7 @@ router.all('/kite/portfolio', requireApiAuth, premium.brokers, wrap(kite.portfol
 router.all('/kite/fills', requireApiAuth, premium.brokers, wrap(kite.fills));
 router.all('/kite/fills/import', requireApiAuth, premium.brokers, wrap(kite.importFillsToJournal));
 router.all('/kite/disconnect', wrap(kite.disconnect));
+router.get('/brokers', requireApiAuth, wrap(listBrokers));
 router.get('/dhan', requireApiAuth, wrap(dhan.status));
 router.post('/dhan/connect', requireApiAuth, premium.brokers, wrap(dhan.connect));
 router.post('/dhan/disconnect', requireApiAuth, wrap(dhan.disconnect));
@@ -112,6 +113,7 @@ router.get('/billing', requireApiAuth, wrap(billing.status));
 router.post('/billing/checkout', requireApiAuth, wrap(billing.checkout));
 router.post('/billing/refresh', requireApiAuth, wrap(billing.refresh));
 router.post('/billing/cancel', requireApiAuth, wrap(billing.cancel));
+router.put('/billing/details', requireApiAuth, wrap(billing.saveDetails));
 
 /* --------------------------------- admin panel -------------------------------- */
 router.get('/admin/overview', requireApiAdmin, wrap(adminPanel.overview));
@@ -131,6 +133,12 @@ router.post(
 );
 router.get('/admin/billing', requireApiAdmin, wrap(adminPanel.getBilling));
 router.put('/admin/billing', requireApiAdmin, requireAdminMfa, wrap(adminPanel.saveBilling));
+router.put(
+  '/admin/billing/business',
+  requireApiAdmin,
+  requireAdminMfa,
+  wrap(adminPanel.saveInvoiceBusiness),
+);
 router.post('/admin/billing/check-keys', requireApiAdmin, wrap(adminPanel.checkRazorpayKeys));
 router.get('/admin/payments', requireApiAdmin, wrap(adminPanel.listPayments));
 router.get('/admin/memberships', requireApiAdmin, wrap(adminPanel.listMemberships));
@@ -240,6 +248,7 @@ router.post(
   wrap(account.sendMyWeeklyReport),
 );
 router.put('/account/live-trading', requireApiAuth, wrap(account.saveLiveTrading));
+router.put('/account/live-order-broker', requireApiAuth, wrap(account.saveLiveOrderBroker));
 router.get('/live-orders', requireApiAuth, wrap(account.getLiveOrders));
 router.post('/live-orders', requireApiAuth, premium.liveOrders, wrap(account.createLiveOrder));
 router.get('/share-links', requireApiAuth, wrap(account.listShareLinks));

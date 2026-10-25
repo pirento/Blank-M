@@ -39,7 +39,7 @@ reports, alert emails), `VAPID_*` (push notifications), `GOOGLE_*` (Google sign-
 
 Most API keys can instead be entered in the **admin panel → Integrations** (`/admin/integrations`):
 OpenAI, Zerodha Kite, Upstox, Fyers, Razorpay, SMTP, Telegram, Google sign-in, push (VAPID),
-TrueData and the business details on the legal pages. A value saved there wins over `.env` and
+TrueData, screenshot storage (S3) and the business details on the legal pages. A value saved there wins over `.env` and
 reaches every server process within a minute. Keep `BROKER_TOKEN_ENCRYPTION_KEY` in `.env`.
 
 ### Without email (SMTP)
@@ -52,7 +52,7 @@ need SMTP.
 ## Quick path: one script on a fresh Ubuntu VPS
 
 `deploy/setup-vps.sh` does path A below in one go: Node.js 22, pnpm, PM2, Nginx, Certbot, a local
-MongoDB 8 (bound to localhost), a firewall, the code in `/srv/blank`, a `.env` from
+MongoDB 8 (bound to localhost, a one-node replica set `rs0`), a firewall, the code in `/srv/blank`, a `.env` from
 `.env.production.example` with fresh secrets (`scripts/generate-secrets.js`), the build, PM2, the
 HTTPS certificate, the scheduled jobs and a daily MongoDB backup (`deploy/backup-mongo.sh`, 14 days
 kept in `/srv/blank/backups`). Set `BACKUP_REMOTE` in `.env` to an rclone remote (an encrypted
@@ -224,8 +224,11 @@ when Settings says it has expired.
 Upstox and Fyers log in over OAuth through one platform app each: create the app with the broker,
 register `https://<your-domain>/api/upstox/callback` or `https://<your-domain>/api/fyers/callback`
 as its redirect URL, and enter its keys in the admin panel → Integrations. Angel One needs no server
-setup: each member enters their own SmartAPI details in Settings → Angel One. All three are
-read-only and bring fills into the journal; balance, holdings and live orders are Zerodha only.
+setup: each member enters their own SmartAPI details in Settings → Angel One. All three bring
+fills into the journal. Upstox also gives holdings, balance and live NSE equity orders (no
+automatic stop-loss/target). Upstox accepts API orders only from a static IP the member registered
+in their Upstox app settings, and one IP can belong to one Upstox customer only; orders from any
+other IP are refused.
 
 ### Live market data (TrueData, optional)
 
@@ -268,6 +271,118 @@ is one GTT that sells the filled quantity at the plan's stop-loss (as a LIMIT 0.
 trigger) or at its target, whichever comes first; both triggers must be at least 0.25% from the
 current price. Zerodha GTTs do not support intraday (MIS) positions, so MIS orders need their stop
 placed in Kite.
+
+## Storing screenshots in S3
+
+Trade chart screenshots are the only files kept for good (up to 500 MB per member), so a growing
+install can keep them in S3-compatible storage instead of MongoDB: AWS S3, Cloudflare R2,
+DigitalOcean Spaces, Wasabi or MinIO. Statements and voice notes are temporary and stay in MongoDB.
+
+1. Create a **private** bucket (no public access: the app checks the owner and streams each image
+   itself).
+2. Create an access key that can use **only that bucket**: list, read, write and delete objects. On
+   AWS, an IAM user with `s3:ListBucket` on `arn:aws:s3:::<bucket>` and `s3:GetObject`,
+   `s3:PutObject`, `s3:DeleteObject` on `arn:aws:s3:::<bucket>/*`; on R2, an API token with
+   _Object Read & Write_ for that bucket.
+3. In the **admin panel → Integrations → Screenshot storage (S3)** set the bucket name, region
+   (`ap-south-1` for AWS Mumbai, `auto` for R2), the endpoint URL when not on AWS (for example
+   `https://<account-id>.r2.cloudflarestorage.com` or `https://sgp1.digitaloceanspaces.com`), the
+   access key ID and the secret. Tick _Path-style addresses_ for MinIO. (`S3_*` in `.env` work too.)
+   Once the bucket and both keys are set, new screenshots go to the bucket (on every server process
+   within a minute); old ones keep loading from MongoDB.
+4. A minute later, copy the old ones:
+   `cd /srv/blank && node scripts/migrate-screenshots-to-s3.js` (or
+   `pnpm run maintenance:screenshots-to-s3`). It skips files already copied with the same size, so
+   it can simply be run again after an interruption, and it exits with an error when any file
+   failed.
+5. Open a few trades' screenshots in the app, then delete the MongoDB copies:
+   `node scripts/migrate-screenshots-to-s3.js --delete` (each copy is deleted only after its S3 copy
+   is checked). Until then a member's storage use counts both copies.
+
+**Backups:** files in S3 are not in `mongodump` (`deploy/backup-mongo.sh`). Turn on bucket
+versioning where the provider has it (AWS S3, Wasabi, MinIO), with a lifecycle rule that removes old
+versions after 30 days, or use the provider's backups or replication. Keep the S3 settings once the
+copy is done: without them, screenshots stored in S3 can no longer be shown.
+
+## Running on more than one server
+
+Sessions, rate limits, job claims, platform settings and live prices are in MongoDB, and files are
+in MongoDB or S3, so any web server can answer any request: no sticky sessions are needed. Split
+the roles like this:
+
+- **One worker host** runs the live market data feed (`pm2 start ecosystem.config.cjs --only pirento-feed`;
+  TrueData allows one connection per login) and the scheduled jobs (`deploy/crontab.example` and
+  the daily `deploy/backup-mongo.sh`). Exactly one: two crontabs would send every email and
+  Telegram message twice. The worker can also be one of the web hosts.
+- **Web hosts** run only the web app: `pm2 start ecosystem.config.cjs --only pirento-blank`. After
+  `deploy/setup-vps.sh` on a web host, remove the feed (`pm2 delete pirento-feed && pm2 save`), keep
+  only the `health-check.sh` line in `crontab -e`, and stop its local MongoDB
+  (`sudo systemctl disable --now mongod`). Update web hosts with `git pull`, `pnpm install` and
+  `pm2 reload pirento-blank` (see path A), not by re-running the script, which starts the feed and
+  the jobs again.
+- **Every host uses the same `.env`**: the same `MONGODB_URI`, `APP_URL`, `SESSION_SECRET`,
+  `MFA_ENCRYPTION_KEY`, `BROKER_TOKEN_ENCRYPTION_KEY`, `CRON_SECRET` and VAPID keys. A different
+  secret on one host signs members out or cannot decrypt broker tokens. Keys saved in the admin
+  panel reach every host within a minute.
+- **Zerodha orders** leave from whichever web host serves the request, so register every web host's
+  IP on the Kite developer profile (section 5), or route their outbound traffic through one fixed IP.
+
+**Nginx in front of several web hosts.** One Nginx (with the HTTPS certificate) lists the web hosts
+on the private network:
+
+```nginx
+upstream blank_app {
+    server 10.0.0.11:3000 max_fails=3 fail_timeout=15s;
+    server 10.0.0.12:3000 max_fails=3 fail_timeout=15s;
+    keepalive 32;
+}
+```
+
+The rest of `deploy/nginx.conf.example` stays as it is. On each web host set `HOST: '0.0.0.0'` in
+the `pirento-blank` entry of `ecosystem.config.cjs` (instead of `127.0.0.1`) and open port 3000 to
+the Nginx host only (`sudo ufw allow from 10.0.0.10 to any port 3000 proto tcp`): nothing else may
+reach Node, or the forwarded client address could be forged. `TRUST_PROXY` is the number of proxies
+in front of Node: `true` (one) for this Nginx, `2` when a cloud load balancer sits in front of it. A
+cloud load balancer can health-check `GET /api/health`, which answers 503 while that host cannot
+reach the database.
+
+**MongoDB for several servers.** Use a three-node replica set, or MongoDB Atlas (M10 or larger is
+a three-node replica set with Cloud Backup). `deploy/setup-vps.sh` already runs MongoDB as a
+one-node replica set `rs0`, so growing it needs no app change:
+
+1. Install MongoDB 8 on two more hosts with `replication.replSetName: rs0` in `/etc/mongod.conf`.
+2. On every MongoDB host, listen on the private address too (`net.bindIp: 127.0.0.1,10.0.0.21`),
+   turn on access control (the same `security.keyFile` on every member and
+   `security.authorization: enabled`, with a database user for the app; MongoDB's guide "Deploy a
+   Self-Managed Replica Set With Keyfile Authentication" has the steps), and open port 27017 only
+   to the app and MongoDB hosts.
+3. On the current primary, rename the member to its private address and add the others:
+   `cfg = rs.conf(); cfg.members[0].host = '10.0.0.21:27017'; rs.reconfig(cfg)`, then
+   `rs.add('10.0.0.22:27017')` and `rs.add('10.0.0.23:27017')`.
+4. Set on every app host:
+   `MONGODB_URI="mongodb://blank:<password>@10.0.0.21:27017,10.0.0.22:27017,10.0.0.23:27017/blank?replicaSet=rs0&authSource=admin"`
+   and `pm2 reload pirento-blank` (and `pm2 restart pirento-feed` on the worker).
+
+During a failover `/api/health` answers 503 until a new primary is elected (about 10 seconds when a
+node fails), then recovers by itself; a write caught in it is retried once. Keep the daily `deploy/backup-mongo.sh` on the worker
+(`mongodump` reads the same `MONGODB_URI`); on Atlas use Cloud Backup. Screenshots in S3 need their
+own backup (above).
+
+**An install from the older setup script** runs a standalone MongoDB with
+`MONGODB_URI="mongodb://127.0.0.1:27017/blank"`. It keeps working; re-running the script does not
+change it. To switch it to the one-node replica set once (a few seconds of downtime):
+
+```bash
+cd /srv/blank && bash deploy/backup-mongo.sh
+sudo sh -c 'printf "\nreplication:\n  replSetName: rs0\n" >> /etc/mongod.conf'
+sudo systemctl restart mongod
+mongosh --quiet --eval 'rs.initiate({ _id: "rs0", members: [{ _id: 0, host: "127.0.0.1:27017" }] })'
+sed -i 's|^MONGODB_URI=.*|MONGODB_URI="mongodb://127.0.0.1:27017/blank?replicaSet=rs0"|' .env
+pm2 reload pirento-blank && pm2 restart pirento-feed
+```
+
+With Docker Compose, MongoDB starts as replica set `rs0` (its health check initiates it, also on an
+existing data volume), and the app and feed connect with `?replicaSet=rs0`.
 
 ## 7. Health check and logs
 

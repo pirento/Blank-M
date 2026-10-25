@@ -1,8 +1,18 @@
 /**
  * File storage in MongoDB GridFS: statements, temporary voice notes and trade
- * chart screenshots, each in the owner's folder.
+ * chart screenshots, each in the owner's folder. Trade screenshots (the only bucket
+ * that keeps growing) go to an S3-compatible bucket instead once S3_BUCKET and its
+ * keys are set; files not copied there yet are still read from GridFS.
  */
 import { randomUUID } from 'node:crypto';
+import {
+  DeleteObjectsCommand,
+  GetObjectCommand,
+  HeadObjectCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import mongoose from 'mongoose';
 import { nativeDb } from '../config/database.js';
 import { HttpError } from './errors.js';
@@ -37,6 +47,7 @@ export const BUCKETS = {
     mime: new Set(['image/png', 'image/jpeg', 'image/webp']),
     mimeError: 'Screenshots must be PNG, JPEG or WebP images.',
     sizeError: 'Screenshots must be 5 MB or smaller.',
+    s3: true,
   },
 };
 
@@ -72,6 +83,70 @@ function bucket(name) {
     config,
     gridfs: new mongoose.mongo.GridFSBucket(nativeDb(), { bucketName: config.name }),
   };
+}
+
+let s3Client = null;
+
+/** Forgets the S3 client so the next call uses the current S3_* settings. */
+export function resetS3() {
+  s3Client?.destroy();
+  s3Client = null;
+}
+
+/** `{ client, bucket }` when this bucket's files go to S3 (bucket and both keys set), else null. */
+function s3For(bucketName) {
+  const env = process.env;
+  const name = env.S3_BUCKET?.trim();
+  const accessKeyId = env.S3_ACCESS_KEY_ID?.trim();
+  const secretAccessKey = env.S3_SECRET_ACCESS_KEY?.trim();
+  if (!BUCKETS[bucketName]?.s3 || !name || !accessKeyId || !secretAccessKey) return null;
+  const endpoint = env.S3_ENDPOINT?.trim() || undefined;
+  s3Client ??= new S3Client({
+    region: env.S3_REGION?.trim() || (endpoint ? 'auto' : 'ap-south-1'),
+    endpoint,
+    forcePathStyle: /^(1|true)$/i.test(env.S3_FORCE_PATH_STYLE || ''),
+    credentials: { accessKeyId, secretAccessKey },
+    // R2, Spaces, Wasabi and MinIO do not all accept the SDK's newer default checksums.
+    requestChecksumCalculation: 'WHEN_REQUIRED',
+    responseChecksumValidation: 'WHEN_REQUIRED',
+  });
+  return { client: s3Client, bucket: name };
+}
+
+/** Every object matching the ListObjectsV2 `params` (Prefix, StartAfter), page by page. */
+async function* s3Objects({ client, bucket: Bucket }, params) {
+  let ContinuationToken;
+  do {
+    const page = await client.send(
+      new ListObjectsV2Command({ Bucket, ...params, ContinuationToken }),
+    );
+    yield* page.Contents ?? [];
+    ContinuationToken = page.IsTruncated ? page.NextContinuationToken : undefined;
+  } while (ContinuationToken);
+}
+
+/** Deletes the keys (DeleteObjects takes at most 1000 at a time); returns `{ name }` per key. */
+async function s3Remove({ client, bucket: Bucket }, keys) {
+  const removed = [];
+  for (let start = 0; start < keys.length; start += 1000) {
+    const Objects = keys.slice(start, start + 1000).map((Key) => ({ Key }));
+    const result = await client.send(new DeleteObjectsCommand({ Bucket, Delete: { Objects } }));
+    if (result.Errors?.length) {
+      throw new Error(`S3 refused to delete ${result.Errors.length} file(s)`);
+    }
+    removed.push(...(result.Deleted ?? []).map((item) => ({ name: item.Key })));
+  }
+  return removed;
+}
+
+/** The object's size in S3, or null when it is not there. */
+async function s3Size({ client, bucket: Bucket }, Key) {
+  try {
+    return (await client.send(new HeadObjectCommand({ Bucket, Key }))).ContentLength;
+  } catch (error) {
+    if (error.name === 'NotFound') return null;
+    throw error;
+  }
 }
 
 /** Same naming as the original client upload: `<owner>/<time>-<safe name>`. */
@@ -118,6 +193,19 @@ export async function uploadObject(bucketName, path, userId, file) {
   if (file.buffer.length > config.maxBytes) {
     throw new HttpError(config.sizeError, 413);
   }
+  const s3 = s3For(bucketName);
+  if (s3) {
+    // Screenshot paths end in a random UUID, so this never replaces a file (no 409 check).
+    await s3.client.send(
+      new PutObjectCommand({
+        Bucket: s3.bucket,
+        Key: path,
+        Body: file.buffer,
+        ContentType: contentType,
+      }),
+    );
+    return path;
+  }
   const existing = await gridfs.find({ filename: path }).limit(1).toArray();
   if (existing.length) throw new HttpError('A file with this name already exists.', 409);
   await new Promise((resolve, reject) => {
@@ -137,6 +225,20 @@ export async function uploadObject(bucketName, path, userId, file) {
  */
 export async function streamObject(bucketName, path) {
   const { gridfs } = bucket(bucketName);
+  const s3 = s3For(bucketName);
+  if (s3) {
+    try {
+      const object = await s3.client.send(new GetObjectCommand({ Bucket: s3.bucket, Key: path }));
+      return {
+        stream: object.Body,
+        length: object.ContentLength,
+        contentType: object.ContentType || '',
+      };
+    } catch (error) {
+      // Not copied to S3 yet (scripts/migrate-screenshots-to-s3.js): serve it from GridFS.
+      if (error.name !== 'NoSuchKey') throw error;
+    }
+  }
   const [file] = await gridfs.find({ filename: path }).limit(1).toArray();
   if (!file) return null;
   return {
@@ -158,11 +260,13 @@ export async function downloadObject(bucketName, path) {
 /** Returns the names actually removed, so callers can verify a cleanup. */
 export async function removeObjects(bucketName, paths) {
   const { gridfs } = bucket(bucketName);
+  const s3 = s3For(bucketName);
+  // S3 reports every key it was given as deleted, so the GridFS copies below are listed already.
+  const removed = s3 ? await s3Remove(s3, paths) : [];
   const files = await gridfs.find({ filename: { $in: paths } }).toArray();
-  const removed = [];
   for (const file of files) {
     await gridfs.delete(file._id);
-    removed.push({ name: file.filename });
+    if (!s3) removed.push({ name: file.filename });
   }
   return removed;
 }
@@ -177,15 +281,32 @@ export async function ownerBytes(bucketName, userId) {
       { $group: { _id: null, bytes: { $sum: '$length' } } },
     ])
     .toArray();
-  return row?.bytes ?? 0;
+  let s3Bytes = 0;
+  const s3 = s3For(bucketName);
+  // GridFS files not copied yet count too (copies count twice until the migration's --delete).
+  if (s3)
+    for await (const object of s3Objects(s3, { Prefix: `${userId}/` })) s3Bytes += object.Size;
+  return (row?.bytes ?? 0) + s3Bytes;
 }
 
 /**
  * Oldest objects uploaded between `from` and the retention cutoff (temporary uploads; the
- * screenshot sweep walks its bucket in slices with `from`).
+ * screenshot sweep walks its bucket in slices with `from`). S3 lists by name instead: the first
+ * `limit` objects older than the cutoff whose names sort after `after`.
  */
-export async function expiredObjects(bucketName, cutoff, limit, from = new Date(0)) {
+export async function expiredObjects(bucketName, cutoff, limit, from = new Date(0), after = '') {
   const { gridfs } = bucket(bucketName);
+  const s3 = s3For(bucketName);
+  if (s3) {
+    const objects = [];
+    for await (const object of s3Objects(s3, { StartAfter: after || undefined })) {
+      if (object.LastModified > cutoff) continue;
+      const time = object.LastModified.toISOString();
+      objects.push({ id: object.Key, name: object.Key, created_at: time, updated_at: time });
+      if (objects.length === limit) break;
+    }
+    return objects;
+  }
   const files = await gridfs
     .find({ uploadDate: { $gte: from, $lte: cutoff } })
     .sort({ uploadDate: 1 })
@@ -202,8 +323,69 @@ export async function expiredObjects(bucketName, cutoff, limit, from = new Date(
 /** Deletes every file in the member's `<userId>/` folder of a bucket; returns how many. */
 export async function removeOwnerFolder(bucketName, userId) {
   const { gridfs } = bucket(bucketName);
+  let s3Count = 0;
+  const s3 = s3For(bucketName);
+  if (s3) {
+    const keys = [];
+    for await (const object of s3Objects(s3, { Prefix: `${userId}/` })) keys.push(object.Key);
+    s3Count = (await s3Remove(s3, keys)).length;
+  }
   // Owner ids are UUIDs (checked by isSafeOwnerStoragePath), so the prefix needs no escaping.
   const files = await gridfs.find({ filename: { $regex: `^${userId}/` } }).toArray();
   for (const file of files) await gridfs.delete(file._id);
-  return files.length;
+  return s3Count + files.length;
+}
+
+/**
+ * Copies every GridFS trade screenshot to S3 (skipping ones already there with the same size)
+ * and checks each copy's size; with `remove`, then deletes the GridFS copy. Safe to stop and
+ * re-run. Returns `{ copied, present, removed, failed }`.
+ */
+export async function migrateScreenshotsToS3({ remove = false, log = () => {} } = {}) {
+  const s3 = s3For('trade-screenshots');
+  if (!s3) throw new Error('Set S3_BUCKET, S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY first.');
+  const { gridfs } = bucket('trade-screenshots');
+  const counts = { copied: 0, present: 0, removed: 0, failed: 0 };
+  let last = null;
+  for (;;) {
+    // Short pages by _id rather than one long cursor, which a slow copy could let time out.
+    const files = await gridfs
+      .find(last ? { _id: { $gt: last } } : {})
+      .sort({ _id: 1 })
+      .limit(100)
+      .toArray();
+    if (!files.length) break;
+    for (const file of files) {
+      try {
+        if ((await s3Size(s3, file.filename)) === file.length) {
+          counts.present += 1;
+        } else {
+          const chunks = [];
+          for await (const chunk of gridfs.openDownloadStream(file._id)) chunks.push(chunk);
+          await s3.client.send(
+            new PutObjectCommand({
+              Bucket: s3.bucket,
+              Key: file.filename,
+              Body: Buffer.concat(chunks),
+              ContentType: file.metadata?.contentType || undefined,
+            }),
+          );
+          if ((await s3Size(s3, file.filename)) !== file.length) {
+            throw new Error('the copy in S3 has a different size');
+          }
+          counts.copied += 1;
+        }
+        if (remove) {
+          await gridfs.delete(file._id);
+          counts.removed += 1;
+        }
+      } catch (error) {
+        counts.failed += 1;
+        log(`Failed ${file.filename}: ${error.message}`);
+      }
+    }
+    last = files.at(-1)._id;
+    log(`${counts.copied} copied, ${counts.present} already in S3, ${counts.failed} failed so far`);
+  }
+  return counts;
 }
