@@ -1,6 +1,7 @@
 /**
- * Angel One (SmartAPI) connection, used read-only to bring today's fills into
- * the journal. There is no platform app: the member gives their own SmartAPI
+ * Angel One (SmartAPI) connection: brings today's fills into the journal and
+ * serves the broker adapter (adapters/angel.js), which alone places orders.
+ * There is no platform app: the member gives their own SmartAPI
  * API key, client code, PIN and current authenticator (TOTP) code. Only the
  * API key and the session JWT are kept (encrypted, until midnight IST); the
  * PIN and TOTP are sent to Angel One once and never stored or logged.
@@ -102,7 +103,7 @@ export async function connectAngel(userId, input) {
 }
 
 /** SmartAPI product types → the journal's: intraday, delivery, F&O carry-forward. */
-function product(type) {
+export function angelProduct(type) {
   const value = String(type ?? '').toUpperCase();
   return { INTRADAY: 'MIS', DELIVERY: 'CNC', CARRYFORWARD: 'NRML' }[value] ?? (value || 'CNC');
 }
@@ -118,7 +119,7 @@ export function angelTradesToFills(trades, tradingDate) {
   return rowsToFills(
     trades.map((row) => ({
       ...instrument(row),
-      product: product(row.producttype),
+      product: angelProduct(row.producttype),
       side: String(row.transactiontype ?? '').toUpperCase(),
       quantity: row.fillsize,
       price: row.fillprice,
@@ -135,7 +136,7 @@ export function angelCarried(positions, holdings) {
   const carried = new Map();
   for (const row of positions) {
     const { exchange, symbol, problem } = instrument(row);
-    const code = product(row.producttype);
+    const code = angelProduct(row.producttype);
     if (!symbol || problem || code === 'CNC') continue;
     addCarried(
       carried,
@@ -153,16 +154,33 @@ export function angelCarried(positions, holdings) {
   return carried;
 }
 
-async function angelList(session, path, what) {
+/**
+ * One SmartAPI call with the member's `session` ({ apiKey, jwt }); returns the parsed reply. An
+ * ended session (HTTP 401/403 or a token error code) throws tokenRejectedError.
+ */
+export async function angelRequest(session, path, { method = 'GET', body } = {}) {
   const payload = await brokerRequest(LABEL, `${API_BASE}/secure/angelbroking${path}`, {
+    method,
     headers: headers(session.apiKey, session.jwt),
+    body: body === undefined ? undefined : JSON.stringify(body),
     rejected: REJECTED,
   });
   if (TOKEN_CODES.has(String(payload?.errorcode ?? payload?.errorCode ?? '')))
     throw tokenRejectedError(REJECTED);
+  return payload;
+}
+
+/** The `data` of a read-only SmartAPI GET; 502 unless Angel One reports success. */
+export async function angelData(session, path, what) {
+  const payload = await angelRequest(session, path);
   if (payload?.status !== true && payload?.success !== true)
     throw new HttpError(`Angel One returned an invalid ${what}.`, 502);
-  return brokerRows(LABEL, payload.data, what);
+  return payload.data;
+}
+
+/** The rows of a read-only SmartAPI list (trade book, positions, holdings, order book). */
+export async function angelList(session, path, what) {
+  return brokerRows(LABEL, await angelData(session, path, what), what);
 }
 
 /** Today's Angel One fills in the snapshot shape the fills journal reads. */

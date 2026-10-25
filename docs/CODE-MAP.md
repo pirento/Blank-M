@@ -477,11 +477,11 @@ The admin panel's browser modules (one per page in `views/admin/`, plus `shell.j
 | `oauth.js`        | Single-use OAuth state for the Upstox and Fyers logins                                                                             |
 | `upstox.js`       | Upstox (API v2) OAuth connection and today's fills, read-only                                                                      |
 | `fyers.js`        | Fyers (API v3) OAuth connection and today's fills, read-only                                                                       |
-| `angel.js`        | Angel One (SmartAPI) login with the member's own API key and today's fills, read-only; PIN/TOTP never stored                       |
+| `angel.js`        | Angel One (SmartAPI) login with the member's own API key, today's fills and SmartAPI calls for its adapter; PIN/TOTP never stored  |
 | `daily-import.js` | After the close: today's Zerodha/Dhan/Upstox/Fyers/Angel One fills into the journal for opted-in members, with a Telegram summary. |
 | `live-orders.js`  | Live orders through the member's chosen broker's adapter; every safety check is shared                                             |
 | `portfolio.js`    | Broker portfolio and balance through the broker's adapter; shared validation and limits (shared/broker-portfolio.js)               |
-| `adapters/`       | One file per broker (`kite.js`, …) found by name; `index.js` documents the adapter contract and is the registry                    |
+| `adapters/`       | One file per broker (`kite.js`, `angel.js`) found by name; `index.js` documents the adapter contract and is the registry           |
 | `instruments.js`  | Each broker's cached instrument master (BrokerInstrument), refreshed at most daily; the NSE tick rule                              |
 
 ### `services/journal/`

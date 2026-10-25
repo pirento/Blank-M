@@ -266,6 +266,12 @@ describe('broker registry', () => {
         connected: true,
         capabilities: { portfolio: true, balance: true, orders: true, stopTarget: true },
       },
+      {
+        provider: 'angel',
+        label: 'Angel One',
+        connected: false,
+        capabilities: { portfolio: true, balance: true, orders: true, stopTarget: false },
+      },
     ]);
   });
 });
