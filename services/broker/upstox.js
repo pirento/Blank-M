@@ -1,6 +1,7 @@
 /**
  * Upstox (API v2) connection over OAuth, used read-only to bring today's fills
- * into the journal. The platform app keys come from UPSTOX_API_KEY and
+ * into the journal, and the request helpers of its broker adapter
+ * (adapters/upstox.js). The platform app keys come from UPSTOX_API_KEY and
  * UPSTOX_API_SECRET; the redirect URI <APP_URL origin>/api/upstox/callback is
  * registered in the Upstox developer console. The access token is stored
  * encrypted and lapses at 03:30 IST the next day.
@@ -174,14 +175,32 @@ export function upstoxCarried(positions, holdings) {
   return carried;
 }
 
-async function upstoxList(token, path, what) {
+export { product as upstoxProduct };
+
+/** The `data` of a successful Upstox v2 GET (502 for any other reply). */
+export async function upstoxGet(token, path, what) {
   const payload = await brokerRequest(LABEL, `${API_BASE}${path}`, {
     headers: { Authorization: `Bearer ${token}` },
     rejected: REJECTED,
   });
   if (payload?.status !== 'success')
     throw new HttpError(`Upstox returned an invalid ${what}.`, 502);
-  return brokerRows(LABEL, payload.data, what);
+  return payload.data;
+}
+
+/** The rows of an Upstox v2 list (trade book, positions, holdings, order book). */
+export async function upstoxList(token, path, what) {
+  return brokerRows(LABEL, await upstoxGet(token, path, what), what);
+}
+
+/** POSTs JSON to a full Upstox URL (orders have their own host); fails as brokerRequest does. */
+export function upstoxPost(token, url, body) {
+  return brokerRequest(LABEL, url, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    rejected: REJECTED,
+  });
 }
 
 /** Today's Upstox fills in the snapshot shape the fills journal reads. */

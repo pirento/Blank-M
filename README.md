@@ -4,7 +4,8 @@ Blank is an invite-only trading journal for the Indian market: journal P&L with 
 brokerage and statutory charges, trade and strategy records, a risk calculator with saved order
 plans, deterministic backtesting with reviewable research evidence, weekly/monthly reports,
 OpenAI-assisted research and broker links. Zerodha, Dhan, Upstox, Fyers and Angel One fills come
-into the journal (daily automatic import); balance, holdings and live orders are Zerodha only.
+into the journal (daily automatic import); balance, holdings and live orders come from Zerodha or
+Upstox.
 
 **Stack:** Node.js 22 · Express 4 (MVC) · MongoDB with Mongoose 8 · EJS templates · plain
 JavaScript ES modules (no TypeScript, no client build step) · Tailwind CSS 4 · Chart.js ·

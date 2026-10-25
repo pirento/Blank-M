@@ -224,8 +224,11 @@ when Settings says it has expired.
 Upstox and Fyers log in over OAuth through one platform app each: create the app with the broker,
 register `https://<your-domain>/api/upstox/callback` or `https://<your-domain>/api/fyers/callback`
 as its redirect URL, and enter its keys in the admin panel → Integrations. Angel One needs no server
-setup: each member enters their own SmartAPI details in Settings → Angel One. All three are
-read-only and bring fills into the journal; balance, holdings and live orders are Zerodha only.
+setup: each member enters their own SmartAPI details in Settings → Angel One. All three bring
+fills into the journal. Upstox also gives holdings, balance and live NSE equity orders (no
+automatic stop-loss/target). Upstox accepts API orders only from a static IP the member registered
+in their Upstox app settings, and one IP can belong to one Upstox customer only; orders from any
+other IP are refused.
 
 ### Live market data (TrueData, optional)
 

@@ -475,7 +475,7 @@ The admin panel's browser modules (one per page in `views/admin/`, plus `shell.j
 | `broker-api.js`   | Shared broker JSON requests (timeout, size limit, error mapping) and the encrypted token row per broker                            |
 | `fill-mapping.js` | Broker rows → journal fills and carried-in map; NSE/BSE symbols and Kite-style F&O names                                           |
 | `oauth.js`        | Single-use OAuth state for the Upstox and Fyers logins                                                                             |
-| `upstox.js`       | Upstox (API v2) OAuth connection and today's fills, read-only                                                                      |
+| `upstox.js`       | Upstox (API v2) OAuth connection, today's fills, and the request helpers of `adapters/upstox.js`                                   |
 | `fyers.js`        | Fyers (API v3) OAuth connection and today's fills, read-only                                                                       |
 | `angel.js`        | Angel One (SmartAPI) login with the member's own API key and today's fills, read-only; PIN/TOTP never stored                       |
 | `daily-import.js` | After the close: today's Zerodha/Dhan/Upstox/Fyers/Angel One fills into the journal for opted-in members, with a Telegram summary. |
