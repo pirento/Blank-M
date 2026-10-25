@@ -731,13 +731,18 @@ describe('Angel One live orders', () => {
     replies['/order/v1/placeOrder'] = () => new Response('', { status: 429 });
     expect(await order().catch((reason) => reason)).toMatchObject({ status: 429 });
 
-    // An ended session: refused, and the member is asked to log in again.
-    replies['/order/v1/placeOrder'] = () => new Response('', { status: 401 });
-    error = await order().catch((reason) => reason);
-    expect(error).toMatchObject({ status: 401, tokenRejected: true });
-    expect(error.outcome).toBeUndefined();
+    // getProfile just accepted the session: a 401/403 on the order is a refusal (static IP),
+    // and the connection stays linked.
+    const before = await BrokerConnection.findOne({ userId: USER, provider: 'angel' }).lean();
+    for (const status of [401, 403]) {
+      replies['/order/v1/placeOrder'] = () => new Response('', { status });
+      error = await order().catch((reason) => reason);
+      expect(error).toMatchObject({ status: 403, message: expect.stringMatching(/static IP/) });
+      expect(error.tokenRejected).toBeUndefined();
+      expect(error.outcome).toBeUndefined();
+    }
     const row = await BrokerConnection.findOne({ userId: USER, provider: 'angel' }).lean();
-    expect(row.expiresAt.getTime()).toBe(0);
+    expect(row.expiresAt.getTime()).toBe(before.expiresAt.getTime());
   });
 });
 

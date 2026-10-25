@@ -4,6 +4,7 @@
  * Orders, Portfolio, Instruments, Rate Limit). SmartAPI's GTT rules have one trigger each and no
  * one-cancels-the-other link, so this adapter offers no stop-loss and target.
  */
+import { HttpError } from '../../errors.js';
 import { MarketDataError } from '../../market/types.js';
 import { angelData, angelList, angelProduct, angelRequest } from '../angel.js';
 import { brokerMessage, loadBrokerToken, withBrokerToken } from '../broker-api.js';
@@ -272,8 +273,15 @@ export default {
           },
         });
       } catch (error) {
-        // Refused before it was taken: the session, the rate limit, or a 4xx with a reason.
-        if (error.tokenRejected || error.status === 429) throw error;
+        // getProfile just accepted this session, so a 401/403 here is a refusal (static IP, rate
+        // limit), not an ended session: the connection stays linked.
+        if (error.tokenRejected) {
+          throw new HttpError(
+            `${LABEL} refused the order. Check that this server's static IP is registered on your SmartAPI app.`,
+            403,
+          );
+        }
+        if (error.status === 429) throw error;
         if (error.httpStatus >= 400 && error.httpStatus < 500) {
           throw refusedOrder(brokerMessage(error.body));
         }
