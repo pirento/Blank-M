@@ -78,7 +78,7 @@ Common browser helpers live in `public/js/core/` (`dom.js` element builder, card
 | Weekly report email                                  | `services/journal/weekly-report.js`, `scripts/send-weekly-reports.js`                                                      |
 | Quotes and price history                             | `services/market/` (Kite first, Yahoo fallback)                                                                            |
 | Zerodha login, balance, portfolio                    | `services/market/kite/`, `services/broker/`, `controllers/kite.controller.js`                                              |
-| Dhan fills → journal                                 | `services/broker/dhan.js`, `services/broker/fills-journal.js`, `public/js/pages/settings/dhan.js`                          |
+| Dhan fills, portfolio, balance, live orders          | `services/broker/{dhan,adapters/dhan,fills-journal}.js`, `public/js/pages/settings/dhan.js`                                |
 | Upstox / Fyers / Angel One fills → journal           | `services/broker/{upstox,fyers,angel}.js`, `controllers/brokers.controller.js`, `public/js/pages/settings/broker-links.js` |
 | Live orders                                          | `services/broker/live-orders.js`, `public/js/pages/orders.js`                                                              |
 | AI prompts and endpoints                             | `controllers/ai/`, `services/ai/openai.js`                                                                                 |
