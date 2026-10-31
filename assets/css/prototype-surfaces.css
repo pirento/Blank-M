@@ -44,8 +44,8 @@
   color: var(--muted);
 }
 .pill.warn {
-  background: #f8f1e6;
-  color: #816b44;
+  background: #fff4ea;
+  color: #8f5a3c;
 }
 .actions {
   display: flex;
@@ -201,7 +201,7 @@
   justify-content: space-between;
   gap: 9px;
   border: 0;
-  border-bottom: 1px solid #ebeeec;
+  border-bottom: 1px solid #eceee9;
   border-radius: 0;
   background: var(--color-surface);
   padding: 14px;
@@ -228,7 +228,7 @@
   font-family: var(--mono);
 }
 .instrument-row.selected {
-  background: #f0f5f2;
+  background: #f1f5ef;
   box-shadow: inset 2px 0 var(--green);
 }
 .list-add {
@@ -280,7 +280,7 @@
   justify-content: center;
   width: 30px;
   height: 30px;
-  background: #eef2f0;
+  background: #eff2ec;
   color: var(--green);
   font-size: 15px;
 }
@@ -324,7 +324,7 @@
   color: var(--muted);
 }
 .segmented button.selected {
-  background: #e9f1ec;
+  background: #eaf1e8;
   color: var(--green);
 }
 .candle-chart {
@@ -335,12 +335,12 @@
   margin: 13px 0;
 }
 .grid-line {
-  stroke: #e8eeea;
+  stroke: #e8eee6;
   stroke-width: 0.7;
   stroke-dasharray: 3 3;
 }
 .axis-label {
-  fill: #839088;
+  fill: #6f7d80;
   font-family: var(--mono);
   font-size: 9px;
 }
@@ -348,25 +348,25 @@
   stroke-width: 1.2;
 }
 .candle.up {
-  stroke: #2f8465;
+  stroke: #5b8a5e;
 }
 .candle.down {
-  stroke: #bd675e;
+  stroke: #bb3348;
 }
 .candle-body.up {
-  fill: #38886c;
+  fill: #5b8a5e;
 }
 .candle-body.down {
-  fill: #c0756a;
+  fill: #e8707c;
 }
 .volume {
   opacity: 0.15;
 }
 .volume.up {
-  fill: #38886c;
+  fill: #5b8a5e;
 }
 .volume.down {
-  fill: #c0756a;
+  fill: #e8707c;
 }
 .chart-foot {
   display: flex;
@@ -409,8 +409,8 @@
   justify-content: center;
   width: 34px;
   height: 34px;
-  background: #f0f2f7;
-  color: #5076a6;
+  background: #f2f1e8;
+  color: #66663f;
   font-size: 20px;
 }
 .broker-name strong {
@@ -452,9 +452,9 @@
 }
 .strategy-card {
   padding: 19px 18px;
-  border: 1px solid #d7e2da;
+  border: 1px solid #d8e2d6;
   border-radius: 3px;
-  background: #edf3ef;
+  background: #eef3ec;
 }
 .strategy-card .eyebrow {
   font-size: 9px;
@@ -557,7 +557,7 @@ th {
 }
 td {
   padding: 17px 12px;
-  border-bottom: 1px solid #edf0ee;
+  border-bottom: 1px solid #eef1ec;
 }
 tr:last-child td {
   border-bottom: 0;
@@ -580,7 +580,7 @@ td small {
   margin-top: 3px;
 }
 .stock-table tbody tr:hover {
-  background: #fafcfb;
+  background: #fafbf8;
 }
 .symbol-cell {
   display: flex;
@@ -589,7 +589,7 @@ td small {
 }
 .stock-number {
   font: 11px var(--mono);
-  color: #a6b0a9;
+  color: #a5b0b0;
 }
 .source-label {
   font-size: 12px;
@@ -640,13 +640,13 @@ td small {
 .research-glyph {
   width: 95px;
   height: 95px;
-  border: 1px solid #d1dfd5;
+  border: 1px solid #d3dfd1;
   color: var(--green);
   display: flex;
   justify-content: center;
   align-items: center;
   flex-shrink: 0;
-  background: #f2f6f3;
+  background: #f3f6f1;
 }
 .research-glyph .icon {
   height: 35px;
@@ -726,7 +726,7 @@ td small {
 .field select,
 .field textarea {
   width: 100%;
-  border: 1px solid #cbd5ce;
+  border: 1px solid #c4d2c2;
   border-radius: 3px;
   padding: 11px 12px;
   background: var(--color-surface);
@@ -751,7 +751,7 @@ td small {
 }
 .field input::placeholder,
 .field textarea::placeholder {
-  color: #a1aba5;
+  color: #a0abab;
 }
 .formgrid {
   display: grid;
@@ -845,9 +845,9 @@ td small {
 .notice {
   font-size: 12px;
   padding: 11px 14px;
-  background: #f5f3ec;
-  border-left: 2px solid #af9c69;
-  color: #7c6d46;
+  background: #fbf3ec;
+  border-left: 2px solid #d9a27a;
+  color: #8f5a3c;
   margin: 20px 0;
   line-height: 1.5;
 }
@@ -857,7 +857,7 @@ td small {
 }
 .panel .panel {
   border-radius: 0;
-  border-left: 3px solid #86a592;
+  border-left: 3px solid #86a685;
 }
 .panel > .actions {
   margin-top: 20px;
@@ -869,8 +869,8 @@ td small {
 }
 .report-stamp {
   display: inline-block;
-  border: 1px solid #768b7d;
-  color: #768b7d;
+  border: 1px solid #6f7d80;
+  color: #6f7d80;
   padding: 7px 12px;
   letter-spacing: 2px;
   font: 12px var(--mono);
@@ -907,8 +907,8 @@ td small {
   gap: 22px;
 }
 .message {
-  background: #f0f4f1;
-  border-left: 2px solid #b7cabc;
+  background: #f1f4ee;
+  border-left: 2px solid #b8cab7;
   border-radius: 0;
   padding: 17px 20px;
   max-width: 750px;
@@ -952,10 +952,10 @@ td small {
   color: #fff;
 }
 .login-aside .brand-mark i {
-  background: #b1d0bd;
+  background: #b3ccb2;
 }
 .login-aside .section-index {
-  color: #94b4a2;
+  color: #99b898;
 }
 .login-aside h1 {
   font-size: 72px;
@@ -965,10 +965,10 @@ td small {
 .login-aside p {
   font-size: 20px;
   line-height: 1.6;
-  color: #b4c9bc;
+  color: #b6c9b5;
 }
 .login-aside .fineprint {
-  color: #93b39f;
+  color: #99b898;
   font-family: var(--mono);
   font-size: 10px;
 }
@@ -1021,14 +1021,14 @@ td small {
   font-size: 11px;
 }
 .selection {
-  background: #f0f6f2;
+  background: #f1f5ef;
 }
 #toast {
   position: fixed;
   bottom: 104px;
   left: 50%;
   transform: translateX(-50%);
-  background: #213d30;
+  background: #2a363b;
   color: #fff;
   padding: 14px 20px;
   border-radius: 4px;

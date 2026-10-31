@@ -4,8 +4,8 @@
  */
 import { formatCurrency } from '../core/dom.js';
 
-export const CHART_POSITIVE = '#1a7f43';
-export const CHART_NEGATIVE = '#c0392b';
+export const CHART_POSITIVE = '#446e47';
+export const CHART_NEGATIVE = '#bb3348';
 const charts = new Set();
 
 function token(name, fallback) {
@@ -16,8 +16,8 @@ function token(name, fallback) {
 export const thousands = (value) => `₹${Math.round(Number(value) / 1000)}k`;
 
 function baseOptions({ yFormatter, tooltip, showX = false, xFormatter }) {
-  const muted = token('--color-muted', '#727b78');
-  const grid = token('--color-line', '#dce2df');
+  const muted = token('--color-muted', '#5f6c70');
+  const grid = token('--color-line', '#dce4da');
   return {
     responsive: true,
     maintainAspectRatio: false,
@@ -59,7 +59,7 @@ export function areaChart(
   canvas,
   { labels, values, color, tooltipLabel, yFormatter = thousands, fillOpacity = 0.15 },
 ) {
-  const stroke = color || token('--color-accent', '#167256');
+  const stroke = color || token('--color-accent', '#446e47');
   return mount(canvas, {
     type: 'line',
     data: {
@@ -142,7 +142,17 @@ export function barChart(
 }
 
 /** Distinguishable line colours for several series (strategies, for example). */
-export const SERIES_COLORS = ['#167256', '#2f6fb3', '#b7791f', '#8e44ad', '#c0392b', '#5f6b68'];
+// Darker shades of the brand palette (sage, burgundy, terracotta, moss, rose, tan, khaki, slate).
+export const SERIES_COLORS = [
+  '#446e47',
+  '#7a3d45',
+  '#ab4d26',
+  '#5b7a57',
+  '#bb3348',
+  '#9a6b52',
+  '#7f7f5c',
+  '#5f6c70',
+];
 
 /**
  * Several lines over shared x labels, with a legend. Each series:
@@ -162,7 +172,7 @@ export function lineChart(canvas, { labels, series, yFormatter = thousands }) {
   options.plugins.legend = {
     display: true,
     position: 'bottom',
-    labels: { boxWidth: 10, color: token('--color-muted', '#727b78'), font: { size: 11 } },
+    labels: { boxWidth: 10, color: token('--color-muted', '#5f6c70'), font: { size: 11 } },
   };
   return mount(canvas, {
     type: 'line',
@@ -189,8 +199,8 @@ document.addEventListener('blank:theme-changed', () => {
       charts.delete(chart);
       continue;
     }
-    const muted = token('--color-muted', '#727b78');
-    const grid = token('--color-line', '#dce2df');
+    const muted = token('--color-muted', '#5f6c70');
+    const grid = token('--color-line', '#dce4da');
     chart.options.scales.x.ticks.color = muted;
     chart.options.scales.y.ticks.color = muted;
     chart.options.scales.y.grid.color = grid;

@@ -34,6 +34,23 @@
   padding: 19px 25px 20px;
   border-right: 1px solid var(--color-line);
 }
+/* Each figure carries its own palette colour along the top. */
+.reference-account-ledger > div,
+.reference-journal-ledger > div {
+  border-top: 3px solid var(--color-sage);
+}
+.reference-account-ledger > div:nth-child(2),
+.reference-journal-ledger > div:nth-child(2) {
+  border-top-color: var(--color-tan);
+}
+.reference-account-ledger > div:nth-child(3),
+.reference-journal-ledger > div:nth-child(3) {
+  border-top-color: var(--color-coral);
+}
+.reference-account-ledger > div:nth-child(4),
+.reference-journal-ledger > div:nth-child(4) {
+  border-top-color: var(--color-burgundy);
+}
 .reference-account-ledger > div:first-child {
   padding-left: 20px;
 }
@@ -317,8 +334,8 @@
   stroke: var(--color-accent);
 }
 .reference-candle-down {
-  fill: var(--color-danger, #b54b42);
-  stroke: var(--color-danger, #b54b42);
+  fill: var(--color-danger, #bb3348);
+  stroke: var(--color-danger, #bb3348);
 }
 .reference-candle-cursor {
   stroke: var(--color-muted);

@@ -1,6 +1,6 @@
 /* Public reference composition. Member routes use the shared application theme. */
 .blank-landing {
-  --landing-forest: #133b30;
+  --landing-forest: #2a363b;
   background: var(--color-surface);
   color: var(--color-fg);
   font-size: 16px;
@@ -214,20 +214,32 @@
   margin-top: 18px;
 }
 .blank-landing .landing-product-stage {
-  background: #edf0ee;
-  border: 1px solid #e3e8e5;
+  /* The brand's dusk: moss through tan, rose and burgundy to charcoal. */
+  background: linear-gradient(
+    180deg,
+    var(--color-moss) 0%,
+    var(--color-khaki) 20%,
+    var(--color-tan) 32%,
+    var(--color-terracotta) 40%,
+    var(--color-brick) 50%,
+    var(--color-burgundy) 62%,
+    var(--color-plum) 72%,
+    var(--color-aubergine) 82%,
+    var(--color-charcoal) 100%
+  );
+  border: 1px solid #e3e9e1;
   perspective: 1800px;
   padding: 44px 62px 60px;
   overflow: hidden;
   position: relative;
 }
 .blank-landing .landing-terminal {
-  border: 1px solid #b8c9be;
+  border: 1px solid #b9cbb8;
   background: #fff;
   box-shadow:
-    0 2px 0 #c5d0c9,
-    0 5px 0 #d0d9d3,
-    0 8px 0 #d7ded9,
+    0 2px 0 #c4d0c2,
+    0 5px 0 #d0dace,
+    0 8px 0 #d7dfd5,
     16px 25px 35px #1b382722;
   transform: rotateX(7deg) rotateY(-5deg) rotateZ(-1.2deg);
   transform-origin: center;
@@ -313,7 +325,7 @@
   font-size: 20px;
   line-height: 1.35;
   letter-spacing: -0.5px;
-  color: #80958a;
+  color: #7a8c86;
   padding: 22px 20px;
   margin: 0;
 }
@@ -360,7 +372,7 @@
   justify-content: center;
   gap: 30px;
   background: var(--landing-forest);
-  color: #bdd0c5;
+  color: #bccfbb;
   font-size: 11px;
   padding: 14px 20px;
   line-height: 1;
@@ -525,7 +537,7 @@
   gap: 30px;
 }
 .blank-landing .landing-closing .landing-section-index {
-  color: #97b6a6;
+  color: #99b898;
 }
 .blank-landing .landing-closing h2 {
   font-size: 58px;
@@ -534,8 +546,8 @@
   margin: 18px 0 0;
 }
 .blank-landing .landing-closing .landing-button {
-  background: #e3eee8;
-  border-color: #e3eee8;
+  background: #e5eee3;
+  border-color: #e5eee3;
   color: var(--landing-forest);
   padding: 16px 20px;
   gap: 24px;
@@ -916,12 +928,12 @@
   margin-top: 6px;
 }
 .blank-landing .landing-chart-grid {
-  stroke: #e8eeea;
+  stroke: #e8eee6;
   stroke-width: 0.7;
   stroke-dasharray: 3 3;
 }
 .blank-landing .landing-chart-axis {
-  fill: #839088;
+  fill: #6f7d80;
   font-family: var(--font-mono);
   font-size: 9px;
 }
@@ -1008,16 +1020,16 @@
 }
 
 .blank-landing .landing-candle-chart .is-positive {
-  color: #38886c;
+  color: #5b8a5e;
 }
 .blank-landing .landing-candle-chart .is-positive line {
-  stroke: #2f8465;
+  stroke: #5b8a5e;
 }
 .blank-landing .landing-candle-chart .is-negative {
-  color: #c0756a;
+  color: #e8707c;
 }
 .blank-landing .landing-candle-chart .is-negative line {
-  stroke: #bd675e;
+  stroke: #bb3348;
 }
 
 /* Native paragraph spacing and the compact action wrapper in the reference. */

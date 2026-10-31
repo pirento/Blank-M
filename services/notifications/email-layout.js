@@ -11,8 +11,8 @@ const LINK_LINE = /^(?:([^:]{1,60}):\s+)?(https?:\/\/\S+)$/;
 const INLINE_LINK = /https?:\/\/[^\s<]+/g;
 
 const FONT = "font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
-const TEXT = `margin:0 0 16px;font-size:15px;line-height:1.6;color:#1b2424;${FONT}`;
-const ACCENT = '#167256';
+const TEXT = `margin:0 0 16px;font-size:15px;line-height:1.6;color:#2a363b;${FONT}`;
+const ACCENT = '#446e47';
 
 /** This site's origin from APP_URL, or '' when it is unset or not a valid URL. */
 export const siteOrigin = () => {
@@ -81,7 +81,7 @@ function footer() {
     ? ['terms', 'privacy', 'contact']
         .map(
           (page) =>
-            `<a href="${escape(`${site}/${page}`)}" style="color:#5b6766">${page[0].toUpperCase()}${page.slice(1)}</a>`,
+            `<a href="${escape(`${site}/${page}`)}" style="color:#5f6c70">${page[0].toUpperCase()}${page.slice(1)}</a>`,
         )
         .join(' · ')
     : '';
@@ -89,7 +89,7 @@ function footer() {
     escape(name),
     address ? escape(address) : null,
     support
-      ? `Questions? <a href="mailto:${escape(support)}" style="color:#5b6766">${escape(support)}</a>`
+      ? `Questions? <a href="mailto:${escape(support)}" style="color:#5f6c70">${escape(support)}</a>`
       : null,
     links || null,
     'Pirento Blank is a trading journal and planning tool, not investment advice.',
@@ -106,5 +106,5 @@ export function emailHtml(subject, text) {
     .split(/\n\s*\n/)
     .map(renderBlock)
     .join('');
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(subject)}</title></head><body style="margin:0;padding:0;background:#f4f6f5"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f5"><tr><td align="center" style="padding:32px 12px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px"><tr><td style="padding:0 4px 16px;font-size:18px;font-weight:700;color:#1b2424;${FONT}">Pirento <span style="font-weight:400;color:${ACCENT}">Blank</span></td></tr><tr><td style="background:#ffffff;border:1px solid #dfe5e3;border-radius:12px;padding:32px 28px"><h1 style="margin:0 0 20px;font-size:20px;line-height:1.3;color:#1b2424;${FONT}">${escape(subject)}</h1>${body}</td></tr><tr><td style="padding:20px 4px 0;font-size:12px;line-height:1.6;color:#5b6766;${FONT}">${footer()}</td></tr></table></td></tr></table></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(subject)}</title></head><body style="margin:0;padding:0;background:#f5f6f2"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f5f6f2"><tr><td align="center" style="padding:32px 12px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px"><tr><td style="padding:0 4px 16px;font-size:18px;font-weight:700;color:#2a363b;${FONT}">Pirento <span style="font-weight:400;color:${ACCENT}">Blank</span></td></tr><tr><td style="background:#ffffff;border:1px solid #dce4da;border-radius:12px;padding:32px 28px"><h1 style="margin:0 0 20px;font-size:20px;line-height:1.3;color:#2a363b;${FONT}">${escape(subject)}</h1>${body}</td></tr><tr><td style="padding:20px 4px 0;font-size:12px;line-height:1.6;color:#5f6c70;${FONT}">${footer()}</td></tr></table></td></tr></table></body></html>`;
 }
