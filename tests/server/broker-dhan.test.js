@@ -339,10 +339,22 @@ describe('Dhan adapter', () => {
   it('reads an empty demat as no holdings, but never a failed holdings read', async () => {
     routes['GET /holdings'] = () => Response.json({ errorCode: 'DH-1111' }, { status: 500 });
     expect((await readBrokerPortfolio(USER, async () => undefined, 'dhan')).holdings).toEqual([]);
-    routes['GET /holdings'] = () => new Response('busy', { status: 503 });
-    await expect(readBrokerPortfolio(USER, async () => undefined, 'dhan')).rejects.toMatchObject({
-      status: 502,
-    });
+    for (const reply of [
+      () => new Response('busy', { status: 503 }),
+      // Any other Dhan error, even one that mentions holdings, is a failed read.
+      () =>
+        Response.json({ errorCode: 'DH-904', errorMessage: 'Too many requests' }, { status: 400 }),
+      () =>
+        Response.json(
+          { errorCode: 'DH-908', errorMessage: 'Holdings unavailable' },
+          { status: 500 },
+        ),
+    ]) {
+      routes['GET /holdings'] = reply;
+      await expect(readBrokerPortfolio(USER, async () => undefined, 'dhan')).rejects.toMatchObject({
+        status: 502,
+      });
+    }
   });
 
   it('reads the cash balance', async () => {

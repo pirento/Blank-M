@@ -11,6 +11,12 @@ import { openModal } from '../../core/dialog.js';
 import { notify } from '../../core/toast.js';
 import { formatPlanningPrice } from '../../../../shared/risk-calculator.js';
 
+const pending = (broker) =>
+  t(
+    'The outcome of this order is not known yet. Check the order book in {broker} before trying again.',
+    { broker },
+  );
+
 /**
  * Opens the live order dialog for a plan and the member's live-order broker. The user must
  * retype the symbol and tick the acknowledgement before it POSTs to /api/live-orders; then
@@ -65,10 +71,16 @@ export function openLiveOrder(plan, { broker, onDone }) {
           close();
           if (order.status === 'placed')
             notify(`Order placed with ${brokerName} (order ${order.brokerOrderId}).`, 'success');
-          else notify(order.error || 'The order was not placed.', 'error');
+          else if (order.status === 'rejected')
+            notify(order.error || 'The order was not placed.', 'error');
+          // 'submitting' or 'unknown': the broker may still have it.
+          else notify(pending(brokerName), 'error');
           await onDone();
         } catch (error) {
-          message.textContent = errorMessage(error, 'The order could not be placed.');
+          // A timeout or lost connection does not mean the broker never got the order.
+          message.textContent = [0, 504].includes(error?.status)
+            ? pending(brokerName)
+            : errorMessage(error, 'The order could not be placed.');
           message.hidden = false;
           submit.textContent = 'Place order';
           sync();
