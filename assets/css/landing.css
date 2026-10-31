@@ -214,7 +214,19 @@
   margin-top: 18px;
 }
 .blank-landing .landing-product-stage {
-  background: #eef1ec;
+  /* The brand's dusk: moss through tan, rose and burgundy to charcoal. */
+  background: linear-gradient(
+    180deg,
+    var(--color-moss) 0%,
+    var(--color-khaki) 20%,
+    var(--color-tan) 32%,
+    var(--color-terracotta) 40%,
+    var(--color-brick) 50%,
+    var(--color-burgundy) 62%,
+    var(--color-plum) 72%,
+    var(--color-aubergine) 82%,
+    var(--color-charcoal) 100%
+  );
   border: 1px solid #e3e9e1;
   perspective: 1800px;
   padding: 44px 62px 60px;

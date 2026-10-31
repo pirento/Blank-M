@@ -142,7 +142,17 @@ export function barChart(
 }
 
 /** Distinguishable line colours for several series (strategies, for example). */
-export const SERIES_COLORS = ['#446e47', '#2f6fb3', '#ab4d26', '#8e44ad', '#bb3348', '#5f6c70'];
+// Darker shades of the brand palette (sage, burgundy, terracotta, moss, rose, tan, khaki, slate).
+export const SERIES_COLORS = [
+  '#446e47',
+  '#7a3d45',
+  '#ab4d26',
+  '#5b7a57',
+  '#bb3348',
+  '#9a6b52',
+  '#7f7f5c',
+  '#5f6c70',
+];
 
 /**
  * Several lines over shared x labels, with a legend. Each series:

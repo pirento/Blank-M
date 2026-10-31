@@ -45,7 +45,7 @@
 @theme {
   --color-canvas: #f5f6f2;
   --color-surface: #ffffff;
-  --color-elevated: #ecf1ea;
+  --color-elevated: #eeefe6;
   --color-line: #dce4da;
   --color-line-strong: #c4d2c2;
 
@@ -71,6 +71,22 @@
   --color-caution: #ab4d26;
   --color-caution-soft: #fff1e6;
 
+  /* The full palette, light to dark, as in the brand's dusk gradient. */
+  --color-moss: #8eab8a;
+  --color-sage: #99b898;
+  --color-khaki: #adad8c;
+  --color-tan: #c69880;
+  --color-peach: #fecea8;
+  --color-terracotta: #ca8575;
+  --color-coral: #ff847c;
+  --color-rose: #e84a5f;
+  --color-brick: #c26163;
+  --color-burgundy: #7a3d45;
+  --color-plum: #5a363d;
+  --color-aubergine: #3a3034;
+  --color-slate: #2a363b;
+  --color-charcoal: #1e2a2c;
+
   --radius-control: 3px;
   --radius-card: 3px;
 
@@ -83,7 +99,7 @@
 }
 
 .dark {
-  --color-canvas: #1c2427;
+  --color-canvas: #1e2a2c;
   --color-surface: #232e32;
   --color-elevated: #2a363b;
   --color-line: #34434a;
@@ -96,14 +112,14 @@
   --color-accent: #99b898;
   --color-accent-hover: #b6cdb5;
   --color-accent-fg: #1c2427;
-  --color-accent-soft: #3a3236;
+  --color-accent-soft: #3a3034;
 
   --color-positive: #99b898;
-  --color-positive-soft: #263329;
+  --color-positive-soft: #2b3a2d;
   --color-negative: #ff847c;
-  --color-negative-soft: #3b2528;
+  --color-negative-soft: #43292f;
   --color-caution: #fecea8;
-  --color-caution-soft: #3a3027;
+  --color-caution-soft: #3f3229;
 }
 
 html {
@@ -409,6 +425,23 @@ textarea {
   color: #a9bfa8;
   box-shadow: 0 -4px 25px #172f2610;
 }
+.workspace-dock::before {
+  content: '';
+  position: absolute;
+  inset: -1px 0 auto;
+  height: 3px;
+  background: linear-gradient(
+    90deg,
+    var(--color-moss),
+    var(--color-khaki),
+    var(--color-tan),
+    var(--color-peach),
+    var(--color-coral),
+    var(--color-rose),
+    var(--color-burgundy),
+    var(--color-plum)
+  );
+}
 .workspace-dock-caption {
   flex-shrink: 0;
   font: 9px var(--font-mono);
@@ -696,6 +729,16 @@ textarea {
   letter-spacing: 1.1px;
   color: var(--color-accent);
 }
+.blank-login .login-aside {
+  background: linear-gradient(
+    180deg,
+    var(--color-charcoal) 0%,
+    var(--color-slate) 40%,
+    var(--color-aubergine) 60%,
+    var(--color-plum) 78%,
+    var(--color-burgundy) 100%
+  );
+}
 .blank-login .login-aside .section-index {
   color: #99b898;
 }
@@ -711,7 +754,7 @@ textarea {
   margin-top: 0;
 }
 .blank-login .login-aside .fineprint {
-  color: #99b898;
+  color: var(--color-peach);
   font: 10px var(--font-mono);
 }
 .blank-login .back-link {
