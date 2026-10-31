@@ -25,7 +25,7 @@ export function tokenRejectedError(message) {
 
 /**
  * Calls a broker API and returns its parsed JSON. 401/403 throw a `tokenRejected`
- * HttpError with `rejected` as its message, 429 a rate-limit message, other
+ * HttpError with `rejected` as its message, 429 (or SmartAPI's rate-limit 403) a rate-limit message, other
  * failures 502/504. A failed response's parsed body is kept on `error.body`
  * so a caller can show the broker's own reason (for example a wrong TOTP).
  */
@@ -57,10 +57,14 @@ export async function brokerRequest(
   } finally {
     clearTimeout(timer);
   }
-  if (response.status === 401 || response.status === 403) {
+  // SmartAPI answers its rate limit with 403 "Access denied because of exceeding access rate":
+  // that is not a rejected token, so it must not expire the connection.
+  const rateLimited =
+    response.status === 429 || (response.status === 403 && /exceeding access rate/i.test(text));
+  if (!rateLimited && (response.status === 401 || response.status === 403)) {
     throw tokenRejectedError(rejected ?? `${label} rejected the connection. Reconnect it.`);
   }
-  if (response.status === 429)
+  if (rateLimited)
     throw new HttpError(`${label} is rate limiting requests. Try again in a minute.`, 429);
   if (text.length > MAX_RESPONSE_BYTES)
     throw new HttpError(`${label} returned too much data.`, 502);

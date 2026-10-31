@@ -104,6 +104,7 @@
   "Performance": "प्रदर्शन",
   "Risk limits today": "आज की रिस्क सीमाएँ",
   "Place live order with {broker}": "{broker} पर लाइव ऑर्डर लगाएँ",
+  "The outcome of this order is not known yet. Check the order book in {broker} before trying again.": "इस ऑर्डर का नतीजा अभी पता नहीं है। दोबारा कोशिश करने से पहले {broker} में ऑर्डर बुक देखें।",
   "This sends a real order to your broker account.": "इससे आपके ब्रोकर अकाउंट में असली ऑर्डर जाएगा।",
   "Place order": "ऑर्डर लगाएँ",
   "Place stop & target (GTT)": "स्टॉप और टारगेट लगाएँ (GTT)",

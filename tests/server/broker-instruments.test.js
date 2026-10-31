@@ -63,7 +63,12 @@ describe('broker instrument cache', () => {
       yield { exchange: 'NSE', symbol: '', token: '1' }; // unreadable: skipped
       yield { exchange: 'NSE', symbol: 'NEW', token: 9001 };
     }
-    const row = await brokerInstrument('upstox', 'NSE', 'SYM0', next);
+    // The lookup answers from the day-old row; the refresh lands behind it.
+    expect(await brokerInstrument('upstox', 'NSE', 'SYM0', next)).toMatchObject({ token: '1000' });
+    await vi.waitFor(async () =>
+      expect(await BrokerInstrument.countDocuments({ provider: 'upstox' })).toBe(2),
+    );
+    const row = await BrokerInstrument.findById('upstox:NSE:SYM0').lean();
     expect(row).toMatchObject({ token: '9000', isin: 'INE009A01021', lotSize: null });
     const symbols = await BrokerInstrument.find({ provider: 'upstox' }).distinct('symbol');
     expect(symbols.sort()).toEqual(['NEW', 'SYM0']);
@@ -86,6 +91,40 @@ describe('broker instrument cache', () => {
     await brokerInstrument('dhan', 'NSE', 'SYM0', async () => master(2));
     await dayLater('dhan');
     expect(await brokerInstrument('dhan', 'NSE', 'SYM1', broken)).toMatchObject({ token: '1001' });
+  });
+
+  it('does not hold a lookup on a day-old cache for the refresh', async () => {
+    await brokerInstrument('angel', 'NSE', 'SYM0', async () => master(1));
+    await dayLater('angel');
+    let release;
+    const slow = vi.fn(() => new Promise((resolve) => (release = resolve)));
+    expect(await brokerInstrument('angel', 'NSE', 'SYM0', slow)).toMatchObject({ token: '1000' });
+    await vi.waitFor(() => expect(slow).toHaveBeenCalledOnce());
+    release(master(2));
+    await vi.waitFor(async () =>
+      expect(await BrokerInstrument.countDocuments({ provider: 'angel' })).toBe(2),
+    );
+  });
+
+  it('marks a partly loaded first list stale so the next lookup retries', async () => {
+    async function* partial() {
+      yield* master(1500);
+      throw new Error('connection reset');
+    }
+    await expect(brokerInstrument('fyers', 'NSE', 'SYM0', partial)).rejects.toThrow(
+      'connection reset',
+    );
+    expect(await BrokerInstrument.countDocuments({ provider: 'fyers' })).toBe(1000);
+    expect(
+      await BrokerInstrument.countDocuments({ provider: 'fyers', updatedAt: { $gt: new Date(0) } }),
+    ).toBe(0);
+    await RateWindow.deleteMany({});
+    const loadAll = vi.fn(async () => master(1500));
+    await brokerInstrument('fyers', 'NSE', 'SYM0', loadAll);
+    await vi.waitFor(async () =>
+      expect(await BrokerInstrument.countDocuments({ provider: 'fyers' })).toBe(1500),
+    );
+    expect(loadAll).toHaveBeenCalledOnce();
   });
 
   it('leaves the refresh to the process that holds it', async () => {
