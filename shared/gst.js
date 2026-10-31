@@ -43,6 +43,9 @@ export const GST_STATES = [
   ['38', 'Ladakh'],
 ].map(([code, name]) => ({ code, name }));
 
+/** Union territories without a legislature charge UTGST instead of SGST (same amount). */
+export const UTGST_STATE_CODES = new Set(['04', '26', '31', '35', '38']);
+
 /** The state for a GST state code, or null. */
 export const gstState = (code) => GST_STATES.find((state) => state.code === code) ?? null;
 

@@ -17,6 +17,7 @@ import {
   JournalEmbedding,
   LiveOrder,
   LoginUsername,
+  ManualInvitation,
   OrderPlanRecord,
   PaperTrade,
   PriceAlert,
@@ -103,6 +104,8 @@ export async function deleteMember(email) {
     files += await removeOwnerFolder(bucketName, userId);
   }
   await AllowedUser.deleteOne({ _id: user.email });
+  // Otherwise the address stays stored and can never be invited again.
+  await ManualInvitation.deleteMany({ email: user.email });
   await User.deleteOne({ _id: userId });
   return { email: user.email, rows, files };
 }

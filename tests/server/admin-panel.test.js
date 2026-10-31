@@ -39,7 +39,12 @@ beforeEach(async () => {
   forgetPlanCache();
   mails = [];
   setMailTransport({ sendMail: async (message) => mails.push(message) });
-  razorpay = { calls: [] };
+  // What Razorpay answers for GET /subscriptions/sub_test1 and for cancelling it.
+  razorpay = {
+    calls: [],
+    subscription: { id: 'sub_test1', status: 'created' },
+    cancel: { id: 'sub_test1', status: 'cancelled', paid_count: 1 },
+  };
   // Only Razorpay is faked; supertest's own requests go through.
   globalThis.fetch = vi.fn(async (url, options) => {
     if (String(url) === 'https://oauth2.googleapis.com/token') {
@@ -54,8 +59,11 @@ beforeEach(async () => {
     if (path === '/plans') return Response.json({ id: 'plan_test1' });
     if (path === '/plans?count=1') return Response.json({ items: [] });
     if (path === '/subscriptions/sub_test1/cancel') {
-      return Response.json({ id: 'sub_test1', status: 'cancelled', paid_count: 1 });
+      return razorpay.cancel.error
+        ? Response.json(razorpay.cancel, { status: 400 })
+        : Response.json(razorpay.cancel);
     }
+    if (path === '/subscriptions/sub_test1') return Response.json(razorpay.subscription);
     if (path === '/subscriptions') {
       return Response.json({
         id: 'sub_test1',
@@ -448,11 +456,15 @@ describe('Premium', () => {
     expect(razorpay.calls[0].body.item).toMatchObject({ amount: 49900, currency: 'INR' });
     // The first charge waits for the end of the trial.
     expect(razorpay.calls[1].body.start_at).toBeGreaterThan(Date.now() / 1000 + 13 * 86400);
-    // Opening checkout again reuses the unpaid subscription.
+    // Opening checkout again reuses the unpaid subscription (after checking it is still open).
     expect((await member.send('post', '/api/billing/checkout', {})).body.url).toBe(
       'https://rzp.io/i/pay',
     );
-    expect(razorpay.calls).toHaveLength(2);
+    expect(razorpay.calls.map((call) => call.path)).toEqual([
+      '/plans',
+      '/subscriptions',
+      '/subscriptions/sub_test1',
+    ]);
 
     const paidUntil = Math.floor(Date.now() / 1000) + 30 * 86400;
     const event = {
@@ -563,6 +575,17 @@ describe('Premium webhooks and checkout edge cases', () => {
     expect(computeMembership(plan, member, { ...renewing, paidUntil: longAgo }).premium).toBe(
       false,
     );
+    // Subscribed during the trial: the first charge gets the same grace after the trial ends.
+    const firstCharge = { trialEndsAt: ended, razorpayStatus: 'authenticated' };
+    expect(computeMembership(plan, member, firstCharge)).toMatchObject({
+      premium: true,
+      state: 'active',
+    });
+    expect(computeMembership(plan, member, { ...firstCharge, trialEndsAt: longAgo }).premium).toBe(
+      false,
+    );
+    const inTrial = { ...firstCharge, trialEndsAt: new Date(Date.now() + 86_400_000) };
+    expect(computeMembership(plan, member, inTrial).state).toBe('trial');
 
     const { admin, member: payer } = await payingMember();
     await signedWebhook(entity('active', 30), 'evt_a');
@@ -588,6 +611,56 @@ describe('Premium webhooks and checkout edge cases', () => {
     expect(revoked.status).toBe(200);
     const cancel = razorpay.calls.find((call) => call.path === '/subscriptions/sub_test1/cancel');
     expect(cancel.body).toEqual({ cancel_at_cycle_end: 0 });
+  });
+
+  it('replaces an expired checkout, which never blocks switching billing off', async () => {
+    const { admin, member } = await payingMember();
+    razorpay.subscription = { id: 'sub_test1', status: 'expired' };
+    const again = await member.send('post', '/api/billing/checkout', {});
+    expect(again.body).toEqual({ url: 'https://rzp.io/i/pay' });
+    expect(razorpay.calls.filter((call) => call.path === '/subscriptions')).toHaveLength(2);
+    // The new checkout is unpaid too ('created'): it does not count as a live subscription.
+    expect((await admin.send('put', '/api/admin/billing', { enabled: false })).status).toBe(200);
+  });
+
+  it('renews only once paid, and tells a member who cancelled renewal when Premium ends', async () => {
+    const { Subscription } = await import('../../models/index.js');
+    const { member } = await payingMember();
+    const record = () => Subscription.findById(member.userId).lean();
+    await signedWebhook(entity('active', 30), 'evt_a');
+    expect((await record()).cancelAtPeriodEnd).toBe(false);
+    // "Cancel renewal": Razorpay keeps it active until the paid month ends.
+    razorpay.cancel = entity('active', 30).payload.subscription.entity;
+    razorpay.subscription = razorpay.cancel;
+    expect((await member.send('post', '/api/billing/cancel', {})).status).toBe(200);
+    await member.send('post', '/api/billing/refresh', {});
+    expect((await record()).cancelAtPeriodEnd).toBe(true);
+    const refused = await member.send('post', '/api/billing/checkout', {});
+    expect(refused.status).toBe(409);
+    expect(refused.body.error).toMatch(/^Premium ends on .+\. You can subscribe again then\.$/);
+
+    // Once it ends, a new checkout does not "renew" until it is paid.
+    await signedWebhook(entity('completed', 0), 'evt_b');
+    expect((await member.send('post', '/api/billing/checkout', {})).status).toBe(200);
+    expect(await record()).toMatchObject({ razorpayStatus: 'created', cancelAtPeriodEnd: true });
+    await signedWebhook(entity('active', 30), 'evt_c');
+    expect((await record()).cancelAtPeriodEnd).toBe(false);
+  });
+
+  it('deletes a member whose subscription Razorpay already ended', async () => {
+    const { deleteMember } = await import('../../services/admin/delete-member.js');
+    await payingMember();
+    razorpay.cancel = {
+      error: { description: 'Subscription is not cancellable in expired status' },
+    };
+    // Still cancellable: deleting stops rather than leave a member being charged.
+    razorpay.subscription = { id: 'sub_test1', status: 'active' };
+    await expect(deleteMember('member@example.com')).rejects.toMatchObject({ status: 502 });
+    razorpay.subscription = { id: 'sub_test1', status: 'expired' };
+    expect(await deleteMember('member@example.com')).toMatchObject({
+      email: 'member@example.com',
+    });
+    expect(await User.exists({ email: 'member@example.com' })).toBeNull();
   });
 
   it('keeps billing on while members have live subscriptions', async () => {

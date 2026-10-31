@@ -16,6 +16,7 @@ import { reserveAttempts } from '../services/rate-window.js';
 import { allowFeature, membershipFor } from '../services/billing/membership.js';
 import { featureLabel, loadPlan, publicPlan } from '../services/billing/plan.js';
 import { amountInWords, invoiceFor } from '../services/billing/invoices.js';
+import { UTGST_STATE_CODES } from '../shared/gst.js';
 
 const TITLES = Object.fromEntries(
   [...NAV_LINKS, ...ADMIN_NAV_GROUP.items].map((link) => [link.path, link.name]),
@@ -210,6 +211,7 @@ export async function invoice(req, res, next) {
     title: found.type === 'tax-invoice' ? 'Tax invoice' : 'Payment receipt',
     invoice: found,
     words: amountInWords(found.total),
+    stateTax: UTGST_STATE_CODES.has(found.seller?.state?.code) ? 'UTGST' : 'SGST',
   });
 }
 

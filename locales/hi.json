@@ -330,5 +330,6 @@
   "Balance": "बैलेंस",
   "Holdings": "होल्डिंग्स",
   "Stop & target": "स्टॉप और टारगेट",
-  "Live order broker": "लाइव ऑर्डर का ब्रोकर"
+  "Live order broker": "लाइव ऑर्डर का ब्रोकर",
+  "{plan} ends on {date}. You can subscribe again then.": "{plan} {date} को ख़त्म होगा। तब आप फिर से सब्सक्राइब कर सकते हैं।"
 }

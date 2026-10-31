@@ -95,8 +95,18 @@ export function computeMembership(plan, user, sub, now = Date.now()) {
     sub?.paidUntil && renewing
       ? new Date(new Date(sub.paidUntil).getTime() + RENEWAL_GRACE_MS)
       : sub?.paidUntil;
-  // The latest of the three dates is when Premium ends.
-  const ends = [sub?.grantUntil, paidEnds, sub?.trialEndsAt]
+  // Subscribed during a trial or grant (or a paid month): the first charge is due when it ends
+  // (startCheckout's start_at), so the same grace applies.
+  const firstChargeEnds =
+    sub?.razorpayStatus === 'authenticated' && !sub.cancelAtPeriodEnd
+      ? new Date(
+          Math.max(
+            ...[sub.trialEndsAt, sub.grantUntil, sub.paidUntil].map((d) => +new Date(d ?? 0)),
+          ) + RENEWAL_GRACE_MS,
+        )
+      : null;
+  // The latest of these dates is when Premium ends.
+  const ends = [sub?.grantUntil, paidEnds, firstChargeEnds, sub?.trialEndsAt]
     .filter((date) => later(date, now))
     .map((date) => new Date(date).getTime());
   const endsAt = ends.length ? Math.max(...ends) : null;
@@ -108,9 +118,11 @@ export function computeMembership(plan, user, sub, now = Date.now()) {
         : 'active'
       : later(sub?.trialEndsAt, now)
         ? 'trial'
-        : sub
-          ? 'free'
-          : 'not-started';
+        : later(firstChargeEnds, now)
+          ? 'active'
+          : sub
+            ? 'free'
+            : 'not-started';
   return {
     ...base,
     ...dates,

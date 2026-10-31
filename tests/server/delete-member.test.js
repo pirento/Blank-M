@@ -12,6 +12,7 @@ import {
 import {
   AllowedUser,
   BrokerConnection,
+  ManualInvitation,
   Payment,
   PushSubscription,
   Trade,
@@ -76,10 +77,22 @@ describe('member data removal', () => {
       userId: other.user._id,
     });
 
+    await ManualInvitation.create({
+      email: user.email,
+      role: 'member',
+      tokenHash: 'a'.repeat(64),
+      invitedBy: 'admin',
+      createdAt: new Date(),
+      expiresAt: new Date(),
+      status: 'accepted',
+    });
+
     const result = await deleteMember('Leaver@Example.com');
     expect(result).toMatchObject({ email: 'leaver@example.com', files: 1 });
     expect(await User.exists({ _id: user._id })).toBeNull();
     expect(await AllowedUser.exists({ _id: user.email })).toBeNull();
+    // The address can be invited again.
+    expect(await ManualInvitation.exists({ email: user.email })).toBeNull();
     expect(await Trade.countDocuments({ userId: user._id })).toBe(0);
     expect(await Trade.countDocuments({ userId: other.user._id })).toBe(1);
     expect(await mongoose.connection.db.collection('tradeScreenshots.files').countDocuments()).toBe(
