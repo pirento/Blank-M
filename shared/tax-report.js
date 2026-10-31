@@ -37,7 +37,7 @@ export const TAX_CATEGORIES = {
   },
   nonSpeculative: {
     label: 'Non-speculative business (F&O)',
-    note: 'Losses can be set off against other business income (not salary) and carried forward 8 years.',
+    note: 'In the same year, losses can be set off against any income except salary; carried forward (up to 8 years), only against business income.',
   },
 };
 
