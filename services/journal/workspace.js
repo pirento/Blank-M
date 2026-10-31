@@ -473,6 +473,9 @@ const SWEEP_BATCH = 1000;
  * file) or, in S3, which lists by name, the last name checked.
  */
 const SWEEP_POSITION = 'screenshot_sweep';
+const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
+/** tradeScreenshotPath's `<owner>/<trade>/<uuid>`: anything else in the bucket is not ours to delete. */
+const SCREENSHOT_NAME = new RegExp(`^${UUID}/${UUID}/${UUID}$`, 'i');
 
 /**
  * One slice of the orphan sweep: deletes trade-screenshot files older than a day that no trade
@@ -488,14 +491,15 @@ export async function removeOrphanScreenshots() {
     new Date(position?.value ?? 0),
     position?.after,
   );
-  // Paths are `<owner>/<trade>/<uuid>`: only that trade can point to the file.
-  const tradeIds = files.map((file) => file.name.split('/')[1]).filter(Boolean);
+  // Only that trade can point to the file. Other objects (a shared S3 bucket) are skipped.
+  const names = files.map((file) => file.name).filter((name) => SCREENSHOT_NAME.test(name));
+  const tradeIds = names.map((name) => name.split('/')[1]);
   const kept = new Set(
     (await Trade.find({ _id: { $in: tradeIds } }, { screenshotPath: 1 }).lean()).map(
       (trade) => trade.screenshotPath,
     ),
   );
-  const orphans = files.map((file) => file.name).filter((name) => !kept.has(name));
+  const orphans = names.filter((name) => !kept.has(name));
   if (orphans.length) await removeObjects('trade-screenshots', orphans);
   // A full slice resumes from its last file (re-checked, harmless); a short one reached the end.
   const moreMayRemain = files.length === SWEEP_BATCH;

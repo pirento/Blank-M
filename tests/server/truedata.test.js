@@ -126,6 +126,73 @@ describe('shared live feed', () => {
     feed.stop();
   }, 20_000);
 
+  it('serves no stale vendor price and adds no listener when registering fails', async () => {
+    await LiveQuote.create({ _id: ':feed', price: 0, at: new Date() });
+    // Followed for over 5 s (a 60 s registration), but its last price is from before the close.
+    const followed = () =>
+      LiveSubscription.updateOne(
+        { _id: 'INFY' },
+        { $set: { expiresAt: new Date(Date.now() + 60_000) } },
+        { upsert: true },
+      );
+    await followed();
+    await LiveQuote.create({ _id: 'INFY', price: 1500, at: new Date(Date.now() - 3 * 60_000) });
+    expect(await vendorQuote('INFY')).toBeNull();
+    await LiveQuote.updateOne({ _id: 'INFY' }, { $set: { at: new Date() } });
+    await followed();
+    expect(await vendorQuote('INFY')).toMatchObject({ price: 1500 });
+
+    // Another page keeps the poll running, so a leaked listener would get TCS ticks.
+    const stop = await subscribeVendorQuotes(['INFY'], { onTick: () => undefined });
+    const ticks = [];
+    const write = vi.spyOn(LiveSubscription, 'bulkWrite').mockRejectedValueOnce(new Error('down'));
+    await expect(
+      subscribeVendorQuotes(['TCS'], { onTick: (tick) => ticks.push(tick) }),
+    ).rejects.toThrow('down');
+    write.mockRestore();
+    await LiveQuote.create({ _id: 'TCS', price: 4000, at: new Date() });
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    stop();
+    expect(ticks).toEqual([]);
+  });
+
+  it('keeps symbols open pages stream ahead of one-off quotes within the plan limit', async () => {
+    const later = new Date(Date.now() + 10 * 60_000);
+    await LiveSubscription.insertMany([
+      // One-off quotes (price checks) registered for longer, but no page is streaming them.
+      ...Array.from({ length: 500 }, (_, index) => ({ _id: `Q${index}`, expiresAt: later })),
+      { _id: 'STREAMED', expiresAt: new Date(Date.now() + 60_000), wantedAt: new Date() },
+    ]);
+    const sockets = [];
+    class FakeSocket {
+      constructor() {
+        this.readyState = 1;
+        this.sent = [];
+        sockets.push(this);
+        queueMicrotask(() =>
+          this.onmessage({
+            data: JSON.stringify({ success: true, message: 'TrueData Real Time Data Service' }),
+          }),
+        );
+      }
+      send(text) {
+        this.sent.push(JSON.parse(text));
+      }
+      close() {
+        this.readyState = 3;
+      }
+    }
+    const feed = startTrueDataFeed({ WebSocketImpl: FakeSocket });
+    try {
+      await vi.waitFor(() => expect(sockets[0]?.sent).toHaveLength(1), { timeout: 5000 });
+      const [{ symbols }] = sockets[0].sent;
+      expect(symbols).toHaveLength(500);
+      expect(symbols).toContain('STREAMED');
+    } finally {
+      feed.stop();
+    }
+  });
+
   it('reconnects when the login changes in the admin panel and goes idle when it is cleared', async () => {
     const sockets = [];
     class FakeSocket {

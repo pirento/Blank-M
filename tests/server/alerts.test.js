@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const market = vi.hoisted(() => ({ prices: {}, reads: [] }));
+const market = vi.hoisted(() => ({ status: 'open', prices: {}, reads: [] }));
 const pushes = vi.hoisted(() => ({ sent: [], fail: null }));
 vi.mock('../../services/market/index.js', async (original) => ({
   ...(await original()),
@@ -19,6 +19,12 @@ vi.mock('web-push', () => ({
     },
     generateVAPIDKeys: () => ({ publicKey: 'p', privateKey: 'q' }),
   },
+}));
+
+// The scheduled check only moves paper trades and alerts while the market is open.
+vi.mock('../../shared/market.js', async (original) => ({
+  ...(await original()),
+  getMarketStatus: () => market.status,
 }));
 
 const { createMember, resetDatabase, signIn, startTestApp, stopTestApp } =

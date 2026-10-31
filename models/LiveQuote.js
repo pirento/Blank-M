@@ -22,6 +22,8 @@ const liveSubscriptionSchema = new mongoose.Schema(
     _id: String, // symbol
     /** Renewed by web processes while a page shows the symbol; the feed drops it after this. */
     expiresAt: { type: Date, required: true },
+    /** Last renewal by an open page's stream (one-off quotes leave it unset); the feed ranks by it. */
+    wantedAt: Date,
   },
   { versionKey: false },
 );
