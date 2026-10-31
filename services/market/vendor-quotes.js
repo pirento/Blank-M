@@ -28,10 +28,16 @@ let renewTimer = null;
 /** Tells the feed which symbols to stream (for `forMs`); never shortens a longer registration. */
 async function register(symbols, forMs = SUBSCRIPTION_MS) {
   if (!symbols.length) return;
-  const expiresAt = new Date(Date.now() + forMs);
+  const now = Date.now();
+  const expiresAt = new Date(now + forMs);
+  // Open streams (renewed every RENEW_MS) stamp wantedAt, so the feed keeps them first within its limit.
+  const update =
+    forMs === SUBSCRIPTION_MS
+      ? { $max: { expiresAt, wantedAt: new Date(now) } }
+      : { $max: { expiresAt } };
   await LiveSubscription.bulkWrite(
     symbols.map((symbol) => ({
-      updateOne: { filter: { _id: symbol }, update: { $max: { expiresAt } }, upsert: true },
+      updateOne: { filter: { _id: symbol }, update, upsert: true },
     })),
     { ordered: false },
   );
@@ -83,12 +89,14 @@ export async function subscribeVendorQuotes(symbols, { onTick }) {
   // No feed running: let the caller use the member's own broker instead.
   if (!isTrueDataConfigured() || !(await feedAlive())) return null;
   const wanted = [...new Set(symbols)];
+  // Registered before listening: nothing is added (or ticked) if this throws, and no tick
+  // can reach the caller before it has the unsubscribe function.
+  await register(wanted);
   for (const symbol of wanted) {
     if (!watchers.has(symbol)) watchers.set(symbol, new Set());
     watchers.get(symbol).add(onTick);
     lastSeen.delete(symbol); // send the current price straight away
   }
-  await register(wanted);
   startTimers();
   return () => {
     for (const symbol of wanted) {
@@ -118,6 +126,7 @@ export async function vendorQuote(symbol) {
     subscription.expiresAt.getTime() - Date.now() < QUOTE_SUBSCRIPTION_MS - 5000;
   if (!alive || !followed) return null;
   const row = await LiveQuote.findById(symbol).lean();
-  if (!row) return null;
+  // An old price (market closed, symbol not streaming) is not served as live.
+  if (!row || Date.now() - row.at.getTime() > LIVE_TICK_MS) return null;
   return { symbol, price: row.price, previousClose: null, currency: 'INR', source: 'truedata' };
 }

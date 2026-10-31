@@ -19,8 +19,8 @@
 # the member's own journal, so it can start early; the 105 minutes fit a few thousand members.
 0 2 * * 1-5 cd /srv/blank && set -a && . ./.env && set +a && node scripts/premarket-plan.js >> /var/log/blank-cron.log 2>&1
 
-# Every 5 minutes, Monday–Friday 03:45–10:00 UTC (09:15–15:30 IST): paper trade stops/targets,
-# price alerts and automatic stop/target GTTs for filled live orders.
+# Every 5 minutes, Monday–Friday 03:00–10:55 UTC (08:30–16:25 IST): automatic stop/target GTTs for
+# filled live orders, plus paper trade stops/targets and price alerts while NSE is open (09:15–15:30 IST).
 */5 3-10 * * 1-5 cd /srv/blank && set -a && . ./.env && set +a && node scripts/price-checks.js >> /var/log/blank-cron.log 2>&1
 
 # Monday–Friday 10:45 UTC (16:15 IST): today's Zerodha, Dhan, Upstox, Fyers and Angel One fills into

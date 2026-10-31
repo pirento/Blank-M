@@ -74,11 +74,13 @@ cd "$APP_DIR"
 if [ ! -f .env ]; then
   echo "==> Creating .env with fresh secrets"
   cp .env.production.example .env
-  sudo -u "$APP_USER" node scripts/generate-secrets.js > /tmp/blank-secrets
+  # mktemp: mode 600 and an unpredictable name, so other users cannot read or pre-create it.
+  SECRETS_FILE=$(mktemp)
+  sudo -u "$APP_USER" node scripts/generate-secrets.js > "$SECRETS_FILE"
   while IFS='=' read -r key value; do
     sed -i "s|^${key}=.*|${key}=${value}|" .env
-  done < /tmp/blank-secrets
-  rm -f /tmp/blank-secrets
+  done < "$SECRETS_FILE"
+  rm -f "$SECRETS_FILE"
   sed -i "s|https://blank.example.com|https://${DOMAIN}|g" .env
   if grep -q 'replSetName: rs0' /etc/mongod.conf; then
     sed -i 's|^MONGODB_URI=.*|MONGODB_URI="mongodb://127.0.0.1:27017/blank?replicaSet=rs0"|' .env

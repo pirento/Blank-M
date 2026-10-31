@@ -1,13 +1,19 @@
 // @vitest-environment node
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const market = vi.hoisted(() => ({ prices: {} }));
+const market = vi.hoisted(() => ({ status: 'open', prices: {} }));
 vi.mock('../../services/market/index.js', async (original) => ({
   ...(await original()),
   getQuote: async (symbol) => {
     if (!(symbol in market.prices)) throw new Error('no quote');
     return { price: market.prices[symbol] };
   },
+}));
+
+// The scheduled check only moves paper trades and alerts while the market is open.
+vi.mock('../../shared/market.js', async (original) => ({
+  ...(await original()),
+  getMarketStatus: () => market.status,
 }));
 
 const { createMember, resetDatabase, signIn, startTestApp, stopTestApp } =
@@ -28,6 +34,7 @@ afterAll(async () => {
 beforeEach(async () => {
   await resetDatabase();
   market.prices = { INFY: 1500, TCS: 4000 };
+  market.status = 'open';
 });
 
 async function member() {
@@ -121,5 +128,24 @@ describe('paper trading', () => {
     expect(overlap.body.paper).toBeUndefined();
     const list = await send('get', '/api/paper');
     expect(list.body.closed[0]).toMatchObject({ exitReason: 'target', exitPrice: 1525 });
+  });
+
+  it('leaves paper trades alone in the scheduled check while the market is closed', async () => {
+    const { send } = await member();
+    await send('post', '/api/paper', {
+      symbol: 'INFY',
+      direction: 'Long',
+      quantity: 1,
+      takeProfit: 1520,
+    });
+    market.prices.INFY = 1525;
+    // After the close the last price is stale: no paper exit on it.
+    market.status = 'closed-hours';
+    const run = await supertest(app)
+      .post('/api/maintenance/price-checks')
+      .set('Authorization', `Bearer ${SECRET}`);
+    expect(run.body).toMatchObject({ market: 'closed-hours', autoGtt: { enabled: false } });
+    expect(run.body.paper).toBeUndefined();
+    expect((await send('get', '/api/paper')).body.closed).toEqual([]);
   });
 });

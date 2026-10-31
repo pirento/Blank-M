@@ -63,6 +63,19 @@ describe('upload cleanup', () => {
     expect(left.map((file) => file.filename)).toEqual([newStatement]);
   });
 
+  it('removes more than a hundred expired voice notes in one call', async () => {
+    const user = randomUUID();
+    for (let index = 0; index < 150; index += 1) {
+      const path = voiceNotePath(user, 'v.mp3').path;
+      await uploadObject('voice-notes', path, user, { mimetype: 'audio/mpeg', buffer: MP3 });
+      await age('voiceNotes', path, 2);
+    }
+    const response = await request(app)
+      .post('/api/maintenance/voice-notes')
+      .set('Authorization', `Bearer ${SECRET}`);
+    expect(response.body).toMatchObject({ deleted: 150, moreMayRemain: false });
+  });
+
   it('sweeps screenshot files older than a day that no trade points to', async () => {
     const user = randomUUID();
     const tradeId = randomUUID();
