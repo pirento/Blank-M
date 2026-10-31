@@ -29,10 +29,10 @@ function themeColors() {
   const read = (name, fallback) => css.getPropertyValue(name).trim() || fallback;
   return {
     background: read('--color-surface', '#ffffff'),
-    text: read('--color-muted', '#5b6766'),
-    grid: read('--color-line', '#e3e8e6'),
-    up: read('--color-positive', '#167256'),
-    down: read('--color-negative', '#c2403a'),
+    text: read('--color-muted', '#5f6c70'),
+    grid: read('--color-line', '#e3e9e1'),
+    up: read('--color-positive', '#446e47'),
+    down: read('--color-negative', '#bb3348'),
   };
 }
 

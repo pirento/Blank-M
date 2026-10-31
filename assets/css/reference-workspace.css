@@ -317,8 +317,8 @@
   stroke: var(--color-accent);
 }
 .reference-candle-down {
-  fill: var(--color-danger, #b54b42);
-  stroke: var(--color-danger, #b54b42);
+  fill: var(--color-danger, #bb3348);
+  stroke: var(--color-danger, #bb3348);
 }
 .reference-candle-cursor {
   stroke: var(--color-muted);
