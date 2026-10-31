@@ -43,9 +43,9 @@
  * Body text pairs are checked for WCAG AA in the theme contract tests.
  */
 @theme {
-  --color-canvas: #f5f6f2;
+  --color-canvas: #faf6f1;
   --color-surface: #ffffff;
-  --color-elevated: #eeefe6;
+  --color-elevated: #f3eee6;
   --color-line: #dce4da;
   --color-line-strong: #c4d2c2;
 
@@ -87,6 +87,18 @@
   --color-slate: #2a363b;
   --color-charcoal: #1e2a2c;
 
+  --gradient-dusk: linear-gradient(
+    90deg,
+    var(--color-moss),
+    var(--color-khaki),
+    var(--color-tan),
+    var(--color-peach),
+    var(--color-coral),
+    var(--color-rose),
+    var(--color-burgundy),
+    var(--color-plum)
+  );
+
   --radius-control: 3px;
   --radius-card: 3px;
 
@@ -120,6 +132,15 @@
   --color-negative-soft: #43292f;
   --color-caution: #fecea8;
   --color-caution-soft: #3f3229;
+}
+
+.dark .workspace-shell {
+  background:
+    radial-gradient(900px 420px at 100% 0%, #5a363d59, transparent 70%),
+    radial-gradient(800px 420px at 0% 100%, #8eab8a1f, transparent 70%), var(--color-canvas);
+}
+.dark .workspace-environment-strip {
+  background: linear-gradient(90deg, #3a3034, #26352b);
 }
 
 html {
@@ -271,14 +292,22 @@ textarea {
 .workspace-shell {
   display: flex;
   min-height: 100dvh;
-  background: #f8f9f6;
+  background:
+    radial-gradient(900px 420px at 100% 0%, #fecea83d, transparent 70%),
+    radial-gradient(800px 420px at 0% 100%, #99b89833, transparent 70%), var(--color-canvas);
   color: var(--color-fg);
   padding-bottom: 90px;
 }
-.dark .workspace-shell {
-  background: var(--color-canvas);
+.workspace-topbar::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 -1px;
+  height: 2px;
+  background: var(--gradient-dusk);
+  opacity: 0.85;
 }
 .workspace-topbar {
+  position: relative;
   display: flex;
   flex-shrink: 0;
   align-items: center;
@@ -363,7 +392,7 @@ textarea {
   padding: 8px 32px;
   color: var(--color-muted);
   font-size: 11px;
-  background: var(--color-canvas);
+  background: linear-gradient(90deg, #fff1e6, #eef3ec);
 }
 .workspace-environment-strip b {
   font: 10px var(--font-mono);
@@ -385,6 +414,22 @@ textarea {
   align-items: center;
   gap: 24px;
   margin-bottom: 24px;
+}
+.workspace-pagehead h1::after,
+.reference-page-heading h1::after {
+  content: '';
+  display: block;
+  width: 56px;
+  height: 3px;
+  margin-top: 10px;
+  border-radius: 2px;
+  background: linear-gradient(
+    90deg,
+    var(--color-sage),
+    var(--color-peach),
+    var(--color-coral),
+    var(--color-rose)
+  );
 }
 .workspace-pagehead h1 {
   font-size: 30px;
@@ -487,7 +532,7 @@ textarea {
   color: #fff;
 }
 .workspace-dock-link[aria-current='page'] {
-  background: #445760;
+  background: linear-gradient(180deg, #445760, #3a3034);
   color: #fff;
 }
 .workspace-dock-link[aria-current='page']::after {
@@ -495,8 +540,8 @@ textarea {
   right: 18px;
   bottom: 0;
   left: 18px;
-  height: 2px;
-  background: #b5cdb4;
+  height: 3px;
+  background: linear-gradient(90deg, var(--color-sage), var(--color-peach), var(--color-coral));
   content: '';
 }
 .workspace-dock-link sup {
