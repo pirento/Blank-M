@@ -147,7 +147,10 @@ describe('admin panel', () => {
     const overview = await admin.agent.get('/api/admin/overview');
     expect(overview.status).toBe(200);
     expect(overview.body.members.total).toBe(2);
-    expect((await admin.agent.get('/admin/integrations')).status).toBe(200);
+    const integrations = await admin.agent.get('/admin/integrations');
+    expect(integrations.status).toBe(200);
+    // Back after sign-out on a shared device must not show a cached admin page.
+    expect(integrations.headers['cache-control']).toBe('private, no-store');
   });
 
   it('saves API keys encrypted, applies them at once and never returns secrets', async () => {

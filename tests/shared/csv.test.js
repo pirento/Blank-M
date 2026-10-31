@@ -9,6 +9,7 @@ import {
   parseCsv,
   tradeKey,
 } from '../../shared/csv.js';
+import { buildTradesCsv } from '../../shared/trade-export.js';
 
 describe('parseCsv', () => {
   it('reads a plain file', () => {
@@ -363,5 +364,51 @@ describe('CSV import fixes', () => {
     const { candidates, errors } = buildCandidates(parsed.rows, mapping);
     expect(errors.map((error) => error.line)).toEqual([3]);
     expect(candidates[0]).toMatchObject({ line: 4, segment: 'OPT', optionType: 'CE' });
+  });
+
+  it('round-trips F&O contract details through the trade-book export', () => {
+    const base = { date: '2026-10-05', type: 'Long', grossPnl: 0, charges: 0, pnl: 0, notes: '' };
+    const csv = buildTradesCsv([
+      {
+        ...base,
+        symbol: 'NIFTY',
+        quantity: 150,
+        entryPrice: 100,
+        exitPrice: 120,
+        segment: 'OPT',
+        strike: 24500,
+        optionType: 'PE',
+        expiry: '2026-10-28',
+        lotSize: 75,
+      },
+      { ...base, symbol: 'TCS', quantity: 5, entryPrice: 4000, exitPrice: 4100, segment: 'EQ' },
+    ]);
+    const parsed = parseCsv(csv);
+    const { candidates, errors } = buildCandidates(parsed.rows, guessMapping(parsed.headers));
+    expect(errors).toEqual([]);
+    expect(candidates[0]).toMatchObject({
+      symbol: 'NIFTY',
+      quantity: 150,
+      segment: 'OPT',
+      strike: 24500,
+      optionType: 'PE',
+      expiry: '2026-10-28',
+      lotSize: 75,
+    });
+    expect(candidates[1]).not.toHaveProperty('segment');
+  });
+
+  it('rejects a re-imported F&O row whose quantity is not whole lots', () => {
+    const csv =
+      'Date,Symbol,Direction,Quantity,Entry,Exit,Segment,Lot size\n2026-10-05,NIFTY,Long,100,1,2,FUT,75';
+    const parsed = parseCsv(csv);
+    const { errors } = buildCandidates(parsed.rows, guessMapping(parsed.headers));
+    expect(errors[0].reason).toMatch(/multiple of the lot size/);
+  });
+
+  it('never reads a "Lots" or "Lot size" column as the quantity', () => {
+    expect(guessMapping(['Date', 'Symbol', 'Lots']).quantity).toBe(-1);
+    expect(guessMapping(['Lot size', 'Qty']).quantity).toBe(1);
+    expect(guessMapping(['Lot Size']).quantity).toBe(-1);
   });
 });

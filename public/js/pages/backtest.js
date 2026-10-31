@@ -246,12 +246,12 @@ function resultsView() {
                       h(
                         'td',
                         { class: 'py-2' },
-                        `${new Date(trade.entryTime).toLocaleDateString('en-IN')} @ ${trade.entryPrice}`,
+                        `${new Date(trade.entryTime).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })} @ ${trade.entryPrice}`,
                       ),
                       h(
                         'td',
                         {},
-                        `${new Date(trade.exitTime).toLocaleDateString('en-IN')} @ ${trade.exitPrice}`,
+                        `${new Date(trade.exitTime).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })} @ ${trade.exitPrice}`,
                       ),
                       h('td', { class: 'text-right' }, String(trade.quantity)),
                       h(
@@ -303,7 +303,7 @@ function paint() {
     if (state.result.metrics.totalTrades > 0) {
       areaChart(canvas, {
         labels: state.result.equityCurve.map((point) =>
-          new Date(point.time).toLocaleDateString('en-IN'),
+          new Date(point.time).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }),
         ),
         values: state.result.equityCurve.map((point) => point.equity),
         tooltipLabel: 'Equity',

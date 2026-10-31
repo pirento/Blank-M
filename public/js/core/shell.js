@@ -68,7 +68,8 @@ export async function signOut() {
   } catch {
     // The session cookie is server-side; reloading reflects the true state.
   }
-  window.location.assign('/login');
+  // replace, not assign: Back must not return to the signed-in page on a shared device.
+  window.location.replace('/login');
 }
 
 function bindSignOut(root = document) {

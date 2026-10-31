@@ -197,17 +197,21 @@ export function createTradeForm({
       mistake,
     ),
   );
-  const strategyField =
-    strategies.length > 0
-      ? select({ id: id('strategy') }, [
-          { value: '', label: 'None', selected: !form.strategyId },
-          ...strategies.map((strategy) => ({
-            value: strategy.id,
-            label: strategy.name,
-            selected: strategy.id === form.strategyId,
-          })),
-        ])
-      : null;
+  const strategySelect = () =>
+    select({ id: id('strategy') }, [
+      { value: '', label: 'None', selected: !form.strategyId },
+      ...strategies.map((strategy) => ({
+        value: strategy.id,
+        label: strategy.name,
+        selected: strategy.id === form.strategyId,
+      })),
+    ]);
+  let strategyField = strategies.length > 0 ? strategySelect() : null;
+  const strategyBox = h(
+    'div',
+    { class: 'space-y-2', hidden: !strategyField },
+    strategyField ? [label(t('Strategy (optional)'), strategyField.id), strategyField] : null,
+  );
 
   const execution = createExecutionSection({
     trade,
@@ -253,14 +257,7 @@ export function createTradeForm({
       field('segment', 'Segment', fields.segment),
     ),
     contractBox,
-    strategyField
-      ? h(
-          'div',
-          { class: 'space-y-2' },
-          label(t('Strategy (optional)'), strategyField.id),
-          strategyField,
-        )
-      : null,
+    strategyBox,
     h(
       'div',
       { class: 'space-y-2' },
@@ -567,6 +564,15 @@ export function createTradeForm({
       },
     });
   });
+
+  /** Lists a newly saved strategy in the picker without clearing what was typed. */
+  element.addStrategy = (strategy) => {
+    read();
+    strategies = [strategy, ...strategies];
+    strategyField = strategySelect();
+    strategyBox.replaceChildren(label(t('Strategy (optional)'), strategyField.id), strategyField);
+    strategyBox.hidden = false;
+  };
 
   paint();
   return element;

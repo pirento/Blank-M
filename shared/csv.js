@@ -7,7 +7,7 @@
  * and shows the result.
  */
 
-import { segmentOfSymbol } from './segments.js';
+import { SEGMENT_VALUES, contractDetails, lotProblem, segmentOfSymbol } from './segments.js';
 
 /**
  * A hand-rolled RFC 4180 reader rather than a dependency.
@@ -144,8 +144,16 @@ const FIELD_ALIASES = {
     'closeprice',
     'exitrate',
   ],
-  quantity: ['quantity', 'qty', 'shares', 'units', 'lots', 'filledqty', 'tradedqty'],
+  // Not "lots": a lot count is not units, and it would also partly match "Lot size".
+  quantity: ['quantity', 'qty', 'shares', 'units', 'filledqty', 'tradedqty'],
   notes: ['notes', 'note', 'remarks', 'comment', 'comments', 'description'],
+  // F&O contract columns (as the trade-book export writes them); after the others so they never
+  // take a column from a core field.
+  segment: ['segment'],
+  strike: ['strike', 'strikeprice'],
+  optionType: ['optiontype'],
+  expiry: ['expiry', 'expirydate'],
+  lotSize: ['lotsize'],
 };
 
 function squash(header) {
@@ -433,6 +441,35 @@ export function buildCandidates(rows, mapping) {
       return;
     }
 
+    // A Segment column with EQ/FUT/OPT (the trade-book export) wins; other values (a broker's
+    // "FO") fall back to reading the contract name.
+    const segmentCell = cell(row, mapping.segment ?? -1)
+      .trim()
+      .toUpperCase();
+    let contract = {};
+    if (SEGMENT_VALUES.includes(segmentCell) && segmentCell !== 'EQ') {
+      const raw = (field) => cell(row, mapping[field] ?? -1).trim();
+      const { values, errors: problems } = contractDetails({
+        segment: segmentCell,
+        lotSize: normaliseNumber(raw('lotSize')) ?? raw('lotSize'),
+        expiry: normaliseDate(raw('expiry')) ?? raw('expiry'),
+        strike: normaliseNumber(raw('strike')) ?? raw('strike'),
+        optionType: raw('optionType').toUpperCase() || symbol.slice(-2),
+      });
+      const reason = Object.values(problems)[0] ?? lotProblem(quantity, values.lotSize);
+      if (reason) {
+        errors.push({ line, reason });
+        return;
+      }
+      contract = values;
+    } else if (segmentCell !== 'EQ') {
+      // F&O contract names (NIFTY26OCT24500CE, BANKNIFTY26OCTFUT) carry their segment, which sets
+      // the charge rates and the tax head. Equity rows stay as before (no segment means equity).
+      const inferred = fnoSegment(symbol);
+      if (inferred === 'FUT') contract = { segment: 'FUT' };
+      if (inferred === 'OPT') contract = { segment: 'OPT', optionType: symbol.slice(-2) };
+    }
+
     candidates.push({
       line,
       date,
@@ -442,10 +479,7 @@ export function buildCandidates(rows, mapping) {
       exitPrice,
       quantity,
       notes: cell(row, mapping.notes).trim(),
-      // F&O contract names (NIFTY26OCT24500CE, BANKNIFTY26OCTFUT) carry their segment, which sets
-      // the charge rates and the tax head. Equity rows stay as before (no segment means equity).
-      ...(fnoSegment(symbol) === 'FUT' ? { segment: 'FUT' } : {}),
-      ...(fnoSegment(symbol) === 'OPT' ? { segment: 'OPT', optionType: symbol.slice(-2) } : {}),
+      ...contract,
     });
   });
 
