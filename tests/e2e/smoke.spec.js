@@ -67,7 +67,8 @@ test('wrong password shows an error and sign out ends the session', async ({ pag
 
 test('the live chart draws candles with a legend and intervals', async ({ page }) => {
   const errors = trackErrors(page);
-  const start = Date.UTC(2026, 9, 19, 3, 45);
+  // The last 60 five-minute candles before now: a fixed date drifts out of the chart's range.
+  const start = Math.floor(Date.now() / 300_000) * 300_000 - 60 * 5 * 60_000;
   // Fixed candles, so the test does not depend on a market data provider.
   await page.route('**/api/history?**', (route) => {
     const symbol = new URL(route.request().url()).searchParams.get('symbol');
