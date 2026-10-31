@@ -218,6 +218,7 @@ export async function quoteStream(req, res) {
   const lastSent = new Map();
   let unsubscribe = null;
   let ended = false;
+  let keepAlive = null;
   const stream = {
     userId,
     end: () => {
@@ -229,11 +230,11 @@ export async function quoteStream(req, res) {
       res.end();
     },
   };
-  // Proxies close idle connections; a comment every 25 s keeps the stream open.
-  const keepAlive = setInterval(() => res.write(': keep-alive\n\n'), 25_000);
   const handlers = {
     // `at` (trade time, ms) comes from the data vendor; Zerodha ticks are "now".
     onTick: ({ symbol, price, at }) => {
+      // A tick can arrive before the headers below are written.
+      if (!res.headersSent) return;
       const now = Date.now();
       if (now - (lastSent.get(symbol) ?? 0) < 1000) return;
       lastSent.set(symbol, now);
@@ -242,15 +243,9 @@ export async function quoteStream(req, res) {
     onEnd: () => stream.end(),
   };
   // The platform's data vendor for everyone; otherwise the member's own Zerodha feed.
-  try {
-    unsubscribe =
-      (await subscribeVendorQuotes(symbols, handlers)) ??
-      (await subscribeLiveQuotes(userId, symbols, handlers));
-  } catch (error) {
-    // Nothing was sent yet: stop the keep-alive so it never writes to a finished response.
-    clearInterval(keepAlive);
-    throw error;
-  }
+  unsubscribe =
+    (await subscribeVendorQuotes(symbols, handlers)) ??
+    (await subscribeLiveQuotes(userId, symbols, handlers));
   const headers = {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'private, no-store',
@@ -259,13 +254,18 @@ export async function quoteStream(req, res) {
     'X-Accel-Buffering': 'no',
   };
   if (!unsubscribe) {
-    clearInterval(keepAlive);
     res.writeHead(200, headers);
     return res.end('event: unavailable\ndata: {}\n\n');
   }
-  if (req.destroyed) return stream.end();
+  // Closed (or ended by the feed) while subscribing: stop listening.
+  if (ended || req.destroyed) {
+    unsubscribe();
+    return res.end();
+  }
   streams.add(stream);
   res.writeHead(200, headers);
+  // Proxies close idle connections; a comment every 25 s keeps the stream open.
+  keepAlive = setInterval(() => res.write(': keep-alive\n\n'), 25_000);
   // Browsers reconnect after this long when the stream ends (for example, Kite closed it).
   res.write('retry: 30000\n\n');
   req.on('close', () => stream.end());

@@ -10,3 +10,7 @@ overrides:
   '@parcel/watcher': 2.6.0
   # vitest installs happy-dom as a peer even though the tests use jsdom; 21.0.4 fixes GHSA for CVE-2026-33943.
   happy-dom: ^21.0.4
+  # mongodb-memory-server (tests only) pins follow-redirects 1.16.1; 1.16.2 fixes the credential-redirect advisory.
+  follow-redirects: ^1.16.2
+  # supertest's qs: 6.16.1 fixes the stringify DoS advisory.
+  qs: ^6.16.1

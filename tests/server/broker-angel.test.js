@@ -578,6 +578,19 @@ describe('Angel One adapter', () => {
       status: 502,
     });
   });
+
+  it('treats SmartAPI’s rate-limit 403 as a rate limit and keeps the connection', async () => {
+    const expiresAt = async () =>
+      (await BrokerConnection.findOne({ userId: USER, provider: 'angel' }).lean()).expiresAt;
+    replies['/user/v1/getProfile'] = () =>
+      new Response('Access denied because of exceeding access rate', { status: 403 });
+    await expect(angel.readBalance(USER)).rejects.toMatchObject({ status: 429 });
+    expect((await expiresAt()).getTime()).toBeGreaterThan(Date.now());
+
+    replies['/user/v1/getProfile'] = () => new Response('Forbidden', { status: 403 });
+    await expect(angel.readBalance(USER)).rejects.toMatchObject({ tokenRejected: true });
+    expect((await expiresAt()).getTime()).toBe(0);
+  });
 });
 
 describe('Angel One live orders', () => {

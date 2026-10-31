@@ -9,6 +9,7 @@ import { authorizeMaintenance } from '../services/maintenance/authorize.js';
 import { requireMethod } from '../services/http.js';
 import { placePendingAutoGtts } from '../services/broker/live-orders.js';
 import { reserveAttempts } from '../services/rate-window.js';
+import { getMarketStatus } from '../shared/market.js';
 
 /** GET /api/paper: open and recent closed paper trades, with a summary of the closed ones. */
 export async function list(req, res) {
@@ -42,7 +43,8 @@ export async function remove(req, res) {
 /**
  * POST /api/maintenance/price-checks: places automatic stop/target GTTs for
  * filled live orders, closes paper trades whose stop or target was crossed and
- * fires price alerts. At most one run starts every 4 minutes (the job runs every 5).
+ * fires price alerts (those two only while the market is open). At most one run starts every
+ * 4 minutes (the job runs every 5).
  */
 export async function runPriceChecks(req, res) {
   res.setHeader('Cache-Control', 'private, no-store');
@@ -56,7 +58,11 @@ export async function runPriceChecks(req, res) {
     });
     return;
   }
-  // Real-money stops and targets first; paper trades and alerts can wait.
+  // Real-money stops and targets first, at any hour (a GTT placed after the close still guards
+  // the next session); paper trades and alerts can wait.
   const autoGtt = await placePendingAutoGtts();
+  // Outside market hours prices are stale: no paper exits or alerts on them.
+  const market = getMarketStatus();
+  if (market !== 'open') return res.json({ market, autoGtt });
   res.json({ paper: await paper.checkAllPaperTrades(), alerts: await checkAllAlerts(), autoGtt });
 }

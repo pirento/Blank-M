@@ -42,22 +42,31 @@ async function refresh(provider, loadAll) {
     stored += batch.length;
     batch = [];
   };
-  for await (const item of await loadAll()) {
-    const row = {
-      exchange: text(item?.exchange).trim().toUpperCase(),
-      symbol: text(item?.symbol).trim().toUpperCase(),
-      token: text(item?.token).trim(),
-      isin: /^[A-Z0-9]{12}$/.test(item?.isin ?? '') ? item.isin : null,
-      lotSize: positive(item?.lotSize),
-      tickSize: positive(item?.tickSize),
-    };
-    // One unreadable row must not cost the member every other instrument.
-    if (!row.exchange || !row.symbol || !row.token) continue;
-    batch.push(row);
-    if (batch.length >= BATCH_SIZE) await flush();
+  try {
+    for await (const item of await loadAll()) {
+      const row = {
+        exchange: text(item?.exchange).trim().toUpperCase(),
+        symbol: text(item?.symbol).trim().toUpperCase(),
+        token: text(item?.token).trim(),
+        isin: /^[A-Z0-9]{12}$/.test(item?.isin ?? '') ? item.isin : null,
+        lotSize: positive(item?.lotSize),
+        tickSize: positive(item?.tickSize),
+      };
+      // One unreadable row must not cost the member every other instrument.
+      if (!row.exchange || !row.symbol || !row.token) continue;
+      batch.push(row);
+      if (batch.length >= BATCH_SIZE) await flush();
+    }
+    if (batch.length) await flush();
+    if (!stored) throw new MarketDataError(`The ${provider} instrument list was empty.`, 502);
+  } catch (error) {
+    // A partial list must not pass for a fresh one: the next lookup retries once the lock lapses.
+    await BrokerInstrument.updateMany(
+      { provider, updatedAt: { $gte: startedAt } },
+      { $set: { updatedAt: new Date(0) } },
+    );
+    throw error;
   }
-  if (batch.length) await flush();
-  if (!stored) throw new MarketDataError(`The ${provider} instrument list was empty.`, 502);
   // Only after a complete refresh: rows the broker no longer lists (expired or delisted).
   await BrokerInstrument.deleteMany({ provider, updatedAt: { $lt: startedAt } });
   return true;
@@ -67,9 +76,10 @@ async function refresh(provider, loadAll) {
  * The cached `{ provider, exchange, symbol, token, isin, lotSize, tickSize, updatedAt }` row, or
  * null when the broker does not list it. When `provider`'s cache is missing or older than a day,
  * `loadAll()` (an array or async iterable of `{ exchange, symbol, token, isin?, lotSize?,
- * tickSize? }` from the broker's instrument master) refreshes all of its rows first: one refresh
- * per broker at a time in this process, and across processes. A failed refresh keeps the old rows
- * (and throws only when there are none).
+ * tickSize? }` from the broker's instrument master) refreshes all of its rows: one refresh per
+ * broker at a time in this process, and across processes. Only a missing cache waits for it; a
+ * day-old one answers at once and refreshes in the background. A failed refresh keeps the old
+ * rows (and throws only when there are none).
  */
 export async function brokerInstrument(provider, exchange, symbol, loadAll) {
   const oldest = await BrokerInstrument.findOne({ provider }, { updatedAt: 1 })
@@ -81,19 +91,21 @@ export async function brokerInstrument(provider, exchange, symbol, loadAll) {
       run = refresh(provider, loadAll).finally(() => refreshing.delete(provider));
       refreshing.set(provider, run);
     }
-    try {
-      if (!(await run) && !oldest) {
+    if (!oldest) {
+      if (!(await run)) {
         throw new MarketDataError(
           'The broker instrument list is being loaded. Try again in a minute.',
           503,
         );
       }
-    } catch (error) {
-      if (!oldest) throw error;
-      log.warn('instrument refresh failed; using the cached list', {
-        provider,
-        reason: error?.message,
-      });
+    } else {
+      // An order is waiting on this lookup: answer from the cached rows, refresh behind it.
+      run.catch((error) =>
+        log.warn('instrument refresh failed; using the cached list', {
+          provider,
+          reason: error?.message,
+        }),
+      );
     }
   }
   return BrokerInstrument.findById(

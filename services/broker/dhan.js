@@ -67,12 +67,7 @@ export function dhanPost(path, token, body) {
  */
 export function dhanHoldings(token) {
   return dhanGet('/holdings', token).catch((error) => {
-    const emptyDemat =
-      error.body &&
-      (error.body.errorCode === 'DH-1111' ||
-        error.httpStatus < 500 ||
-        /holding/i.test(JSON.stringify(error.body)));
-    if (error.tokenRejected || !emptyDemat) throw error;
+    if (error.tokenRejected || error.body?.errorCode !== 'DH-1111') throw error;
     log.info('dhan holdings empty', { error: errorName(error) });
     return [];
   });

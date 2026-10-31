@@ -95,10 +95,9 @@ export async function savePlan(actor, changes) {
   if (changes.enabled !== undefined) next.enabled = changes.enabled === true;
   // Switching billing off would hide members' Cancel button while Razorpay keeps charging them.
   if (current.enabled && !next.enabled) {
+    // Not 'created': an abandoned checkout never charges, and Razorpay expires it.
     const paying = await Subscription.countDocuments({
-      razorpayStatus: {
-        $in: ['created', 'authenticated', 'active', 'pending', 'halted', 'paused'],
-      },
+      razorpayStatus: { $in: ['authenticated', 'active', 'pending', 'halted', 'paused'] },
     });
     if (paying) {
       throw new HttpError(

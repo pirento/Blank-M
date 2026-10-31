@@ -510,3 +510,20 @@ describe('strategy stages', () => {
     ).toBe(400);
   });
 });
+
+describe('caching', () => {
+  it('never stores signed-in pages, and revalidates scripts on every load', async () => {
+    const { agent } = await member();
+    const page = await agent.get('/journal');
+    expect(page.status).toBe(200);
+    // The page embeds the trade book; Back after sign-out must not show it from cache.
+    expect(page.headers['cache-control']).toBe('private, no-store');
+    for (const path of ['/js/core/shell.js', '/shared/csv.js', '/vendor/zod/v3/index.js']) {
+      const script = await agent.get(path);
+      expect(script.status).toBe(200);
+      expect(script.headers['cache-control']).toBe('no-cache');
+      expect((await agent.get(path).set('If-None-Match', script.headers.etag)).status).toBe(304);
+    }
+    expect((await agent.get('/favicon.svg')).headers['cache-control']).not.toBe('no-cache');
+  });
+});

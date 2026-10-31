@@ -313,6 +313,11 @@ describe('CSV formula neutralization and numeric export', () => {
         '',
         '',
         '',
+        'EQ',
+        '',
+        '',
+        '',
+        '',
       ],
     ]);
   });

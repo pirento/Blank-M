@@ -205,11 +205,14 @@ describe('trade screenshots in S3', () => {
     const orphan = await shot(user);
     const fresh = await shot(user);
     await Trade.collection.insertOne({ _id: tradeId, userId: user, screenshotPath: current });
-    for (const path of [current, replaced, orphan]) {
+    // Someone else's objects in a shared bucket, even under a member-like folder, are not ours.
+    const foreign = ['backups/db.tar', `${user}/notes.txt`, `${user}/${tradeId}/x/y`];
+    for (const key of foreign) objects.set(key, { body: PNG, type: 'text/plain' });
+    for (const path of [current, replaced, orphan, ...foreign]) {
       objects.get(path).modified = new Date(Date.now() - 2 * 86_400_000);
     }
     expect(await removeOrphanScreenshots()).toEqual({ deleted: 2, moreMayRemain: false });
-    expect([...objects.keys()].sort()).toEqual([current, fresh].sort());
+    expect([...objects.keys()].sort()).toEqual([current, fresh, ...foreign].sort());
   });
 
   it('copies GridFS screenshots to S3, skips copies already there, and deletes only with remove', async () => {

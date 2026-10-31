@@ -10,6 +10,8 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
+      # Inside the container (.env.production.example's 127.0.0.1 would refuse the port mapping).
+      HOST: 0.0.0.0
       MONGODB_URI: mongodb://mongo:27017/blank?replicaSet=rs0
       # The app listens on localhost only; put Nginx (HTTPS) in front of it.
       # Production session cookies are Secure, so sign-in needs HTTPS.

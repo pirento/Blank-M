@@ -177,8 +177,8 @@ strategyForm.addEventListener('submit', async (event) => {
       strategyForm.elements[key].value = '';
     notify('Strategy saved.', 'success');
     paintLists();
-    // The trade form's strategy picker must list the new strategy.
-    mountTradeForm();
+    // Added in place: remounting would wipe a half-typed trade.
+    $('[data-trade-form]').querySelector('form')?.addStrategy(result.strategy);
   } catch (error) {
     notifyError(error, 'Could not save the strategy.');
   } finally {

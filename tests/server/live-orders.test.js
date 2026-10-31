@@ -40,7 +40,7 @@ const { calculateRiskPlan } = await import('../../shared/risk-calculator.js');
 const { DEFAULT_CHARGES } = await import('../../shared/types.js');
 const { currentStep, totpCode } = await import('../../services/auth/totp.js');
 const { placePendingAutoGtts } = await import('../../services/broker/live-orders.js');
-const { BrokerConnection } = await import('../../models/index.js');
+const { BrokerConnection, LiveOrder } = await import('../../models/index.js');
 
 let app;
 beforeAll(async () => {
@@ -433,6 +433,26 @@ describe('automatic stop-loss and target', () => {
     expect(broker.gtt).not.toHaveBeenCalled();
     expect(telegram.sent.at(-1).text).toMatch(
       /NOT placed: The entry order is not completely filled/,
+    );
+    const listed = (await account.agent.get('/api/live-orders')).body.orders[0];
+    expect(listed.gtt).toMatchObject({ status: 'rejected' });
+    expect(await placePendingAutoGtts()).toMatchObject({ checked: 0 });
+  });
+
+  it('warns on Telegram once a past day’s entry still cannot be confirmed', async () => {
+    const account = await trader();
+    const plan = await syncedPlan(account, { product: 'CNC' });
+    await place(account, plan, { autoStopTarget: true });
+    broker.read.mockRejectedValue(new Error('order not found'));
+    expect(await placePendingAutoGtts()).toMatchObject({ waiting: 1, failed: 0 });
+    expect(telegram.sent).toEqual([]);
+
+    // The next trading day: the read can no longer succeed, so the member is told.
+    await LiveOrder.updateMany({}, { $set: { tradingDate: '2020-01-02' } });
+    expect(await placePendingAutoGtts()).toMatchObject({ waiting: 0, failed: 1 });
+    expect(broker.gtt).not.toHaveBeenCalled();
+    expect(telegram.sent.at(-1).text).toMatch(
+      /NOT placed: Its entry fill could not be confirmed on its trading day \(2020-01-02\)/,
     );
     const listed = (await account.agent.get('/api/live-orders')).body.orders[0];
     expect(listed.gtt).toMatchObject({ status: 'rejected' });

@@ -32,6 +32,10 @@ const DAY_MS = 24 * 60 * 60_000;
 const LIVE_STATUSES = ['created', 'authenticated', 'active', 'pending'];
 // Renewals that failed (halted/paused) can still charge when an old invoice is paid; cancel those too.
 const CANCELLABLE_STATUSES = [...LIVE_STATUSES, 'halted', 'paused'];
+const day = (date) =>
+  new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeZone: 'Asia/Kolkata' }).format(
+    new Date(date),
+  );
 
 /**
  * The Razorpay plan for the current price, created on first use, after a price change or after
@@ -76,10 +80,21 @@ export async function startCheckout(user) {
     { $set: { razorpayStatus: 'creating' } },
   ).lean();
   if (!claimed) {
-    const sub = await Subscription.findById(user._id).lean();
-    if (sub?.razorpayStatus === 'created' && sub.checkoutUrl) return { url: sub.checkoutUrl };
+    let sub = await Subscription.findById(user._id).lean();
+    if (sub?.razorpayStatus === 'created' && sub.checkoutUrl) {
+      // Razorpay expires an unpaid checkout: reuse the link only while it is still open.
+      sub = await applySubscriptionEntity(await fetchSubscription(sub.razorpaySubscriptionId));
+      if (sub?.razorpayStatus === 'created' && sub.checkoutUrl) return { url: sub.checkoutUrl };
+      if (sub && !LIVE_STATUSES.includes(sub.razorpayStatus)) return startCheckout(user);
+    }
     if (sub?.razorpayStatus === 'creating') {
       throw new HttpError('Your payment page is being prepared. Try again in a moment.', 409);
+    }
+    if (sub?.cancelAtPeriodEnd && sub.paidUntil) {
+      throw new HttpError(
+        `${plan.name} ends on ${day(sub.paidUntil)}. You can subscribe again then.`,
+        409,
+      );
     }
     throw new HttpError('You already have a subscription. It renews every month.', 409);
   }
@@ -117,7 +132,6 @@ export async function startCheckout(user) {
           razorpayStatus: created.status ?? 'created',
           checkoutUrl: created.shortUrl,
           planPrice: plan.priceMonthly,
-          cancelAtPeriodEnd: false,
         },
       },
     );
@@ -163,6 +177,14 @@ async function applySubscriptionEntity(entity) {
     ...(paid ? { $max: { paidUntil: new Date(entity.current_end * 1000) } } : {}),
   };
   const ours = await Subscription.findOne({ razorpaySubscriptionId: entity.id }).lean();
+  // Renewal starts once checkout is paid or authorised, not when it opens: an abandoned checkout
+  // never shows "renews" or counts in MRR. Later updates keep a member's "Cancel renewal".
+  if (
+    ['authenticated', 'active'].includes(status) &&
+    [undefined, null, 'created', 'creating'].includes(ours?.razorpayStatus)
+  ) {
+    update.$set.cancelAtPeriodEnd = false;
+  }
   if (ours) {
     if (!(FINAL_STATUSES.includes(ours.razorpayStatus) && !FINAL_STATUSES.includes(status))) {
       update.$set.razorpayStatus = status;
@@ -304,7 +326,14 @@ export async function endSubscriptionNow(userId) {
   if (!sub?.razorpaySubscriptionId || !CANCELLABLE_STATUSES.includes(sub.razorpayStatus)) {
     return false;
   }
-  const entity = await cancelSubscription(sub.razorpaySubscriptionId, { immediately: true });
+  // Razorpay refuses to cancel one that already ended (e.g. an expired checkout): carry on then.
+  const entity = await cancelSubscription(sub.razorpaySubscriptionId, { immediately: true }).catch(
+    async (error) => {
+      const old = await fetchSubscription(sub.razorpaySubscriptionId);
+      if (CANCELLABLE_STATUSES.includes(old?.status)) throw error;
+      return old;
+    },
+  );
   await applySubscriptionEntity(entity);
   await Subscription.updateOne({ _id: userId }, { $set: { cancelAtPeriodEnd: true } });
   return true;

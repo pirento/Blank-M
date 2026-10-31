@@ -102,7 +102,7 @@
           <tr><td colspan="2" class="right">IGST @ <%= invoice.rate %>%</td><td class="num"><%= formatCurrency(invoice.igst) %></td></tr>
           <% } else if (taxed) { %>
           <tr><td colspan="2" class="right">CGST @ <%= invoice.rate / 2 %>%</td><td class="num"><%= formatCurrency(invoice.cgst) %></td></tr>
-          <tr><td colspan="2" class="right">SGST @ <%= invoice.rate / 2 %>%</td><td class="num"><%= formatCurrency(invoice.sgst) %></td></tr>
+          <tr><td colspan="2" class="right"><%= stateTax %> @ <%= invoice.rate / 2 %>%</td><td class="num"><%= formatCurrency(invoice.sgst) %></td></tr>
           <% } %>
           <tr class="total"><td colspan="2" class="right">Total (<%= invoice.currency %>)</td><td class="num"><%= formatCurrency(invoice.total) %></td></tr>
         </tbody>

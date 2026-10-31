@@ -14,7 +14,8 @@ import { isSafeOwnerStoragePath } from '../services/storage-path.js';
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** Bucket → how long its files are kept. */
 const RETENTION_MS = { 'voice-notes': DAY_MS, statements: 7 * DAY_MS };
-const BATCH_SIZE = 100;
+/** Files per bucket per call; the daily script makes up to 20 calls, so 20,000 a day per bucket. */
+const BATCH_SIZE = 1000;
 const candidateSchema = z.object({
   id: z.string().regex(/^[a-f0-9]{24}$/),
   name: z.string().min(1).max(1024),

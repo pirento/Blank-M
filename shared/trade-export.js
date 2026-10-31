@@ -23,6 +23,12 @@ export function buildTradesCsv(trades) {
     'Stop-loss',
     'Entered at',
     'Exited at',
+    // Contract details, so a re-imported F&O trade keeps its segment (shared/csv.js reads them).
+    'Segment',
+    'Strike',
+    'Option type',
+    'Expiry',
+    'Lot size',
   ];
   const rows = trades.map((trade) => [
     csvTextCell(trade.date),
@@ -38,6 +44,11 @@ export function buildTradesCsv(trades) {
     trade.stopLoss ?? '',
     csvTextCell(trade.entryTime ?? ''),
     csvTextCell(trade.exitTime ?? ''),
+    csvTextCell(trade.segment ?? 'EQ'),
+    trade.strike ?? '',
+    csvTextCell(trade.optionType ?? ''),
+    csvTextCell(trade.expiry ?? ''),
+    trade.lotSize ?? '',
   ]);
   return [header, ...rows].map((row) => row.join(',')).join('\n');
 }

@@ -135,9 +135,9 @@ export function startTrueDataFeed({ WebSocketImpl = globalThis.WebSocket } = {})
   /** Subscribes to newly wanted symbols and drops ones nobody watches any more. */
   async function syncSymbols() {
     if (socket?.readyState !== 1) return;
-    // The most recently wanted first, so the same symbols stay within the plan's limit.
+    // Symbols open pages stream first (by wantedAt), then one-off quotes, within the plan's limit.
     const rows = await LiveSubscription.find({ expiresAt: { $gt: new Date() } }, { _id: 1 })
-      .sort({ expiresAt: -1 })
+      .sort({ wantedAt: -1, expiresAt: -1 })
       .limit(MAX_SYMBOLS)
       .lean();
     const wanted = new Set(rows.map((row) => row._id));

@@ -218,9 +218,8 @@ function mountBilling() {
     const { membership, plan, payments, freeUsage = {} } = info;
     // Any live Razorpay subscription can be cancelled, whatever gives Premium right now (a grant,
     // the trial, or nothing while a failed charge is being retried).
-    const renewing =
-      ['authenticated', 'active', 'pending'].includes(membership.razorpayStatus) &&
-      !membership.cancelAtPeriodEnd;
+    const live = ['authenticated', 'active', 'pending'].includes(membership.razorpayStatus);
+    const renewing = live && !membership.cancelAtPeriodEnd;
     const subscribe = button(
       state.busy ? 'Opening payment page…' : `Subscribe — ${rupees(plan.priceMonthly)}/month`,
       {
@@ -290,7 +289,17 @@ function mountBilling() {
           h(
             'div',
             { class: 'flex flex-wrap gap-2' },
-            renewing ? cancel : subscribe,
+            renewing
+              ? cancel
+              : // Renewal cancelled: Razorpay refuses a second subscription until this one ends.
+                live
+                ? statusLine(
+                    t('{plan} ends on {date}. You can subscribe again then.', {
+                      plan: plan.name,
+                      date: day(membership.paidUntil),
+                    }),
+                  )
+                : subscribe,
             button('Refresh status', {
               variant: 'ghost',
               disabled: state.busy,

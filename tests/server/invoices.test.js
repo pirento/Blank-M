@@ -251,6 +251,16 @@ describe('GST invoices', () => {
       'Pirento Group LLP',
     );
 
+    // A seller in a union territory without a legislature charges UTGST, not SGST.
+    const chandigarh = { code: '04', name: 'Chandigarh' };
+    await Invoice.updateOne(
+      { number },
+      { $set: { 'seller.state': chandigarh, placeOfSupply: chandigarh } },
+    );
+    const ut = (await buyer.agent.get(`/billing/invoices/${number}`)).text;
+    expect(ut).toContain('UTGST @ 9%');
+    expect(ut).not.toContain('SGST @');
+
     const stranger = await member('other@example.com');
     expect((await stranger.agent.get(`/billing/invoices/${number}`)).status).toBe(404);
     expect((await request(app).get(`/billing/invoices/${number}`)).status).toBe(302);

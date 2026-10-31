@@ -279,7 +279,8 @@ install can keep them in S3-compatible storage instead of MongoDB: AWS S3, Cloud
 DigitalOcean Spaces, Wasabi or MinIO. Statements and voice notes are temporary and stay in MongoDB.
 
 1. Create a **private** bucket (no public access: the app checks the owner and streams each image
-   itself).
+   itself). Use a dedicated bucket for screenshots only, not one shared with other apps or backups:
+   the app lists the whole bucket and its cleanup deletes leftover screenshot files in it.
 2. Create an access key that can use **only that bucket**: list, read, write and delete objects. On
    AWS, an IAM user with `s3:ListBucket` on `arn:aws:s3:::<bucket>` and `s3:GetObject`,
    `s3:PutObject`, `s3:DeleteObject` on `arn:aws:s3:::<bucket>/*`; on R2, an API token with

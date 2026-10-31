@@ -575,10 +575,14 @@ export async function placePendingAutoGtts({ limit = 100 } = {}) {
         if (error?.claimLost) continue;
         // Still filling, or the broker/the quote briefly unreachable: try on the next check.
         if (error?.pending || error?.status === 503) {
-          counts.waiting += 1;
-          continue;
-        }
-        problem = error instanceof Error ? error.message : 'The GTT failed.';
+          // Once its trading day is over the order cannot fill or (often) be read any more:
+          // report it rather than wait until it silently leaves the window.
+          if (order.tradingDate >= todayInIst()) {
+            counts.waiting += 1;
+            continue;
+          }
+          problem = `Its entry fill could not be confirmed on its trading day (${order.tradingDate}).`;
+        } else problem = error instanceof Error ? error.message : 'The GTT failed.';
       }
     }
     if (problem) {

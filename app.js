@@ -45,9 +45,18 @@ export function createApp({ sessionStore } = {}) {
     res.type('application/manifest+json').sendFile(path.join(root, 'public/manifest.webmanifest'));
   });
   const staticOptions = { maxAge: env.isProduction ? '1h' : 0, index: false };
-  app.use(express.static(path.join(root, 'public'), staticOptions));
-  app.use('/shared', express.static(path.join(root, 'shared'), staticOptions));
-  app.use('/vendor/zod', express.static(packageDirectory('zod'), staticOptions));
+  // Modules and styles have unversioned URLs: revalidate each load (a 304 via ETag), so a page
+  // never mixes HTML from one deploy with scripts from another.
+  const revalidate = (res) => res.setHeader('Cache-Control', 'no-cache');
+  const codeOptions = { ...staticOptions, setHeaders: revalidate };
+  app.use(
+    express.static(path.join(root, 'public'), {
+      ...staticOptions,
+      setHeaders: (res, file) => /\.(m?js|css)$/.test(file) && revalidate(res),
+    }),
+  );
+  app.use('/shared', express.static(path.join(root, 'shared'), codeOptions));
+  app.use('/vendor/zod', express.static(packageDirectory('zod'), codeOptions));
   const vendorFiles = {
     'chart.umd.min.js': path.join(packageDirectory('chart.js'), 'dist/chart.umd.min.js'),
     'jspdf.umd.min.js': path.join(packageDirectory('jspdf'), 'dist/jspdf.umd.min.js'),
