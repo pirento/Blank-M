@@ -23,7 +23,7 @@ import { env } from '../config/env.js';
 import { clientAddress } from '../services/http.js';
 import { loadPlan } from '../services/billing/plan.js';
 import { isMailConfigured } from '../services/mailer.js';
-import { welcomeMember } from '../services/notifications/emails.js';
+import { passwordChangedEmail, welcomeMember } from '../services/notifications/emails.js';
 import { submitAccessRequest } from '../services/admin/access-requests.js';
 
 /** Password sign-in with an invited email or a claimed username. */
@@ -38,7 +38,7 @@ export async function login(req, res) {
     throw new HttpError('Administrators sign in with Google on the admin sign-in page.', 403);
   }
   await establishSession(req, user, { method: 'password' });
-  await recordSignIn(user);
+  await recordSignIn(user, req.get('user-agent'));
   res.json({ ok: true, mfaRequired: user.hasVerifiedFactor(), csrfToken: req.session.csrfToken });
 }
 
@@ -140,6 +140,7 @@ export async function setPassword(req, res) {
   const activating = Boolean(req.session.auth?.activation) && !user.emailConfirmedAt;
   await updatePassword(user, req.body?.password);
   if (activating) void welcomeMember(user).catch(() => undefined);
+  else void passwordChangedEmail(user, { added: !user.passwordHash });
   // Other sessions authenticated with the old password are ended.
   await revokeUserSessions(user._id, req.sessionID);
   req.session.auth.passwordRecovery = false;
@@ -263,7 +264,7 @@ export async function googleCallback(req, res) {
     );
     if (await accessProblem(user)) return res.redirect(`${loginPage}?error=invite_only`);
     await establishSession(req, user, { method: 'oauth' });
-    await recordSignIn(user);
+    await recordSignIn(user, req.get('user-agent'));
     if (firstSignIn) void welcomeMember(user).catch(() => undefined);
     // An administrator with an authenticator still has to enter its code (the /admin guard asks).
     res.redirect(expected.forAdmin ? '/admin' : '/dashboard');

@@ -1,0 +1,24 @@
+<% const what = list === 'weekly' ? t('the weekly report email') : t('newsletters and announcements'); %>
+<!doctype html>
+<html lang="<%= lang %>">
+  <head>
+    <%- include('../partials/head') %>
+  </head>
+  <body>
+    <main class="flex min-h-dvh flex-col items-center justify-center gap-4 bg-canvas px-6 text-center text-fg">
+      <%- include('../partials/brand') %>
+      <% if (done) { %>
+        <h1 class="mt-4 text-xl font-semibold"><%= t('You are unsubscribed') %></h1>
+        <p role="status" class="max-w-md text-sm text-muted"><%= t('You will no longer get') %> <%= what %>. <%= t('You can turn it back on any time in Settings → Email reports.') %></p>
+        <a href="/" class="<%= buttonClass('outline') %>"><%= t('Go home') %></a>
+      <% } else { %>
+        <h1 class="mt-4 text-xl font-semibold"><%= t('Unsubscribe') %></h1>
+        <p class="max-w-md text-sm text-muted"><%= t('Stop getting') %> <%= what %>? <%= t('Emails about your account, sign-ins and payments still arrive.') %></p>
+        <form method="post" action="/email/unsubscribe">
+          <input type="hidden" name="t" value="<%= token %>" />
+          <button type="submit" class="<%= buttonClass() %>"><%= t('Unsubscribe') %></button>
+        </form>
+      <% } %>
+    </main>
+  </body>
+</html>

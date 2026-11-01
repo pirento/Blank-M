@@ -224,7 +224,8 @@ describe('GST invoices', () => {
       placeOfSupply: { code: '27', name: 'Maharashtra' },
       buyer: { name: 'Ravi Traders', email: 'member@example.com' },
     });
-    await vi.waitFor(() => expect(mails.at(-1)?.subject).toMatch(/Payment received/));
+    // The first charge of a subscription is a welcome that carries the invoice link.
+    await vi.waitFor(() => expect(mails.at(-1)?.subject).toBe('Welcome to Premium'));
     expect(mails.at(-1).text).toContain(`http://blank.test/billing/invoices/${number}`);
 
     expect((await buyer.agent.get('/api/billing')).body.payments[0].invoice).toBe(number);

@@ -20,6 +20,8 @@ router.get('/invite', pages.invite);
 router.get('/:page(terms|privacy|disclaimer|refunds|contact)', wrap(pages.legal));
 router.get('/auth/link/:purpose(activate|recover)', pages.authLink);
 router.get('/share/:token', wrap(pages.sharedJournal));
+router.get('/email/unsubscribe', wrap(pages.emailUnsubscribe));
+router.post('/email/unsubscribe', wrap(pages.emailUnsubscribe));
 
 const CHARTS = ['chart.umd.min.js'];
 const PDF = ['jspdf.umd.min.js', 'html-to-image.js'];

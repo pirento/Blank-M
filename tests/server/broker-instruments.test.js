@@ -65,8 +65,10 @@ describe('broker instrument cache', () => {
     }
     // The lookup answers from the day-old row; the refresh lands behind it.
     expect(await brokerInstrument('upstox', 'NSE', 'SYM0', next)).toMatchObject({ token: '1000' });
-    await vi.waitFor(async () =>
-      expect(await BrokerInstrument.countDocuments({ provider: 'upstox' })).toBe(2),
+    // The refresh runs in the background; under a busy test run it can take more than a second.
+    await vi.waitFor(
+      async () => expect(await BrokerInstrument.countDocuments({ provider: 'upstox' })).toBe(2),
+      { timeout: 10_000 },
     );
     const row = await BrokerInstrument.findById('upstox:NSE:SYM0').lean();
     expect(row).toMatchObject({ token: '9000', isin: 'INE009A01021', lotSize: null });
@@ -101,8 +103,9 @@ describe('broker instrument cache', () => {
     expect(await brokerInstrument('angel', 'NSE', 'SYM0', slow)).toMatchObject({ token: '1000' });
     await vi.waitFor(() => expect(slow).toHaveBeenCalledOnce());
     release(master(2));
-    await vi.waitFor(async () =>
-      expect(await BrokerInstrument.countDocuments({ provider: 'angel' })).toBe(2),
+    await vi.waitFor(
+      async () => expect(await BrokerInstrument.countDocuments({ provider: 'angel' })).toBe(2),
+      { timeout: 10_000 },
     );
   });
 
@@ -121,8 +124,9 @@ describe('broker instrument cache', () => {
     await RateWindow.deleteMany({});
     const loadAll = vi.fn(async () => master(1500));
     await brokerInstrument('fyers', 'NSE', 'SYM0', loadAll);
-    await vi.waitFor(async () =>
-      expect(await BrokerInstrument.countDocuments({ provider: 'fyers' })).toBe(1500),
+    await vi.waitFor(
+      async () => expect(await BrokerInstrument.countDocuments({ provider: 'fyers' })).toBe(1500),
+      { timeout: 10_000 },
     );
     expect(loadAll).toHaveBeenCalledOnce();
   });

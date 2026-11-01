@@ -34,6 +34,8 @@ const origin = () => {
   }
 };
 
+const shortened = (text) => `${text.slice(0, 300)}${text.length > 300 ? '…' : ''}`;
+
 function toReport(row) {
   return {
     id: row._id,
@@ -49,7 +51,7 @@ function toReport(row) {
   };
 }
 
-/** Saves a member's report (at most 5 an hour) and tells the administrators. */
+/** Saves a member's report (at most 5 an hour), confirms it to the member and tells the administrators. */
 export async function submitProblemReport(user, input) {
   const parsed = reportSchema.safeParse(input ?? {});
   if (!parsed.success) throw new HttpError(parsed.error.issues[0].message, 400);
@@ -60,6 +62,16 @@ export async function submitProblemReport(user, input) {
     email: user.email,
     ...parsed.data,
   });
+  await sendQuietly(report.email, 'We received your problem report', [
+    'Thank you for telling us. Your report has reached the Pirento Blank team.',
+    '',
+    `Topic: ${CATEGORY_LABELS[report.category]}`,
+    '',
+    'What you wrote:',
+    quote(shortened(report.message)),
+    '',
+    'What happens next: we read every report and will email you here when it is fixed, or sooner if we need more detail. There is no need to send it again.',
+  ]);
   const admins = await User.find({ role: 'admin', status: 'active' }, { email: 1 }).lean();
   await Promise.all(
     admins.map((admin) =>
@@ -112,7 +124,7 @@ export async function resolveProblemReport(id, input, actor) {
     note ? `\nWhat we did:\n${quote(note)}` : null,
     '',
     'Your report:',
-    quote(`${report.message.slice(0, 300)}${report.message.length > 300 ? '…' : ''}`),
+    quote(shortened(report.message)),
     '',
     'If it still happens, reply to this email or send a new report from Settings.',
   ]);

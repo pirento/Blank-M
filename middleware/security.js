@@ -57,6 +57,8 @@ const CSRF_EXEMPT = new Set([
   '/api/maintenance/premarket-plan',
   '/api/telegram/webhook',
   '/api/invitations/accept',
+  // Mail providers' one-click unsubscribe has no session; the signed token authorizes it.
+  '/email/unsubscribe',
 ]);
 
 function sameToken(expected, received) {

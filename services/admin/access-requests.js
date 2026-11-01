@@ -11,6 +11,7 @@ import { reserveAttempts } from '../rate-window.js';
 import { opaque } from '../auth/accounts.js';
 import { sendQuietly } from '../notifications/emails.js';
 import { quote } from '../notifications/email-layout.js';
+import { env } from '../../config/env.js';
 
 const KEEP_DECIDED_MS = 90 * 24 * 60 * 60_000;
 
@@ -111,8 +112,14 @@ export async function submitAccessRequest(input, clientAddress) {
   void sendQuietly(request.email, 'We received your request to join Pirento Blank', [
     `Hi ${request.name},`,
     '',
-    'Thank you for your interest in Pirento Blank. Your request has reached our team.',
-    'When it is approved you will get another email with your sign-in details: you can sign in with the Google account for this address, or choose a password.',
+    'Thank you for asking to join Pirento Blank. Your request has reached our team.',
+    '',
+    'What happens next:',
+    '- We review every request by hand, usually within 2 working days.',
+    `- If it is approved, you get an email with a link to choose your password${env.googleAuthEnabled ? ', or you can sign in with the Google account for this address' : ''}.`,
+    '- If we cannot offer a place right now, we will tell you by email.',
+    '',
+    'There is nothing else you need to do for now.',
     '',
     'If you did not make this request, ignore this email and nothing will happen.',
   ]);
@@ -183,8 +190,15 @@ export async function finishAccessDecision(request, status, actor) {
     await sendQuietly(request.email, 'About your request to join Pirento Blank', [
       `Hi ${request.name},`,
       '',
-      'Thank you for your interest in Pirento Blank. We are not able to open an account for you right now.',
-      'This is usually because we are admitting a limited number of members at a time. You are welcome to ask again later.',
+      'Thank you for your interest in Pirento Blank, and for taking the time to ask.',
+      '',
+      'We are not able to offer you a place right now. We admit a limited number of members at a time so that we can look after everyone well; it is not a judgement about you or your trading.',
+      '',
+      'You are welcome to apply again later from our home page.',
+      origin() ? `Apply again later: ${origin()}/` : null,
+      '',
+      'Thank you again,',
+      'The Pirento Blank team',
     ]);
   }
 }

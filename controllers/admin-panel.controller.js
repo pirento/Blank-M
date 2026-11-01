@@ -91,7 +91,7 @@ export const ADMIN_PAGES = [
     '/announcements',
     'announcements',
     'Announcements',
-    'Email all members, or only Premium or free.',
+    'Newsletter / announcement email to all members, or only Premium or free.',
   ],
   ['/audit', 'audit', 'Audit log', 'Every change made in the admin panel.'],
 ];

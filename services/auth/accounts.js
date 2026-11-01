@@ -18,6 +18,7 @@ import { HttpError } from '../errors.js';
 import { reserveAttempts } from '../rate-window.js';
 import { sha256Hex } from '../crypto.js';
 import { isMailConfigured, sendMail } from '../mailer.js';
+import { newSignInEmail } from '../notifications/emails.js';
 import { loadPlan } from '../billing/plan.js';
 import { env } from '../../config/env.js';
 import { createLogger, errorName } from '../logger.js';
@@ -221,9 +222,42 @@ export async function revokeUserSessions(userId, exceptSessionId = null) {
   await nativeDb().collection('sessions').deleteMany(filter);
 }
 
-/** Stamps the member's last sign-in time. */
-export async function recordSignIn(user) {
-  await User.updateOne({ _id: user._id }, { $set: { lastSignInAt: new Date() } });
+/**
+ * Stamps the last sign-in time and remembers the device (its coarse label, hashed) among the last
+ * 10, in one update. A device not seen before is emailed about, except on the very first sign-in.
+ */
+export async function recordSignIn(user, userAgent) {
+  const device = describeDevice(userAgent);
+  const hash = opaque('device', device);
+  const before = await User.findOneAndUpdate(
+    { _id: user._id },
+    [
+      {
+        $set: {
+          lastSignInAt: new Date(),
+          knownDevices: {
+            $slice: [
+              {
+                $concatArrays: [
+                  [hash],
+                  {
+                    $filter: {
+                      input: { $ifNull: ['$knownDevices', []] },
+                      cond: { $ne: ['$$this', hash] },
+                    },
+                  },
+                ],
+              },
+              10,
+            ],
+          },
+        },
+      },
+    ],
+    { projection: { knownDevices: 1 } },
+  ).lean();
+  const known = before?.knownDevices ?? [];
+  if (known.length && !known.includes(hash)) void newSignInEmail(user, device);
 }
 
 function appOrigin() {
@@ -327,24 +361,25 @@ export async function sendActivationEmail(user, { selfSignup = false, approved =
     return;
   }
   const token = await issueToken(user, 'activate', ACTIVATION_TTL_MS);
-  const link = `${appOrigin()}/auth/link/activate#token=${token}`;
-  const google = env.googleAuthEnabled
+  const origin = appOrigin();
+  const link = `${origin}/auth/link/activate#token=${token}`;
+  const support = process.env.SUPPORT_EMAIL?.trim();
+  const [subject, intro, expired] = selfSignup
     ? [
-        '',
-        `Sign in with Google: ${appOrigin()}/login`,
-        `Use the Google account for ${user.email}. No password needed.`,
+        'Confirm your Pirento Blank account',
+        'Welcome to Pirento Blank. Please confirm this is your email address.',
+        `If the link has expired, sign up again with this address at ${origin}/signup for a new one.`,
       ]
-    : [];
-  const [subject, intro] = selfSignup
-    ? ['Confirm your Pirento Blank account', 'Welcome to Pirento Blank.']
     : approved
       ? [
           'Your Pirento Blank access is approved',
-          'Good news: your request to join Pirento Blank has been approved.',
+          'Good news: the Pirento Blank team has approved your request to join.',
+          `If the link has expired, ${support ? `write to ${support}` : 'reply to this email'} and we will send you a new one.`,
         ]
       : [
           'Your Pirento Blank invitation',
-          'You have been invited to a private Pirento Blank workspace.',
+          'The Pirento Blank team has invited you to join Pirento Blank, a private, invite-only workspace.',
+          'If the link has expired, ask the person who invited you to send a new invitation.',
         ];
   await sendMail({
     to: user.email,
@@ -352,11 +387,21 @@ export async function sendActivationEmail(user, { selfSignup = false, approved =
     text: [
       intro,
       '',
+      'Pirento Blank is a private journal for Indian traders: plan your trades, record them with real costs and review what works.',
+      '',
       selfSignup
-        ? 'Confirm your email and choose your password within 24 hours:'
-        : 'Choose your password within 24 hours to activate your account:',
+        ? 'Confirm your email and choose your password. The link works once and expires in 24 hours.'
+        : 'Choose your password to activate your account. The link works once and expires in 24 hours.',
       `${selfSignup ? 'Confirm my account' : 'Set my password'}: ${link}`,
-      ...(selfSignup ? [] : google),
+      ...(env.googleAuthEnabled
+        ? [
+            '',
+            `Prefer Google? Sign in with the Google account for ${user.email}; no password needed.`,
+            `Sign in with Google: ${origin}/login`,
+          ]
+        : []),
+      '',
+      expired,
       '',
       selfSignup
         ? 'If you did not sign up, ignore this email and no account will be created.'

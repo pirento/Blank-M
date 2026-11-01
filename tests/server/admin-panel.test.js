@@ -1092,28 +1092,35 @@ describe('member emails', () => {
     expect(mails.at(-1)).toMatchObject({ to: 'member@example.com' });
     expect(mails.at(-1).subject).toMatch(/trial ends/);
 
-    // A charged renewal emails a receipt.
+    // The first charge welcomes the member to Premium; a later renewal emails a receipt.
     await Subscription.updateOne(
       { _id: member.userId },
       { $set: { razorpaySubscriptionId: 'sub_test1' } },
     );
-    await signedWebhook(
-      {
-        event: 'subscription.charged',
-        payload: {
-          subscription: {
-            entity: {
-              id: 'sub_test1',
-              status: 'active',
-              current_end: Math.floor(Date.now() / 1000) + 30 * 86400,
-              paid_count: 1,
+    const charged = (paidCount, paymentId) =>
+      signedWebhook(
+        {
+          event: 'subscription.charged',
+          payload: {
+            subscription: {
+              entity: {
+                id: 'sub_test1',
+                status: 'active',
+                current_end: Math.floor(Date.now() / 1000) + paidCount * 30 * 86400,
+                paid_count: paidCount,
+              },
             },
+            payment: { entity: { id: paymentId, amount: 49900, status: 'captured' } },
           },
-          payment: { entity: { id: 'pay_1', amount: 49900, status: 'captured' } },
         },
-      },
-      'evt_charge',
-    );
+        `evt_${paymentId}`,
+      );
+    await charged(1, 'pay_1');
+    await vi.waitFor(() => expect(mails.at(-1).subject).toBe('Welcome to Premium'));
+    expect(mails.at(-1).text).toContain('Amount paid: ₹499');
+    expect(mails.at(-1).text).toContain('- Backtesting');
+    expect(mails.at(-1).text).toContain('Your payments: http://blank.test/billing');
+    await charged(2, 'pay_2');
     await vi.waitFor(() => expect(mails.at(-1).subject).toMatch(/Payment received/));
 
     // An announcement reaches members who did not opt out.
