@@ -260,22 +260,31 @@ async function applyWebhookEvent(event) {
           )?._id
         : null) ??
       null;
-    await Payment.updateOne(
-      { _id: payment.id },
-      {
-        $set: {
-          userId: owner,
-          razorpaySubscriptionId: subscription?.id ?? payment.subscription_id ?? null,
-          amount: payment.amount / 100,
-          currency: payment.currency ?? 'INR',
-          status: String(payment.status ?? 'unknown'),
-          method: payment.method ?? null,
-          paidAt: new Date((payment.created_at ?? Date.now() / 1000) * 1000),
-          ...(payment.status === 'captured' ? { invoiceDue: true } : {}),
+    const status = String(payment.status ?? 'unknown');
+    // Razorpay can deliver events out of order: a payment never moves back from captured or
+    // refunded, and an event that names no member keeps the owner already stored.
+    const later = { refunded: [], captured: ['refunded'] }[status] ?? ['captured', 'refunded'];
+    try {
+      await Payment.updateOne(
+        { _id: payment.id, status: { $nin: later } },
+        {
+          $set: {
+            ...(owner ? { userId: owner } : {}),
+            razorpaySubscriptionId: subscription?.id ?? payment.subscription_id ?? null,
+            amount: payment.amount / 100,
+            currency: payment.currency ?? 'INR',
+            status,
+            method: payment.method ?? null,
+            paidAt: new Date((payment.created_at ?? Date.now() / 1000) * 1000),
+            ...(status === 'captured' ? { invoiceDue: true } : {}),
+          },
         },
-      },
-      { upsert: true },
-    );
+        { upsert: true },
+      );
+    } catch (error) {
+      // The payment exists with a later status: this event is older news.
+      if (error?.code !== 11000) throw error;
+    }
     // The payment counts even if this fails: the invoice is issued when payments are next viewed.
     if (payment.status === 'captured') {
       await issueInvoice(payment.id).catch((error) =>

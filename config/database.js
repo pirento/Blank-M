@@ -30,7 +30,25 @@ export async function connectDatabase(uri = env.mongoUri) {
   await connecting;
   await ensureSessionIndexes();
   await ensureUploadIndexes();
+  await dropRetiredIndexes();
   return mongoose.connection;
+}
+
+/** Indexes nothing queries any more: autoIndex never drops them, and each one costs every write. */
+const RETIRED_INDEXES = [
+  ['brokerinstruments', 'provider_1_token_1'],
+  ['instruments', 'instrumentToken_1'],
+];
+async function dropRetiredIndexes() {
+  for (const [collection, index] of RETIRED_INDEXES) {
+    await mongoose.connection.db
+      .collection(collection)
+      .dropIndex(index)
+      .catch((error) => {
+        // Already gone (27) or the collection does not exist yet (26).
+        if (![26, 27].includes(error?.code)) throw error;
+      });
+  }
 }
 
 /**

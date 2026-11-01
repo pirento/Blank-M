@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getMarketStatus, isMarketOpen, toIst } from '../../shared/market.js';
+import { getMarketStatus, toIst } from '../../shared/market.js';
 
 /** Helper: build a UTC instant. IST is UTC+05:30. */
 function utc(iso) {
@@ -36,7 +36,6 @@ describe('getMarketStatus', () => {
   it('is open during the session on a weekday', () => {
     // 2026-08-10 is a Monday. 05:00 UTC = 10:30 IST.
     expect(getMarketStatus(utc('2026-08-10T05:00:00Z'))).toBe('open');
-    expect(isMarketOpen(utc('2026-08-10T05:00:00Z'))).toBe(true);
   });
 
   it('is closed before the open and after the close', () => {

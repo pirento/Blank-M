@@ -23,6 +23,9 @@ import { HttpError } from '../services/errors.js';
 const sha256 = (value) => createHash('sha256').update(value).digest('hex');
 const iso = (value) => new Date(value).toISOString();
 const SEQUENCE = 'strategy_evidence_revision';
+// Each evidence record can be about 500 KB and a backup loads them all, so a member keeps a bounded set.
+const MAX_EVIDENCE_RECORDS = 100;
+const MAX_EVIDENCE_REVIEWS = 2000;
 
 /** The server's own snapshot of the current draft; key order is fixed for hashing. */
 function researchSnapshot(strategy) {
@@ -120,6 +123,12 @@ export async function saveEvidence(req, res) {
   ) {
     throw new HttpError('Strategy changed. Run a new simulation against the current draft.', 409);
   }
+  if ((await StrategyEvidence.countDocuments({ userId })) >= MAX_EVIDENCE_RECORDS) {
+    throw new HttpError(
+      `Research evidence is full (${MAX_EVIDENCE_RECORDS} records). Contact the administrator.`,
+      409,
+    );
+  }
   let saved;
   try {
     saved = await StrategyEvidence.create({
@@ -207,6 +216,12 @@ export async function appendReview(req, res) {
         409,
       );
     }
+  }
+  if ((await StrategyEvidenceReview.countDocuments({ userId })) >= MAX_EVIDENCE_REVIEWS) {
+    throw new HttpError(
+      `Evidence reviews are full (${MAX_EVIDENCE_REVIEWS.toLocaleString('en-IN')} reviews). Contact the administrator.`,
+      409,
+    );
   }
   const saved = await StrategyEvidenceReview.create({
     _id: input.data.id,

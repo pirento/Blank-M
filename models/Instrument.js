@@ -4,7 +4,7 @@ import mongoose from 'mongoose';
 const instrumentSchema = new mongoose.Schema(
   {
     _id: String, // instrument_key
-    instrumentToken: { type: Number, unique: true, sparse: true },
+    instrumentToken: { type: Number, default: null },
     exchangeToken: { type: Number, default: null },
     exchange: { type: String, required: true },
     segment: { type: String, default: null },

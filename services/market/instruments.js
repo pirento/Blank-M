@@ -117,6 +117,7 @@ export async function refreshInstruments() {
     const rows = parseInstruments(await download());
     if (!rows.length)
       throw new MarketDataError('The instrument master contained no NSE equities.', 502);
+    const startedAt = new Date();
     for (let index = 0; index < rows.length; index += BATCH_SIZE) {
       try {
         await Instrument.bulkWrite(
@@ -148,6 +149,8 @@ export async function refreshInstruments() {
         throw new MarketDataError('Could not store instruments.', 500);
       }
     }
+    // Only after a complete refresh: rows Zerodha no longer lists (delisted, or a new token).
+    await Instrument.deleteMany({ updatedAt: { $lt: startedAt } });
     return rows.length;
   })();
   try {

@@ -103,11 +103,6 @@ export function getMarketStatus(instant = new Date()) {
   return 'open';
 }
 
-/** True only while getMarketStatus reports 'open'. */
-export function isMarketOpen(instant = new Date()) {
-  return getMarketStatus(instant) === 'open';
-}
-
 /** Status text for a getMarketStatus value; undefined for an unknown status. */
 export function describeMarketStatus(status) {
   switch (status) {

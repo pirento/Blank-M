@@ -144,8 +144,9 @@ export async function enroll(req, res) {
   const secret = generateTotpSecret();
   const id = randomUUID();
   const friendlyName = `Blank authenticator ${id.slice(0, 8)}`;
-  await User.updateOne(
-    { _id: user._id },
+  // The filter keeps the cap when two setups start at once.
+  const added = await User.updateOne(
+    { _id: user._id, [`factors.${MAX_FACTORS - 1}`]: { $exists: false } },
     {
       $push: {
         factors: {
@@ -158,6 +159,9 @@ export async function enroll(req, res) {
       },
     },
   );
+  if (!added.modifiedCount) {
+    throw new HttpError(`You can have at most ${MAX_FACTORS} authenticators.`, 409);
+  }
   const uri = otpauthUri({ secret, accountName: user.email });
   const qrCode = await QRCode.toDataURL(uri, { margin: 1, width: 220 });
   res.status(201).json({ id, secret, qrCode, uri });
