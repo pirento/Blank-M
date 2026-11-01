@@ -158,7 +158,7 @@ export default {
       status: STATUSES[order.status] ?? 'open',
       filledQuantity: order.filledQuantity,
       averagePrice: order.averagePrice,
-      message: null,
+      message: order.message,
     };
   },
 

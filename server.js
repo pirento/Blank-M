@@ -8,6 +8,7 @@ import { endLiveQuoteStreams } from './controllers/market.controller.js';
 import { hasOpenAiKey } from './services/ai/openai-key.js';
 import { ensureAiConfiguration } from './services/ai/config.js';
 import { createLogger } from './services/logger.js';
+import { NSE_HOLIDAYS, todayInIst } from './shared/market.js';
 import { startAnnouncementResumer } from './services/admin/announcements.js';
 import {
   applyPlatformSettings,
@@ -42,6 +43,12 @@ async function start() {
     }
     if (!env.sessionSecret) {
       log.warn('SESSION_SECRET is not set. Using a development-only secret.');
+    }
+    const year = todayInIst().slice(0, 4);
+    if (![...NSE_HOLIDAYS].some((date) => date.startsWith(year))) {
+      log.warn(
+        `NSE holidays for ${year} are missing from shared/market.js, so holidays show the market as open. Add the year's NSE holiday list.`,
+      );
     }
   });
   // Outlive Nginx's idle upstream connections (60 s), so it never reuses a socket Node just closed.

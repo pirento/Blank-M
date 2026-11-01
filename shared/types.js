@@ -19,7 +19,7 @@ export const DEFAULT_CHARGES = {
   stampDutyPercent: 0.003,
 };
 
-/** Per-user account settings, stored in Firestore so they follow the user. */
+/** Per-user account settings, stored in MongoDB so they follow the user. */
 
 export const DEFAULT_ACCOUNT_SETTINGS = {
   openingBalance: 100000,
