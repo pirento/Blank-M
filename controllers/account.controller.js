@@ -13,6 +13,7 @@ import {
   revokeUserSessions,
 } from '../services/auth/accounts.js';
 import { deleteMember } from '../services/admin/delete-member.js';
+import { accountDeletedEmail } from '../services/notifications/emails.js';
 import { buildBackup, restoreBackup } from '../services/journal/backup.js';
 import { AccountSettings } from '../models/index.js';
 import { isMailConfigured } from '../services/mailer.js';
@@ -105,6 +106,7 @@ export async function deleteAccount(req, res) {
   }
   await confirmAccountOwner(user, req.member.session, req.body?.currentPassword, 'account-delete');
   await deleteMember(user.email);
+  void accountDeletedEmail(user.email);
   await destroySession(req);
   res.clearCookie(SESSION_COOKIE);
   res.json({ ok: true, redirect: '/' });

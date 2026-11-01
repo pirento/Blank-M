@@ -21,12 +21,42 @@ describe('email layout', () => {
     expect(html).toContain('Hello &lt;you&gt;');
     expect(html).toContain('Line with &lt;b&gt;tags&lt;/b&gt; &amp; more');
     expect(html).toMatch(/<li[^>]*>first<\/li><li[^>]*>second<\/li>/);
-    expect(html).toMatch(/href="https:\/\/blank.test\/dashboard"[^>]*>Open your workspace<\/a>/);
-    expect(html).toMatch(/href="https:\/\/blank.test\/plain"[^>]*>Open link<\/a>/);
+    expect(html).toMatch(
+      /href="https:\/\/blank.test\/dashboard"[^>]*>Open your workspace&nbsp;&rarr;<\/a>/,
+    );
+    expect(html).toMatch(/href="https:\/\/blank.test\/plain"[^>]*>Open link&nbsp;&rarr;<\/a>/);
+    // The first button is solid, later ones are outlined.
+    expect(html.match(/background:#446e47;border:1px solid #446e47;color:#ffffff/g)).toHaveLength(
+      1,
+    );
     expect(html).toContain('https://blank.test/privacy');
     expect(html).not.toContain('<b>');
     // Links elsewhere (for example typed by a visitor) are never buttons or links.
     expect(html).not.toContain('href="https://evil.example');
     expect(html).toContain('Sign in: https://evil.example/login');
+  });
+
+  it('shows figures as a table, codes large, signed amounts coloured and typed words as a quote', () => {
+    const html = emailHtml(
+      'Weekly report',
+      [
+        'Trades: 5',
+        'Net P&L: -₹1,200',
+        'Best day: +₹800',
+        '',
+        'Setup code (valid 15 minutes): 12345678',
+        '',
+        '> <script>alert(1)</script>',
+        '> second line',
+      ].join('\n'),
+    );
+    expect(html).toMatch(
+      /<table[^>]*>.*Trades.*>5<.*Net P&amp;L.*color:#bb3348[^>]*>-₹1,200.*color:#446e47[^>]*>\+₹800/s,
+    );
+    expect(html).toMatch(/letter-spacing:4px[^>]*>12345678</);
+    expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;<br>second line');
+    expect(html).not.toContain('<script>');
+    // The inbox preview is the first line of the email.
+    expect(html).toMatch(/display:none[^>]*>Trades: 5</);
   });
 });

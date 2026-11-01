@@ -4,6 +4,9 @@
 import { siteOrigin } from '../notifications/email-layout.js';
 import { AccountSettings, OrderPlanRecord, Trade, User } from '../../models/index.js';
 import { formatCurrency } from '../../middleware/view-helpers.js';
+
+// A leading + lets the email colour a gain (a loss already starts with -).
+const signed = (amount) => `${amount > 0 ? '+' : ''}${formatCurrency(amount)}`;
 import { pnlBySymbol, summarisePerformance } from '../../shared/pnl.js';
 import {
   inReportPeriod,
@@ -94,9 +97,9 @@ export async function buildWeeklyReport(userId, period) {
     lines.push(
       `Trades: ${summary.totalTrades} (${summary.wins} wins, ${summary.losses} losses)`,
       `Win rate: ${summary.winRate.toFixed(1)}%`,
-      `Gross P&L: ${formatCurrency(summary.grossPnl)}`,
+      `Gross P&L: ${signed(summary.grossPnl)}`,
       `Charges: ${formatCurrency(summary.charges)}`,
-      `Net P&L: ${formatCurrency(summary.netPnl)}`,
+      `Net P&L: ${signed(summary.netPnl)}`,
       `Profit factor: ${summary.profitFactor === null ? 'no losing trades' : summary.profitFactor}`,
     );
     if (best) lines.push(`Best symbol: ${best.key} (${formatCurrency(best.netPnl)})`);

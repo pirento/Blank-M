@@ -167,3 +167,37 @@ export async function sendTrialReminders(now = new Date(), limit = 500) {
   }
   return sent;
 }
+
+/**
+ * Security notice after the password was changed, reset or added (not on first activation), so a
+ * member whose account was taken over finds out. Never throws.
+ */
+export function passwordChangedEmail(user, { added = false } = {}) {
+  const support = process.env.SUPPORT_EMAIL?.trim();
+  return sendQuietly(
+    user.email,
+    added ? 'A password was added to your account' : 'Your password was changed',
+    [
+      added
+        ? 'A password was just added to your Pirento Blank account, so you can now also sign in with it.'
+        : 'The password for your Pirento Blank account was just changed. Your other devices were signed out.',
+      '',
+      `When: ${day(new Date())}`,
+      `Account: ${user.email}`,
+      '',
+      `If this was not you, reset your password now${support ? ` and write to ${support}` : ''}.`,
+      origin() ? `Reset password: ${origin()}/login?mode=reset` : null,
+    ],
+  );
+}
+
+/** Confirms a member's own account deletion (sent after the data is gone). Never throws. */
+export function accountDeletedEmail(email) {
+  return sendQuietly(email, 'Your Pirento Blank account was deleted', [
+    'As you asked, your Pirento Blank account and everything in it were deleted: journal, plans, files, broker links and AI history.',
+    'Payment records are kept only as long as the law requires.',
+    '',
+    'If you change your mind, you are welcome to ask for access again.',
+    origin() ? `Pirento Blank: ${origin()}/` : null,
+  ]);
+}

@@ -23,7 +23,7 @@ import { env } from '../config/env.js';
 import { clientAddress } from '../services/http.js';
 import { loadPlan } from '../services/billing/plan.js';
 import { isMailConfigured } from '../services/mailer.js';
-import { welcomeMember } from '../services/notifications/emails.js';
+import { passwordChangedEmail, welcomeMember } from '../services/notifications/emails.js';
 import { submitAccessRequest } from '../services/admin/access-requests.js';
 
 /** Password sign-in with an invited email or a claimed username. */
@@ -140,6 +140,7 @@ export async function setPassword(req, res) {
   const activating = Boolean(req.session.auth?.activation) && !user.emailConfirmedAt;
   await updatePassword(user, req.body?.password);
   if (activating) void welcomeMember(user).catch(() => undefined);
+  else void passwordChangedEmail(user, { added: !user.passwordHash });
   // Other sessions authenticated with the old password are ended.
   await revokeUserSessions(user._id, req.sessionID);
   req.session.auth.passwordRecovery = false;
