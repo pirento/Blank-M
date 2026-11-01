@@ -7,7 +7,7 @@ import * as paper from '../services/journal/paper.js';
 import { checkAllAlerts } from '../services/notifications/price-alerts.js';
 import { authorizeMaintenance } from '../services/maintenance/authorize.js';
 import { requireMethod } from '../services/http.js';
-import { placePendingAutoGtts } from '../services/broker/live-orders.js';
+import { placePendingAutoGtts } from '../services/broker/live-gtt.js';
 import { reserveAttempts } from '../services/rate-window.js';
 import { getMarketStatus } from '../shared/market.js';
 

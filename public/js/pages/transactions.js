@@ -39,6 +39,8 @@ import { createTradeForm } from '../components/trade-form.js';
 import { openTradeScreenshot } from '../components/trade-screenshot.js';
 import { openTradeReplay } from '../components/trade-replay.js';
 import { createBrokerPortfolio } from '../components/broker-portfolio.js';
+import { confirmDelete } from './transactions/confirm-delete.js';
+import { tradeDetails } from './transactions/trade-details.js';
 
 const data = pageData();
 const ownerId = data.accountId;
@@ -57,7 +59,6 @@ const state = {
   sortKey: 'date',
   sortDirection: 'desc',
   selected: new Set(),
-  busy: false,
   // How many matching rows the ledger shows; "Show more" raises it.
   shown: LEDGER_PAGE_SIZE,
 };
@@ -219,38 +220,6 @@ function openEdit(trade) {
   });
 }
 
-/** Setup tags, mistakes and emotion under the symbol (nothing when none were recorded). */
-function tagLine(trade) {
-  const contract =
-    trade.segment === 'FUT' || trade.segment === 'OPT'
-      ? [
-          trade.segment === 'FUT'
-            ? 'FUT'
-            : `${trade.optionType ?? 'OPT'} ${trade.strike ?? ''}`.trim(),
-          trade.expiry && `exp ${trade.expiry}`,
-          trade.lotSize && `${trade.quantity / trade.lotSize} × ${trade.lotSize}`,
-        ]
-          .filter(Boolean)
-          .join(' · ')
-      : null;
-  const timing =
-    trade.entryTime || trade.exitTime ? `${trade.entryTime ?? '?'}–${trade.exitTime ?? '?'}` : null;
-  const parts = [
-    contract ? h('span', { class: 'text-fg' }, contract) : null,
-    timing ? h('span', { class: 'text-muted' }, timing) : null,
-    trade.stopLoss ? h('span', { class: 'text-muted' }, `SL ${trade.stopLoss}`) : null,
-    trade.exitLegs?.length
-      ? h('span', { class: 'text-muted' }, `${trade.exitLegs.length} exits`)
-      : null,
-    ...(trade.setupTags ?? []).map((tag) => h('span', { class: 'text-accent' }, tag)),
-    ...(trade.mistakeTags ?? []).map((tag) => h('span', { class: 'text-negative' }, tag)),
-    trade.emotion ? h('span', { class: 'text-muted' }, trade.emotion) : null,
-  ].filter(Boolean);
-  return parts.length
-    ? h('div', { class: 'mt-1 flex max-w-56 flex-wrap gap-x-2 text-[11px] font-normal' }, parts)
-    : null;
-}
-
 /** Screenshot dialog; a change replaces the trade in the ledger. */
 function openScreenshot(trade) {
   openTradeScreenshot(trade, {
@@ -261,42 +230,9 @@ function openScreenshot(trade) {
   });
 }
 
-function confirmModal({ title, text, confirmLabel, run }) {
-  openModal({
-    title,
-    content: (close) => {
-      const cancel = button(t('Cancel'), {
-        variant: 'outline',
-        className: 'flex-1',
-        onclick: () => !state.busy && close(),
-      });
-      const confirm = button(confirmLabel, { variant: 'destructive', className: 'flex-1' });
-      confirm.addEventListener('click', async () => {
-        if (state.busy) return;
-        state.busy = true;
-        cancel.disabled = true;
-        confirm.disabled = true;
-        confirm.textContent = 'Deleting…';
-        try {
-          await run();
-        } finally {
-          state.busy = false;
-          close();
-          paint();
-        }
-      });
-      return h(
-        'div',
-        {},
-        h('p', { class: 'mb-6 text-sm text-muted' }, text),
-        h('div', { class: 'flex gap-4' }, cancel, confirm),
-      );
-    },
-  });
-}
-
 function deleteOne(trade) {
-  confirmModal({
+  confirmDelete({
+    onDone: paint,
     title: t('Delete trade'),
     text: `Permanently delete the ${trade.symbol} trade from ${trade.date}? Your balance will be recalculated without it.`,
     confirmLabel: 'Delete',
@@ -320,7 +256,8 @@ function deleteOne(trade) {
  */
 function deleteSelected() {
   const count = state.selected.size;
-  confirmModal({
+  confirmDelete({
+    onDone: paint,
     title: t('Delete trades'),
     text: `Permanently delete ${count} ${count === 1 ? 'trade' : 'trades'}? Your balance will be recalculated without them. This cannot be undone.`,
     confirmLabel: `Delete ${count}`,
@@ -422,7 +359,7 @@ function ledgerTable(rows) {
               'td',
               { class: 'px-4 py-3' },
               h('span', { class: 'font-bold text-fg' }, trade.symbol),
-              tagLine(trade),
+              tradeDetails(trade),
             ),
             h(
               'td',

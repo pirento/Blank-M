@@ -266,6 +266,8 @@ Common browser helpers live in `public/js/core/` (`dom.js` element builder, card
 | `strategy.js`                       | Strategy manager.                                                     |
 | `today.js`                          | Today page                                                            |
 | `transactions.js`                   | The trade ledger.                                                     |
+| `transactions/confirm-delete.js`    | Delete confirmation dialog                                            |
+| `transactions/trade-details.js`     | Details line under a ledger row's symbol                              |
 | `../components/trade-screenshot.js` | Trade chart screenshot dialog                                         |
 | `users.js`                          | Administration page                                                   |
 | `watchlist.js`                      | Watchlist page                                                        |
@@ -461,12 +463,14 @@ The admin panel's browser modules (one per page in `views/admin/`, plus `shell.j
 
 ### `services/auth/`
 
-| File              | What it does                                                                |
-| ----------------- | --------------------------------------------------------------------------- |
-| `accounts.js`     | Accounts and sign-in                                                        |
-| `app-sessions.js` | Checks that a stored login session is still valid for broker requests.      |
-| `request-auth.js` | Authenticated member lookup for API handlers (and the administrator check). |
-| `totp.js`         | Time-based one-time passwords (RFC 6238) for authenticator apps.            |
+| File                  | What it does                                                                |
+| --------------------- | --------------------------------------------------------------------------- |
+| `accounts.js`         | Accounts and sign-in                                                        |
+| `sessions.js`         | Signed-in sessions: start, end, list and end a member's other sessions      |
+| `admin-setup-code.js` | The one-time code an administrator needs for a first authenticator          |
+| `app-sessions.js`     | Checks that a stored login session is still valid for broker requests.      |
+| `request-auth.js`     | Authenticated member lookup for API handlers (and the administrator check). |
+| `totp.js`             | Time-based one-time passwords (RFC 6238) for authenticator apps.            |
 
 ### `services/broker/`
 
@@ -481,18 +485,23 @@ The admin panel's browser modules (one per page in `views/admin/`, plus `shell.j
 | `angel.js`        | Angel One (SmartAPI) login with the member's own API key, today's fills and SmartAPI calls for its adapter; PIN/TOTP never stored  |
 | `daily-import.js` | After the close: today's Zerodha/Dhan/Upstox/Fyers/Angel One fills into the journal for opted-in members, with a Telegram summary. |
 | `live-orders.js`  | Live orders through the member's chosen broker's adapter; every safety check is shared                                             |
+| `live-gtt.js`     | Stop-loss/target GTT for a filled delivery buy, by hand or automatically                                                           |
 | `portfolio.js`    | Broker portfolio and balance through the broker's adapter; shared validation and limits (shared/broker-portfolio.js)               |
 | `adapters/`       | One file per broker (`kite.js`, `angel.js`) found by name; `index.js` documents the adapter contract and is the registry           |
 | `instruments.js`  | Each broker's cached instrument master (BrokerInstrument), refreshed at most daily; the NSE tick rule                              |
 
 ### `services/journal/`
 
-| File                  | What it does                                   |
-| --------------------- | ---------------------------------------------- |
-| `backup.js`           | Data backup                                    |
-| `weekly-report.js`    | Weekly report emails                           |
-| `workspace.js`        | Journal data access                            |
-| `account-settings.js` | Planning capital, charge rates and risk limits |
+| File                  | What it does                                    |
+| --------------------- | ----------------------------------------------- |
+| `backup.js`           | Data backup                                     |
+| `weekly-report.js`    | Weekly report emails                            |
+| `workspace.js`        | Journal data access: trades, imports, watchlist |
+| `mappers.js`          | Stored documents → API objects                  |
+| `strategies.js`       | Strategies and trading rules                    |
+| `screenshots.js`      | Trade screenshots and the orphan sweep          |
+| `chat.js`             | AI chat history                                 |
+| `account-settings.js` | Planning capital, charge rates and risk limits  |
 
 ### `services/maintenance/`
 
