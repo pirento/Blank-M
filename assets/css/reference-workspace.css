@@ -334,8 +334,8 @@
   stroke: var(--color-accent);
 }
 .reference-candle-down {
-  fill: var(--color-danger, #bb3348);
-  stroke: var(--color-danger, #bb3348);
+  fill: var(--color-negative);
+  stroke: var(--color-negative);
 }
 .reference-candle-cursor {
   stroke: var(--color-muted);
@@ -697,6 +697,9 @@
   }
 }
 @media (max-width: 760px) {
+  .reference-account-rail {
+    grid-template-columns: 1fr;
+  }
   .reference-page-heading {
     gap: 10px;
     margin-bottom: 21px;

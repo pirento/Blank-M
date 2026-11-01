@@ -267,11 +267,16 @@ export async function emailUnsubscribe(req, res) {
   res.setHeader('Referrer-Policy', 'no-referrer');
   res.setHeader('X-Robots-Tag', 'noindex, nofollow');
   const token = String(req.query.t ?? req.body?.t ?? '');
-  const quota = await reserveAttempts(
-    [{ key: `unsubscribe:${opaque('client', clientAddress(req) || 'unknown')}`, limit: 30 }],
-    60 * 60_000,
-  );
-  const parsed = quota.allowed ? readUnsubscribeToken(token) : null;
+  // Gmail and Yahoo send one-click unsubscribes from a few addresses, so only bad tokens count
+  // toward the limit; a valid token is never refused.
+  let parsed = readUnsubscribeToken(token);
+  const quota = parsed
+    ? { allowed: true }
+    : await reserveAttempts(
+        [{ key: `unsubscribe:${opaque('client', clientAddress(req) || 'unknown')}`, limit: 30 }],
+        60 * 60_000,
+      );
+  if (!quota.allowed) parsed = null;
   if (!parsed) {
     return res.status(quota.allowed ? 400 : 429).render('pages/error', {
       title: 'Link unavailable',

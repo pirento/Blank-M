@@ -298,18 +298,20 @@ export async function handleRevokeUser(req, res) {
     if (invitation.authUserId === admin.user.id) {
       throw new AdminContractError('You cannot revoke your own access', 409);
     }
-    // A retried revoke (to finish the ban) does not email again.
-    const newlyRevoked = !invitation.revokedAt;
     invitation.revokedAt ??= new Date();
     await invitation.save();
     await recordAdminAction(admin, 'member.revoke', body.email);
     // Workspace access is revoked first; the account ban and session removal follow.
+    // Emailed once, when the account itself is first banned (a retry after a failed ban still sends).
+    let newlyBanned = false;
     if (invitation.authUserId) {
       try {
-        await User.updateOne(
+        const before = await User.findOneAndUpdate(
           { _id: invitation.authUserId },
           { $set: { status: 'revoked', bannedUntil: FAR_FUTURE } },
-        );
+          { projection: { status: 1 } },
+        ).lean();
+        newlyBanned = Boolean(before) && before.status !== 'revoked';
         await revokeUserSessions(invitation.authUserId);
         // A revoked member can no longer cancel, so stop their Razorpay renewals here.
         await endSubscriptionNow(invitation.authUserId).catch((error) =>
@@ -330,7 +332,7 @@ export async function handleRevokeUser(req, res) {
       }
     }
     // Only an account that was in use; an unused invitation just stops working.
-    if (newlyRevoked && invitation.acceptedAt) void accessPausedEmail(body.email);
+    if (newlyBanned && invitation.acceptedAt) void accessPausedEmail(body.email);
     res.status(200).json({
       ok: true,
       workspaceAccessRevoked: true,

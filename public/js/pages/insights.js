@@ -33,8 +33,8 @@ import { MIN_GROUP_TRADES, edgeGrid, edgeRankings } from '../../../shared/edge-m
 import { pnlCalendar } from '../components/pnl-calendar.js';
 import { createCoachReview } from '../components/coach-review.js';
 import {
-  CHART_NEGATIVE,
-  CHART_POSITIVE,
+  chartNegative,
+  chartPositive,
   barChart,
   lineChart,
   thousands,
@@ -429,7 +429,7 @@ function paint() {
   barChart(weekdayChart.canvas, {
     labels: weekdays.map((day) => day.label),
     values: weekdays.map((day) => day.netPnl),
-    colors: weekdays.map((day) => (day.netPnl >= 0 ? CHART_POSITIVE : CHART_NEGATIVE)),
+    colors: weekdays.map((day) => (day.netPnl >= 0 ? chartPositive() : chartNegative())),
     tooltip: (value, context) =>
       `${formatCurrency(Number(value))} · ${weekdays[context.dataIndex].count} trades`,
     xFormatter: (label) => label,
@@ -439,7 +439,7 @@ function paint() {
     barChart(rChart.canvas, {
       labels: r.buckets.map((bucket) => bucket.label),
       values: r.buckets.map((bucket) => bucket.count),
-      colors: r.buckets.map((_, index) => (index < 3 ? CHART_NEGATIVE : CHART_POSITIVE)),
+      colors: r.buckets.map((_, index) => (index < 3 ? chartNegative() : chartPositive())),
       tooltip: (value) => `${value} trades`,
       integer: true,
       xFormatter: (label) => label,

@@ -33,7 +33,9 @@ export const env = {
   get googleAuthEnabled() {
     return (
       truthy(process.env.GOOGLE_AUTH_ENABLED) &&
-      Boolean(process.env.GOOGLE_CLIENT_ID?.trim() && process.env.GOOGLE_CLIENT_SECRET?.trim())
+      Boolean(process.env.GOOGLE_CLIENT_ID?.trim() && process.env.GOOGLE_CLIENT_SECRET?.trim()) &&
+      // The redirect back from Google needs the site's address.
+      Boolean(process.env.APP_URL?.trim())
     );
   },
   /** Proxy hops in front of the app: "true" (or "1") is one, e.g. "2" for a load balancer + Nginx; 0 is none. */

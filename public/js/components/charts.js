@@ -4,13 +4,15 @@
  */
 import { formatCurrency } from '../core/dom.js';
 
-export const CHART_POSITIVE = '#446e47';
-export const CHART_NEGATIVE = '#bb3348';
 const charts = new Set();
 
 function token(name, fallback) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 }
+
+/** Gain and loss colours for the current theme (read when a chart is drawn). */
+export const chartPositive = () => token('--color-positive', '#446e47');
+export const chartNegative = () => token('--color-negative', '#bb3348');
 
 /** Default y-axis tick format: rupees rounded to thousands, e.g. "₹12k". */
 export const thousands = (value) => `₹${Math.round(Number(value) / 1000)}k`;
@@ -141,18 +143,16 @@ export function barChart(
   });
 }
 
-/** Distinguishable line colours for several series (strategies, for example). */
-// Darker shades of the brand palette (sage, burgundy, terracotta, moss, rose, tan, khaki, slate).
-export const SERIES_COLORS = [
-  '#446e47',
-  '#7a3d45',
-  '#ab4d26',
-  '#5b7a57',
-  '#bb3348',
-  '#9a6b52',
-  '#7f7f5c',
-  '#5f6c70',
-];
+/**
+ * Distinguishable line colours for several series (strategies, for example): darker palette
+ * shades on light, lighter ones on dark (sage, burgundy/rose, terracotta, moss, rose, tan, khaki, slate).
+ */
+const SERIES_COLORS = {
+  light: ['#446e47', '#7a3d45', '#ab4d26', '#5b7a57', '#bb3348', '#9a6b52', '#7f7f5c', '#5f6c70'],
+  dark: ['#99b898', '#e8707c', '#ff847c', '#8eab8a', '#fecea8', '#c69880', '#adad8c', '#b9c6c1'],
+};
+const seriesColors = () =>
+  SERIES_COLORS[document.documentElement.classList.contains('dark') ? 'dark' : 'light'];
 
 /**
  * Several lines over shared x labels, with a legend. Each series:
@@ -181,8 +181,8 @@ export function lineChart(canvas, { labels, series, yFormatter = thousands }) {
       datasets: series.map((line, index) => ({
         label: line.label,
         data: line.values,
-        borderColor: line.color || SERIES_COLORS[index % SERIES_COLORS.length],
-        backgroundColor: line.color || SERIES_COLORS[index % SERIES_COLORS.length],
+        borderColor: line.color || seriesColors()[index % SERIES_COLORS.light.length],
+        backgroundColor: line.color || seriesColors()[index % SERIES_COLORS.light.length],
         borderWidth: 1.5,
         pointRadius: 0,
         tension: 0.2,

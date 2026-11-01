@@ -252,6 +252,8 @@ export async function googleCallback(req, res) {
     if (expected.forAdmin && user.role !== 'admin')
       return res.redirect(`${loginPage}?error=google`);
     if (user.googleSubject && user.googleSubject !== profile.sub) return fail();
+    // A suspended or banned account is refused before anything about it is saved.
+    if (await accessProblem(user)) return res.redirect(`${loginPage}?error=invite_only`);
     const firstSignIn = created || !user.emailConfirmedAt;
     user.googleSubject = profile.sub;
     user.emailConfirmedAt ??= new Date();
@@ -262,7 +264,6 @@ export async function googleCallback(req, res) {
       { _id: email, acceptedAt: null },
       { $set: { acceptedAt: user.emailConfirmedAt } },
     );
-    if (await accessProblem(user)) return res.redirect(`${loginPage}?error=invite_only`);
     await establishSession(req, user, { method: 'oauth' });
     await recordSignIn(user, req.get('user-agent'));
     if (firstSignIn) void welcomeMember(user).catch(() => undefined);

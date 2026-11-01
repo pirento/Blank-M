@@ -51,7 +51,9 @@ export function loginPage(req, res) {
   const errors = {
     google:
       'Google sign-in could not be completed, or that Google account is not an administrator.',
-    google_unavailable: 'Google sign-in is not set up (admin panel → Integrations).',
+    // The admin panel needs Google to open, so the first setup is on the server.
+    google_unavailable:
+      'Google sign-in is not set up. Add the Google keys and APP_URL to the server .env and restart (see START-HERE.md).',
     invite_only: 'That Google account is not an administrator.',
   };
   res.render('admin/login', {

@@ -94,8 +94,9 @@ export async function billingEventEmail(event, record) {
     ? await Subscription.findOne({ razorpaySubscriptionId: payment.subscription_id }).lean()
     : null;
   if (!record?._id) return false;
-  const user = await User.findById(record._id, { email: 1 }).lean();
-  if (!user) return false;
+  // A suspended member is told about that instead (revoking cancels their renewal).
+  const user = await User.findById(record._id, { email: 1, status: 1 }).lean();
+  if (!user || user.status !== 'active') return false;
   const plan = await loadPlan();
   const billingLink = origin() ? `${origin()}/billing` : null;
   switch (event.event) {
@@ -182,6 +183,10 @@ export async function sendTrialReminders(now = new Date(), limit = 500) {
     .lean();
   let sent = 0;
   for (const sub of due) {
+    // A grant or paid month running past the trial keeps Premium on: no "trial ends" email.
+    const trialEnd = new Date(sub.trialEndsAt).getTime();
+    if ([sub.grantUntil, sub.paidUntil].some((date) => date && new Date(date).getTime() > trialEnd))
+      continue;
     // Claim first so two runs never email twice.
     const claim = await Subscription.updateOne(
       { _id: sub._id, trialReminderSentAt: null },

@@ -56,6 +56,12 @@ describe('email layout', () => {
     expect(html).toMatch(/letter-spacing:4px[^>]*>12345678</);
     expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;<br>second line');
     expect(html).not.toContain('<script>');
+    // A quoted line is someone's words: even a link to this site stays text, never a button.
+    process.env.APP_URL = 'https://blank.test';
+    const quoted = emailHtml('Request', '> Verify your account: https://blank.test/admin');
+    delete process.env.APP_URL;
+    expect(quoted).not.toContain('href="https://blank.test/admin"');
+    expect(quoted).toContain('Verify your account: https://blank.test/admin');
     // The inbox preview is the first line of the email.
     expect(html).toMatch(/display:none[^>]*>Trades: 5</);
   });

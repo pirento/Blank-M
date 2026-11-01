@@ -29,7 +29,7 @@ import {
   pnlDistribution,
   summarisePerformance,
 } from '../../../../shared/pnl.js';
-import { CHART_NEGATIVE, CHART_POSITIVE, areaChart, barChart } from '../../components/charts.js';
+import { chartNegative, chartPositive, areaChart, barChart } from '../../components/charts.js';
 import { RANGES, portfolioBalance, settings, trades } from './shared.js';
 
 let range = 'all';
@@ -309,7 +309,7 @@ export function paintRecord() {
   areaChart(drawdownCard.canvas, {
     labels: drawdown.map((p) => p.label),
     values: drawdown.map((p) => p.drawdown),
-    color: CHART_NEGATIVE,
+    color: chartNegative(),
     tooltipLabel: 'Below peak',
     fillOpacity: 0.12,
   });
@@ -317,14 +317,14 @@ export function paintRecord() {
   barChart(symbolCard.canvas, {
     labels: symbolData.map((entry) => entry.key),
     values: symbolData.map((entry) => entry.netPnl),
-    colors: symbolData.map((entry) => (entry.netPnl >= 0 ? CHART_POSITIVE : CHART_NEGATIVE)),
+    colors: symbolData.map((entry) => (entry.netPnl >= 0 ? chartPositive() : chartNegative())),
     tooltip: netTooltip,
     xFormatter: (label) => String(label).slice(0, 4),
   });
   barChart(weekdayCard.canvas, {
     labels: weekdayData.map((entry) => entry.key),
     values: weekdayData.map((entry) => entry.netPnl),
-    colors: weekdayData.map((entry) => (entry.netPnl >= 0 ? CHART_POSITIVE : CHART_NEGATIVE)),
+    colors: weekdayData.map((entry) => (entry.netPnl >= 0 ? chartPositive() : chartNegative())),
     tooltip: netTooltip,
     xFormatter: (label) => String(label).slice(0, 4),
   });
@@ -332,7 +332,7 @@ export function paintRecord() {
     labels: distribution.map((bucket) => bucket.label),
     values: distribution.map((bucket) => bucket.count),
     colors: distribution.map((bucket) =>
-      bucket.label.startsWith('Win') ? CHART_POSITIVE : CHART_NEGATIVE,
+      bucket.label.startsWith('Win') ? chartPositive() : chartNegative(),
     ),
     tooltip: (value) => `${Number(value)} trades`,
     showX: false,
