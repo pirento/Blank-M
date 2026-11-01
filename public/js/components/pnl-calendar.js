@@ -17,7 +17,7 @@ export function pnlCalendar(trades) {
   const cellView = (cell) => {
     if (!cell) return h('div', { class: 'aspect-square' });
     const strength = cell.count ? 0.15 + 0.85 * (Math.abs(cell.pnl) / largest) : 0;
-    const color = cell.pnl >= 0 ? '26, 127, 67' : '192, 57, 43';
+    const color = cell.pnl >= 0 ? 'positive' : 'negative';
     const text = cell.count
       ? `${cell.date}: ${signed(cell.pnl)} from ${cell.count} ${cell.count === 1 ? 'trade' : 'trades'}`
       : `${cell.date}: no trades`;
@@ -28,7 +28,12 @@ export function pnlCalendar(trades) {
           'flex aspect-square items-center justify-center rounded-[4px] text-[10px]',
           cell.count ? 'text-fg' : 'border border-line text-subtle',
         ),
-        style: cell.count ? { backgroundColor: `rgba(${color}, ${strength.toFixed(2)})` } : {},
+        // Mixed into the background at up to 45%, so the text on top keeps its contrast in both themes.
+        style: cell.count
+          ? {
+              backgroundColor: `color-mix(in srgb, var(--color-${color}) ${Math.round(strength * 45)}%, transparent)`,
+            }
+          : {},
         title: text,
         role: 'img',
         'aria-label': text,

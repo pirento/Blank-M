@@ -589,7 +589,7 @@ td small {
 }
 .stock-number {
   font: 11px var(--mono);
-  color: #a5b0b0;
+  color: var(--color-muted);
 }
 .source-label {
   font-size: 12px;
@@ -2418,4 +2418,9 @@ td small {
 .dark .message,
 .dark .message.user {
   background: var(--color-elevated);
+}
+.dark .notice,
+.dark .pill.warn {
+  background: var(--color-caution-soft);
+  color: var(--color-caution);
 }

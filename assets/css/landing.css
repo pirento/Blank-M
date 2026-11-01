@@ -234,8 +234,8 @@
   position: relative;
 }
 .blank-landing .landing-terminal {
-  border: 1px solid #b9cbb8;
-  background: #fff;
+  border: 1px solid var(--color-line-strong);
+  background: var(--color-surface);
   box-shadow:
     0 2px 0 #c4d0c2,
     0 5px 0 #d0dace,
@@ -325,7 +325,7 @@
   font-size: 20px;
   line-height: 1.35;
   letter-spacing: -0.5px;
-  color: #7a8c86;
+  color: var(--color-muted);
   padding: 22px 20px;
   margin: 0;
 }

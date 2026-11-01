@@ -114,7 +114,11 @@ function renderBlock(block, state) {
     const line = raw.trim();
     const link = LINK_LINE.exec(line);
     const field = FIELD_LINE.exec(line);
-    if (link && ours(link[2]) && link[1] === 'Unsubscribe') {
+    // Quoted lines are someone else's words: never a button, whatever they contain.
+    if (raw.startsWith('> ') || raw === '>') {
+      if (!quoted.length) flush();
+      quoted.push(raw.slice(2));
+    } else if (link && ours(link[2]) && link[1] === 'Unsubscribe') {
       flush();
       out.push(
         `<p style="margin:8px 0 0;font-size:12px;${FONT}"><a href="${escape(link[2])}" style="color:${COLOR.muted};text-decoration:underline">Unsubscribe</a></p>`,
@@ -122,9 +126,6 @@ function renderBlock(block, state) {
     } else if (link && ours(link[2])) {
       flush();
       out.push(button(link[1] ?? 'Open link', link[2], !state.buttons++));
-    } else if (raw.startsWith('> ') || raw === '>') {
-      if (!quoted.length) flush();
-      quoted.push(raw.slice(2));
     } else if (line.startsWith('- ')) {
       if (!list.length) flush();
       list.push(`<li style="margin:0 0 6px">${linkify(escape(line.slice(2)))}</li>`);

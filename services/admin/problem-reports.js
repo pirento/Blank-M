@@ -22,7 +22,13 @@ const CATEGORY_LABELS = {
 const reportSchema = z.object({
   category: z.enum(PROBLEM_CATEGORIES),
   message: z.string().trim().min(10, 'Describe the problem in a sentence or two.').max(2000),
-  page: z.string().trim().max(200).default(''),
+  // Goes into the admin email unquoted: one plain line, never a link.
+  page: z
+    .string()
+    .trim()
+    .max(200)
+    .refine((value) => !/[\r\n]|:\/\//.test(value), 'Give the page name only.')
+    .default(''),
 });
 const resolveSchema = z.object({ note: z.string().trim().max(1000).default('') });
 

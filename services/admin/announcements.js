@@ -122,6 +122,8 @@ function inAudience(audience, membership) {
 async function sendAnnouncement(row) {
   const plan = await loadPlan();
   let lastId = row.lastUserId ?? '';
+  // The lease this run holds: if another process took it over after a stall, this run stops.
+  let lease = row.leaseUntil ?? null;
   for (;;) {
     const users = await User.find(
       { _id: { $gt: lastId }, status: 'active', emailConfirmedAt: { $ne: null } },
@@ -162,18 +164,17 @@ async function sendAnnouncement(row) {
       }
       lastId = user._id;
       // Saved after every member, so a restart never emails anyone twice; also renews the lease.
+      const renewed = new Date(Date.now() + LEASE_MS);
       const kept = await Announcement.updateOne(
-        { _id: row._id, status: 'sending' },
-        {
-          $inc: { [outcome]: 1 },
-          $set: { lastUserId: lastId, leaseUntil: new Date(Date.now() + LEASE_MS) },
-        },
+        { _id: row._id, status: 'sending', leaseUntil: lease },
+        { $inc: { [outcome]: 1 }, $set: { lastUserId: lastId, leaseUntil: renewed } },
       );
       if (!kept.modifiedCount) return;
+      lease = renewed;
     }
   }
   await Announcement.updateOne(
-    { _id: row._id },
+    { _id: row._id, leaseUntil: lease },
     { $set: { status: 'done', finishedAt: new Date(), leaseUntil: null } },
   );
 }

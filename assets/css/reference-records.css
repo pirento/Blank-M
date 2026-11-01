@@ -42,8 +42,8 @@
   color: var(--color-muted, #5f6c70);
 }
 .rr-stamp {
-  border: 1px solid #bb3348;
-  color: #bb3348;
+  border: 1px solid var(--color-negative);
+  color: var(--color-negative);
   padding: 5px 10px;
   font-size: 11px;
   letter-spacing: 0.14em;

@@ -19,7 +19,7 @@ const CLASSES = {
   H3: 'mt-4 mb-2 text-base font-semibold text-fg',
   STRONG: 'font-semibold text-fg',
   A: 'underline underline-offset-2 hover:opacity-70',
-  PRE: 'hidden-scrollbar my-3 overflow-x-auto rounded-xl border bg-[#0D0D0D] p-4',
+  PRE: 'hidden-scrollbar my-3 overflow-x-auto rounded-xl border bg-elevated p-4',
 };
 
 /** Render markdown text to a sanitised, styled div; links open in a new tab. */

@@ -68,6 +68,16 @@ describe('lifecycle emails', () => {
     expect(confirmation.subject).toBe('We received your problem report');
     expect(confirmation.text).toContain('> The weekly P&L does not match my contract note.');
     expect(confirmation.text).toContain('Topic: Wrong numbers or data');
+    // The page name goes into the admin email unquoted, so it may not carry a link or new lines.
+    const sneaky = await session.agent
+      .post('/api/account/problem-report')
+      .set('X-CSRF-Token', session.csrf)
+      .send({
+        category: 'bug',
+        message: 'Something is broken on this page.',
+        page: 'x\n\nOpen admin: http://blank.test/admin',
+      });
+    expect(sneaky.status).toBe(400);
   });
 
   it('emails a sign-in from a new device, but not the first sign-in or a known device', async () => {
@@ -206,6 +216,18 @@ describe('one-click unsubscribe', () => {
     );
     expect(answer.status).toBe(200);
     expect(await AccountSettings.findById(gone).lean()).toBeNull();
+  });
+
+  it('never refuses a genuine token, however many come from one address', async () => {
+    const { user } = await createMember();
+    const token = unsubscribeToken(user._id, 'announcements');
+    // Gmail and Yahoo send everyone's one-click unsubscribes from a few addresses.
+    for (let index = 0; index < 35; index += 1) {
+      expect((await request(app).post(`/email/unsubscribe?t=${token}`)).status).toBe(200);
+    }
+    for (let index = 0; index < 30; index += 1) await request(app).get('/email/unsubscribe?t=bad');
+    expect((await request(app).get('/email/unsubscribe?t=bad')).status).toBe(429);
+    expect((await request(app).post(`/email/unsubscribe?t=${token}`)).status).toBe(200);
   });
 
   it('puts the unsubscribe link and List-Unsubscribe headers on newsletters and weekly reports', async () => {
