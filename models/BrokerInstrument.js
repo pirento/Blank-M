@@ -17,7 +17,6 @@ const brokerInstrumentSchema = new mongoose.Schema({
   /** When the refresh that last wrote this row started; older rows are dropped after a refresh. */
   updatedAt: { type: Date, required: true },
 });
-brokerInstrumentSchema.index({ provider: 1, token: 1 });
 // The cache age (oldest row) and removing rows a refresh no longer lists.
 brokerInstrumentSchema.index({ provider: 1, updatedAt: 1 });
 

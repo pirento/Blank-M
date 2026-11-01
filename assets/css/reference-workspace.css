@@ -404,12 +404,6 @@
   padding: 20px;
   min-width: 0;
 }
-.reference-broker-name {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  margin: 18px 0 14px;
-}
 .reference-broker-initial {
   display: grid;
   place-items: center;
@@ -419,14 +413,6 @@
   background: var(--color-accent-soft);
   color: var(--color-accent);
   flex-shrink: 0;
-}
-.reference-broker-summary > div {
-  padding: 10px 0;
-  border-bottom: 1px solid var(--color-line);
-  font-size: 12px;
-}
-.reference-broker-summary dd {
-  text-align: right;
 }
 .reference-strategy-card {
   padding: 24px 20px;
@@ -846,19 +832,10 @@
   .reference-broker-card .reference-panel-heading h2 {
     font-size: 13px;
   }
-  .reference-broker-name {
-    margin: 14px 0 9px;
-    gap: 7px;
-  }
   .reference-broker-initial {
     width: 26px;
     height: 26px;
     font-size: 17px;
-  }
-  .reference-broker-summary > div {
-    font-size: 11px;
-    gap: 6px;
-    padding: 8px 0;
   }
   .reference-broker-card > a {
     font-size: 11px;

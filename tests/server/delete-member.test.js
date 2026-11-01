@@ -12,6 +12,7 @@ import {
 import {
   AllowedUser,
   BrokerConnection,
+  LoginUsername,
   ManualInvitation,
   Payment,
   PushSubscription,
@@ -87,6 +88,8 @@ describe('member data removal', () => {
       status: 'accepted',
     });
 
+    await LoginUsername.create({ _id: 'leaver', userId: user._id });
+
     const result = await deleteMember('Leaver@Example.com');
     expect(result).toMatchObject({ email: 'leaver@example.com', files: 1 });
     expect(await User.exists({ _id: user._id })).toBeNull();
@@ -99,6 +102,8 @@ describe('member data removal', () => {
       0,
     );
     expect(await Payment.exists({ _id: 'pay_1' })).toBeTruthy();
+    // The username stays taken, by nobody, so no later account can sign in as the leaver.
+    expect(await LoginUsername.findById('leaver').lean()).toMatchObject({ userId: null });
     // The old session no longer works.
     expect((await agent.get('/api/account/export')).status).toBe(401);
   });

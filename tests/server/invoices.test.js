@@ -360,4 +360,37 @@ describe('GST invoices', () => {
     expect((await issueInvoice('pay_stale')).number).toBe(`PB/${year()}/00002`);
     expect(await counter()).toBe(2);
   });
+
+  it('never moves a payment back to an older status, nor drops its owner, on late webhooks', async () => {
+    const buyer = await member();
+    const send = (status, eventId, withOwner = true) => {
+      const raw = JSON.stringify({
+        event: `payment.${status}`,
+        payload: {
+          ...(withOwner
+            ? { subscription: { entity: { id: 'sub_inv1', notes: { userId: buyer.userId } } } }
+            : {}),
+          payment: { entity: { id: 'pay_late', amount: 49900, currency: 'INR', status } },
+        },
+      });
+      return request(app)
+        .post('/api/billing/razorpay/webhook')
+        .set('Content-Type', 'application/json')
+        .set('X-Razorpay-Event-Id', eventId)
+        .set('X-Razorpay-Signature', createHmac('sha256', SECRET).update(raw).digest('hex'))
+        .send(raw);
+    };
+    expect((await send('captured', 'evt_c')).status).toBe(200);
+    expect((await send('authorized', 'evt_a')).status).toBe(200);
+    expect(await Payment.findById('pay_late').lean()).toMatchObject({
+      status: 'captured',
+      userId: buyer.userId,
+    });
+    expect((await send('refunded', 'evt_r', false)).status).toBe(200);
+    expect((await send('captured', 'evt_c2')).status).toBe(200);
+    expect(await Payment.findById('pay_late').lean()).toMatchObject({
+      status: 'refunded',
+      userId: buyer.userId,
+    });
+  });
 });

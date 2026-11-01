@@ -3,7 +3,7 @@
  * removing what keeps working for a member whose access was revoked.
  *
  * Kept on purpose after deletion: payments and invoices (financial records the law requires),
- * the trial claim (one trial per person) and the admin audit log.
+ * the trial claim (one trial per person), the admin audit log and the username, without its owner.
  */
 import {
   AccountSettings,
@@ -66,7 +66,6 @@ const MEMBER_COLLECTIONS = [
   TelegramLink,
   TelegramLinkCode,
   AuthToken,
-  LoginUsername,
   ProblemReport,
   UsageCounter,
 ];
@@ -99,6 +98,8 @@ export async function deleteMember(email) {
   for (const model of MEMBER_COLLECTIONS) rows += (await model.deleteMany({ userId })).deletedCount;
   rows += (await AccountSettings.deleteOne({ _id: userId })).deletedCount;
   rows += (await Subscription.deleteOne({ _id: userId })).deletedCount;
+  // The username stays reserved without an owner, so no later account can sign in with it.
+  await LoginUsername.updateMany({ userId }, { $set: { userId: null } });
   let files = 0;
   for (const bucketName of ['statements', 'voice-notes', 'trade-screenshots']) {
     files += await removeOwnerFolder(bucketName, userId);

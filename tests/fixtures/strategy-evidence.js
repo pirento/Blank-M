@@ -52,15 +52,3 @@ export function evidenceRecord() {
     latest_review: null,
   };
 }
-export function evidenceReview() {
-  return {
-    id: '66666666-6666-4666-8666-666666666666',
-    user_id: evidenceOwner,
-    evidence_id: evidenceRecord().id,
-    decision: 'approved_research',
-    notes: 'Reviewed the exact draft and simulation.',
-    expected_review_revision: 0,
-    server_revision: 2,
-    created_at: '2026-10-09T03:00:00Z',
-  };
-}
