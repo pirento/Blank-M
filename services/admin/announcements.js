@@ -1,9 +1,8 @@
 /**
- * Administrator announcements: one email to every active member, or only to
- * Premium or free members. Sent in the background in batches; members who
- * turned announcements off (Settings → Email reports) are skipped.
+ * Administrator newsletters and announcements: one email to every active member, or only to
+ * Premium or free members. Sent in the background in batches; members who turned announcements
+ * off (Settings → Email reports, or the one-click unsubscribe link) are skipped.
  */
-import { siteOrigin } from '../notifications/email-layout.js';
 import { z } from 'zod';
 import {
   AccountSettings,
@@ -18,6 +17,7 @@ import { HttpError } from '../errors.js';
 import { createLogger, errorName } from '../logger.js';
 import { isMailConfigured } from '../mailer.js';
 import { sendQuietly } from '../notifications/emails.js';
+import { unsubscribeParts } from '../notifications/unsubscribe.js';
 
 const log = createLogger('announcements');
 const BATCH = 100;
@@ -121,7 +121,6 @@ function inAudience(audience, membership) {
 
 async function sendAnnouncement(row) {
   const plan = await loadPlan();
-  const origin = siteOrigin();
   let lastId = row.lastUserId ?? '';
   for (;;) {
     const users = await User.find(
@@ -145,14 +144,20 @@ async function sendAnnouncement(row) {
       const membership = computeMembership(plan, user, subById.get(user._id) ?? null);
       let outcome = 'skipped';
       if (!optedOut.has(user._id) && inAudience(row.audience, membership)) {
-        const ok = await sendQuietly(user.email, row.subject, [
-          row.body,
-          '',
-          '—',
-          origin
-            ? `You get these emails as a Pirento Blank member. Turn them off: ${origin}/settings`
-            : 'Turn these emails off in Settings → Email reports.',
-        ]);
+        const unsubscribe = unsubscribeParts(user._id, 'announcements');
+        const ok = await sendQuietly(
+          user.email,
+          row.subject,
+          [
+            row.body,
+            '',
+            '—',
+            'Pirento Blank is a journal and planning tool, not investment advice.',
+            'You get these emails as a Pirento Blank member. Turn them off in Settings → Email reports, or here:',
+            unsubscribe.line,
+          ],
+          unsubscribe.headers,
+        );
         outcome = ok ? 'sent' : 'failed';
       }
       lastId = user._id;

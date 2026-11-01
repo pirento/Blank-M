@@ -152,7 +152,8 @@ Copy `deploy/crontab.example` into `crontab -e` and adjust the path:
 - **Daily** — `node scripts/maintenance-signups.js` deletes public sign-ups whose email was never
   confirmed within 7 days (connects to MongoDB directly; admin invitations are never touched).
 - **Daily** — `node scripts/billing-reminders.js` emails members whose free trial ends within 3
-  days, once per trial (connects to MongoDB directly).
+  days, whose trial ended without a subscription, and whose cancelled Premium has run out; each
+  once (connects to MongoDB directly).
 - **Monday morning** — `node scripts/send-weekly-reports.js` emails last week's report to members who
   opted in (Settings → Email reports). Each member gets one email per week; re-running is safe.
 - **Weekday mornings (08:00 IST)** — `node scripts/premarket-plan.js` sends the pre-market plan on

@@ -49,14 +49,14 @@ export function setMailTransport(value) {
 }
 
 /**
- * Sends an email from SMTP_FROM: the plain text plus the branded HTML built from it. Throws
- * HttpError 503 when mail is not configured, 429 when the provider rate-limits (421/450),
- * otherwise 502; provider diagnostics are never passed on.
+ * Sends an email from SMTP_FROM: the plain text plus the branded HTML built from it, with any extra
+ * `headers` (e.g. List-Unsubscribe). Throws HttpError 503 when mail is not configured, 429 when the
+ * provider rate-limits (421/450), otherwise 502; provider diagnostics are never passed on.
  */
-export async function sendMail({ to, subject, text }) {
+export async function sendMail({ to, subject, text, headers }) {
   try {
     const html = emailHtml(subject, text);
-    await mailer().sendMail({ from: process.env.SMTP_FROM, to, subject, text, html });
+    await mailer().sendMail({ from: process.env.SMTP_FROM, to, subject, text, html, headers });
   } catch (error) {
     if (error instanceof HttpError) throw error;
     // Provider diagnostics can contain account details; never forward them.

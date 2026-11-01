@@ -1,7 +1,7 @@
 /**
- * Admin → Announcements: write one email and send it to every active member,
- * or only to Premium or free members, then follow its progress. Members who
- * turned announcements off are skipped.
+ * Admin → Announcements: write one newsletter / announcement email and send it to every active
+ * member, or only to Premium or free members, then follow its progress. Members who turned
+ * announcements off (or unsubscribed) are skipped.
  */
 import {
   $,
@@ -51,7 +51,7 @@ function composeCard() {
   subject.addEventListener('input', () => (draft.subject = subject.value));
   body.addEventListener('input', () => (draft.body = body.value));
   audience.addEventListener('change', () => (draft.audience = audience.value));
-  const send = button(state.busy ? 'Sending…' : 'Send announcement', {
+  const send = button(state.busy ? 'Sending…' : 'Send newsletter / announcement', {
     disabled: state.busy || !data.health?.email,
     onclick: async () => {
       const confirmed = await confirmDialog({
@@ -80,19 +80,21 @@ function composeCard() {
   });
   return card(
     {},
-    cardHeader('', cardTitle('New announcement')),
+    cardHeader('', cardTitle('New newsletter / announcement')),
     cardContent(
       'space-y-4',
       data.health?.email
         ? null
-        : statusLine('Set up email (SMTP) in Integrations before sending announcements.'),
+        : statusLine(
+            'Set up email (SMTP) in Integrations before sending a newsletter or announcement.',
+          ),
       h('div', { class: 'space-y-2' }, label('Subject', 'announcement-subject'), subject),
       h('div', { class: 'space-y-2' }, label('Message (plain text)', 'announcement-body'), body),
       h('div', { class: 'space-y-2' }, label('Send to', 'announcement-audience'), audience),
       h(
         'p',
         { class: 'text-xs text-muted' },
-        'Members who turned announcements off in Settings are skipped. A line telling them how is added to every email.',
+        'Members who turned newsletters and announcements off in Settings, or unsubscribed from an earlier one, are skipped. A one-click unsubscribe link is added to every email.',
       ),
       send,
     ),

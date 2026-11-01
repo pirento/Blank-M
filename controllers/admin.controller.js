@@ -26,6 +26,7 @@ import {
   reopenAccessRequest,
 } from '../services/admin/access-requests.js';
 import { createLogger, errorName } from '../services/logger.js';
+import { accessPausedEmail, accessRestoredEmail } from '../services/notifications/emails.js';
 
 const log = createLogger('admin');
 
@@ -297,6 +298,8 @@ export async function handleRevokeUser(req, res) {
     if (invitation.authUserId === admin.user.id) {
       throw new AdminContractError('You cannot revoke your own access', 409);
     }
+    // A retried revoke (to finish the ban) does not email again.
+    const newlyRevoked = !invitation.revokedAt;
     invitation.revokedAt ??= new Date();
     await invitation.save();
     await recordAdminAction(admin, 'member.revoke', body.email);
@@ -326,6 +329,8 @@ export async function handleRevokeUser(req, res) {
         return;
       }
     }
+    // Only an account that was in use; an unused invitation just stops working.
+    if (newlyRevoked && invitation.acceptedAt) void accessPausedEmail(body.email);
     res.status(200).json({
       ok: true,
       workspaceAccessRevoked: true,
@@ -368,6 +373,7 @@ export async function handleRestoreUser(req, res) {
       await User.updateOne({ _id: account._id }, { $set: { status: 'active', bannedUntil: null } });
     }
     await recordAdminAction(admin, 'member.restore', body.email);
+    if (account?.emailConfirmedAt) void accessRestoredEmail(body.email);
     res.status(200).json({ ok: true, status: account?.emailConfirmedAt ? 'active' : 'invited' });
   } catch (error) {
     failure(res, error);

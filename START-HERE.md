@@ -200,19 +200,24 @@ hai — kisi expert se confirm kariye.
   Premium lena padta hai. 0 = bilkul nahi.
 - **Billing page:** member ke menu mein "Billing" hai: plan, is mahine ke free uses, Subscribe/Cancel
   aur payments.
-- **Emails apne aap:** account activate hone par welcome; payment hua / fail hua / renewal band;
-  trial khatam hone se 3 din pehle yaad (`scripts/billing-reminders.js`, roz cron se). Weekly report
-  naye members ke liye ON rehta hai (Settings se band kar sakte hain).
-- **Announcement:** admin panel → Announcements se sab members (ya sirf Premium / free) ko ek email.
+- **Emails apne aap:** account activate hone par welcome; pehle payment par "Welcome to Premium",
+  baad mein payment hua / fail hua / renewal band; trial khatam hone se 3 din pehle yaad, trial
+  khatam hone par aur cancel kiya Premium khatam hone par ek email (`scripts/billing-reminders.js`,
+  roz cron se). Naye device se sign-in, access pause / wapas, problem report milne par bhi email
+  jaata hai. Weekly report naye members ke liye ON rehta hai (Settings se band kar sakte hain).
+- **Unsubscribe:** newsletter/announcement aur weekly report mein one-click unsubscribe link aur
+  `List-Unsubscribe` header hota hai (Gmail/Yahoo ke bulk-sender rules); `APP_URL` aur
+  `SESSION_SECRET` set hone chahiye.
+- **Newsletter / announcement:** admin panel → Announcements se sab members (ya sirf Premium / free) ko ek email.
   Jo member Settings mein "Emails from the team" band kare, use nahi jaata. Email (SMTP) set hona
   chahiye.
 
 ### GST invoices
 
 Har captured Razorpay payment par apne aap ek invoice banta hai (number jaise `PB/26-27/00001`, har
-financial year April–March mein 00001 se dobara). Member use **Billing** page aur "Payment received"
-email ke link se kholta hai, "Print / Save as PDF" se PDF banata hai. Admin panel → Plans & billing →
-Recent payments mein har payment ke saamne uska invoice link hai.
+financial year April–March mein 00001 se dobara). Member use **Billing** page aur "Welcome to
+Premium" / "Payment received" email ke link se kholta hai, "Print / Save as PDF" se PDF banata hai.
+Admin panel → Plans & billing → Recent payments mein har payment ke saamne uska invoice link hai.
 
 1. Admin panel → Plans & billing → **Invoice details** bhariye: legal name, trade name (agar ho),
    poora address, state, GSTIN, SAC code, GST rate (default 18%), invoice prefix (1–4 akshar/ank,

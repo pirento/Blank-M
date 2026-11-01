@@ -34,6 +34,8 @@ const userSchema = new mongoose.Schema(
     status: { type: String, enum: ['active', 'revoked'], default: 'active' },
     emailConfirmedAt: { type: Date, default: null },
     lastSignInAt: { type: Date, default: null },
+    /** Keyed hashes of the last 10 device labels signed in from, newest first (new sign-in alert). */
+    knownDevices: { type: [String], default: undefined },
     bannedUntil: { type: Date, default: null },
     googleSubject: { type: String, default: null },
     factors: { type: [factorSchema], default: [] },

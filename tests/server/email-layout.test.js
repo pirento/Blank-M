@@ -59,4 +59,17 @@ describe('email layout', () => {
     // The inbox preview is the first line of the email.
     expect(html).toMatch(/display:none[^>]*>Trades: 5</);
   });
+
+  it('shows an Unsubscribe line as a small link, never as a button', () => {
+    process.env.APP_URL = 'https://blank.test';
+    const html = emailHtml(
+      'News',
+      ['Hello', '', 'Unsubscribe: https://blank.test/email/unsubscribe?t=abc'].join('\n'),
+    );
+    delete process.env.APP_URL;
+    expect(html).toMatch(
+      /font-size:12px[^>]*><a href="https:\/\/blank.test\/email\/unsubscribe\?t=abc"[^>]*>Unsubscribe<\/a>/,
+    );
+    expect(html).not.toContain('Unsubscribe&nbsp;&rarr;');
+  });
 });

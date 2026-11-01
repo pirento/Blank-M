@@ -17,6 +17,9 @@ import { allowFeature, membershipFor } from '../services/billing/membership.js';
 import { featureLabel, loadPlan, publicPlan } from '../services/billing/plan.js';
 import { amountInWords, invoiceFor } from '../services/billing/invoices.js';
 import { UTGST_STATE_CODES } from '../shared/gst.js';
+import { clientAddress } from '../services/http.js';
+import { opaque } from '../services/auth/accounts.js';
+import { readUnsubscribeToken, unsubscribe } from '../services/notifications/unsubscribe.js';
 
 const TITLES = Object.fromEntries(
   [...NAV_LINKS, ...ADMIN_NAV_GROUP.items].map((link) => [link.path, link.name]),
@@ -252,6 +255,39 @@ export async function sharedJournal(req, res) {
     });
   }
   res.render('pages/share', { title: shared.label || 'Shared journal', shared });
+}
+
+/**
+ * GET and POST /email/unsubscribe?t=…: the link at the end of newsletters and weekly reports. GET
+ * asks to confirm (mail scanners open links, so a GET never unsubscribes); POST, from that page or
+ * a mail provider's one-click button (no session, so CSRF-exempt), turns the emails off. Every
+ * genuine token gets the same answer, whether or not the member still exists.
+ */
+export async function emailUnsubscribe(req, res) {
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+  const token = String(req.query.t ?? req.body?.t ?? '');
+  const quota = await reserveAttempts(
+    [{ key: `unsubscribe:${opaque('client', clientAddress(req) || 'unknown')}`, limit: 30 }],
+    60 * 60_000,
+  );
+  const parsed = quota.allowed ? readUnsubscribeToken(token) : null;
+  if (!parsed) {
+    return res.status(quota.allowed ? 400 : 429).render('pages/error', {
+      title: 'Link unavailable',
+      status: quota.allowed ? 400 : 429,
+      message: quota.allowed
+        ? 'This unsubscribe link is not valid. Turn emails off in Settings → Email reports instead.'
+        : 'Too many requests. Wait a few minutes and try again.',
+    });
+  }
+  if (req.method === 'POST') await unsubscribe(parsed);
+  res.render('pages/email-unsubscribe', {
+    title: 'Unsubscribe',
+    done: req.method === 'POST',
+    list: parsed.list,
+    token,
+  });
 }
 
 /**

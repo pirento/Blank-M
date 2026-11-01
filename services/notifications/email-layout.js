@@ -3,7 +3,8 @@
  * same thing. In the text:
  * - blank lines separate paragraphs, and "- " starts a list item;
  * - a line that is only a link to this site ("https://…" or "Label: https://…") becomes a button
- *   (the first one solid, later ones outlined);
+ *   (the first one solid, later ones outlined), except "Unsubscribe: https://…", which stays a small
+ *   muted link;
  * - a run of "Label: value" lines becomes a summary table, a value that is a 6–8 digit code is shown
  *   large, and a value starting with "-" or "+" is coloured as a loss or a gain;
  * - lines starting with "> " are someone's own words and are shown as a quote.
@@ -113,7 +114,12 @@ function renderBlock(block, state) {
     const line = raw.trim();
     const link = LINK_LINE.exec(line);
     const field = FIELD_LINE.exec(line);
-    if (link && ours(link[2])) {
+    if (link && ours(link[2]) && link[1] === 'Unsubscribe') {
+      flush();
+      out.push(
+        `<p style="margin:8px 0 0;font-size:12px;${FONT}"><a href="${escape(link[2])}" style="color:${COLOR.muted};text-decoration:underline">Unsubscribe</a></p>`,
+      );
+    } else if (link && ours(link[2])) {
       flush();
       out.push(button(link[1] ?? 'Open link', link[2], !state.buttons++));
     } else if (raw.startsWith('> ') || raw === '>') {

@@ -19,6 +19,7 @@ import { accessProblem } from '../auth/accounts.js';
 import { hasFeature } from '../billing/membership.js';
 import { inBatches } from '../batches.js';
 import { isMailConfigured, sendMail } from '../mailer.js';
+import { unsubscribeParts } from '../notifications/unsubscribe.js';
 import { toTrade } from './workspace.js';
 import { hasOpenAiKey } from '../ai/openai-key.js';
 import { findWeeklyReview, runCoachReview } from '../ai/coach-review.js';
@@ -126,10 +127,21 @@ export async function sendWeeklyReport(user, period) {
   const report = await buildWeeklyReport(user._id, period);
   const coach = await coachSection(user, period, report.summary.totalTrades);
   const origin = siteOrigin();
+  const unsubscribe = unsubscribeParts(user._id, 'weekly');
   await sendMail({
     to: user.email,
     subject: report.subject,
-    text: `${report.text}${coach}${origin ? `\n\nOpen your reports: ${origin}/reports` : ''}\n\nYou get this report because weekly emails are on. Turn them off in Settings → Email reports.`,
+    text: [
+      `${report.text}${coach}`,
+      origin ? `\nOpen your reports: ${origin}/reports` : null,
+      '',
+      'Pirento Blank is a journal and planning tool, not investment advice.',
+      'You get this report because weekly emails are on. Turn them off in Settings → Email reports, or here:',
+      unsubscribe.line,
+    ]
+      .filter((line) => line !== null)
+      .join('\n'),
+    headers: unsubscribe.headers,
   });
   return report;
 }

@@ -332,5 +332,14 @@
   "Holdings": "होल्डिंग्स",
   "Stop & target": "स्टॉप और टारगेट",
   "Live order broker": "लाइव ऑर्डर का ब्रोकर",
-  "{plan} ends on {date}. You can subscribe again then.": "{plan} {date} को ख़त्म होगा। तब आप फिर से सब्सक्राइब कर सकते हैं।"
+  "{plan} ends on {date}. You can subscribe again then.": "{plan} {date} को ख़त्म होगा। तब आप फिर से सब्सक्राइब कर सकते हैं।",
+  "the weekly report email": "साप्ताहिक रिपोर्ट ईमेल",
+  "newsletters and announcements": "न्यूज़लेटर और घोषणाएँ",
+  "You are unsubscribed": "आपकी सदस्यता हटा दी गई है",
+  "You will no longer get": "अब आपको यह नहीं मिलेगा:",
+  "You can turn it back on any time in Settings → Email reports.": "आप इसे कभी भी सेटिंग्स → ईमेल रिपोर्ट में फिर से चालू कर सकते हैं।",
+  "Go home": "होम पर जाएँ",
+  "Unsubscribe": "सदस्यता हटाएँ",
+  "Stop getting": "यह बंद करें:",
+  "Emails about your account, sign-ins and payments still arrive.": "आपके अकाउंट, साइन-इन और पेमेंट से जुड़े ईमेल फिर भी आते रहेंगे।"
 }

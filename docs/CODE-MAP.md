@@ -411,7 +411,7 @@ The admin panel's browser modules (one per page in `views/admin/`, plus `shell.j
 | `admin-setup-code.js`          | Code for an admin's first authenticator (no email).  |
 | `maintenance-signups.js`       | Daily: delete sign-ups unconfirmed after 7 days.     |
 | `delete-member.js`             | Delete a member and all their data (on request).     |
-| `billing-reminders.js`         | Daily: "your trial ends soon" emails.                |
+| `billing-reminders.js`         | Daily: trial ending/ended, Premium ended emails.     |
 | `market-feed.js`               | The TrueData live feed process (PM2 app).            |
 | `dev-memory.js`                | Local preview without installing MongoDB             |
 | `daily-import.js`              | Scheduled daily automatic journal (after the close). |

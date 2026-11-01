@@ -38,7 +38,7 @@ export async function login(req, res) {
     throw new HttpError('Administrators sign in with Google on the admin sign-in page.', 403);
   }
   await establishSession(req, user, { method: 'password' });
-  await recordSignIn(user);
+  await recordSignIn(user, req.get('user-agent'));
   res.json({ ok: true, mfaRequired: user.hasVerifiedFactor(), csrfToken: req.session.csrfToken });
 }
 
@@ -264,7 +264,7 @@ export async function googleCallback(req, res) {
     );
     if (await accessProblem(user)) return res.redirect(`${loginPage}?error=invite_only`);
     await establishSession(req, user, { method: 'oauth' });
-    await recordSignIn(user);
+    await recordSignIn(user, req.get('user-agent'));
     if (firstSignIn) void welcomeMember(user).catch(() => undefined);
     // An administrator with an authenticator still has to enter its code (the /admin guard asks).
     res.redirect(expected.forAdmin ? '/admin' : '/dashboard');
