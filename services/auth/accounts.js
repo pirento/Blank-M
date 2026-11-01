@@ -1,9 +1,10 @@
 /**
  * Accounts and sign-in: password hashing, invite-only access checks, password
- * and username sign-in with rate limits, sessions and signed-in devices,
- * activation and password recovery links.
+ * and username sign-in with rate limits, sign-in devices, sign-up, activation
+ * and password recovery links. Sessions and the administrator setup code have
+ * their own files.
  */
-import { createHmac, randomBytes, randomInt, randomUUID } from 'node:crypto';
+import { createHmac, randomBytes } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import {
@@ -13,7 +14,6 @@ import {
   USERNAME_PATTERN,
   User,
 } from '../../models/index.js';
-import { nativeDb } from '../../config/database.js';
 import { HttpError } from '../errors.js';
 import { reserveAttempts } from '../rate-window.js';
 import { sha256Hex } from '../crypto.js';
@@ -22,17 +22,20 @@ import { newSignInEmail } from '../notifications/emails.js';
 import { loadPlan } from '../billing/plan.js';
 import { env } from '../../config/env.js';
 import { createLogger, errorName } from '../logger.js';
+import { describeDevice } from './sessions.js';
 
 const log = createLogger('accounts');
 
 export { USERNAME_PATTERN };
+// Sessions and the administrator setup code have their own files; re-exported for existing importers.
+export * from './sessions.js';
+export * from './admin-setup-code.js';
 export const MIN_PASSWORD_LENGTH = 8;
 const BCRYPT_ROUNDS = 12;
 const INVALID = 'That username or email and password are not recognised.';
 const ACCESS_DENIED = 'This account no longer has access to the workspace.';
 const RECOVERY_TTL_MS = 60 * 60_000;
 export const ACTIVATION_TTL_MS = 24 * 60 * 60_000;
-const ADMIN_SETUP_TTL_MS = 15 * 60_000;
 
 // A fixed hash compared for unknown identities so a missing account does not
 // return measurably faster than a wrong password.
@@ -120,106 +123,6 @@ export async function verifyPasswordSignIn(input, clientAddress) {
     if (current?.userId !== user._id) throw new HttpError(INVALID, 401);
   }
   return user;
-}
-
-/** A coarse, human-readable device label; the raw user agent is not stored. */
-export function describeDevice(userAgent) {
-  const ua = String(userAgent || '');
-  const browser = /Edg\//.test(ua)
-    ? 'Edge'
-    : /OPR\/|Opera/.test(ua)
-      ? 'Opera'
-      : /Firefox\//.test(ua)
-        ? 'Firefox'
-        : /Chrome\//.test(ua)
-          ? 'Chrome'
-          : /Safari\//.test(ua)
-            ? 'Safari'
-            : null;
-  const os = /Android/.test(ua)
-    ? 'Android'
-    : /iPhone|iPad|iPod/.test(ua)
-      ? 'iOS'
-      : /Windows/.test(ua)
-        ? 'Windows'
-        : /Mac OS X|Macintosh/.test(ua)
-          ? 'macOS'
-          : /Linux/.test(ua)
-            ? 'Linux'
-            : null;
-  if (browser && os) return `${browser} on ${os}`;
-  return browser || os || 'Unknown device';
-}
-
-/**
- * Regenerates the session (preventing fixation), stores the auth record with a new public session
- * ID and device label, and issues a fresh CSRF token. Resolves once the session is saved.
- */
-export function establishSession(req, user, { method = 'password', recovery = false } = {}) {
-  return new Promise((resolve, reject) => {
-    req.session.regenerate((error) => {
-      if (error) return reject(error);
-      req.session.auth = {
-        userId: user._id,
-        sessionId: randomUUID(),
-        aal: 'aal1',
-        method,
-        authenticatedAt: Date.now(),
-        passwordRecovery: recovery,
-        device: describeDevice(req.get?.('user-agent')),
-      };
-      req.session.csrfToken = randomBytes(32).toString('base64url');
-      req.session.save((saveError) => (saveError ? reject(saveError) : resolve()));
-    });
-  });
-}
-
-/**
- * Destroys the request's session, if any. Always resolves, even when the store reports an error.
- */
-export function destroySession(req) {
-  return new Promise((resolve) => {
-    if (!req.session) return resolve();
-    req.session.destroy(() => resolve());
-  });
-}
-
-/** The member's signed-in sessions, newest activity first. */
-export async function listUserSessions(userId, currentSessionId, maxAgeMs) {
-  const rows = await nativeDb()
-    .collection('sessions')
-    .find({ 'session.auth.userId': userId }, { projection: { expires: 1, 'session.auth': 1 } })
-    .toArray();
-  return rows
-    .filter((row) => row.session?.auth?.sessionId)
-    .map((row) => {
-      const auth = row.session.auth;
-      const expires = row.expires ? new Date(row.expires).getTime() : null;
-      return {
-        id: auth.sessionId,
-        device: auth.device || 'Unknown device',
-        method: auth.method === 'oauth' ? 'Google' : 'Password',
-        signedInAt: auth.authenticatedAt ? new Date(auth.authenticatedAt).toISOString() : null,
-        lastActiveAt: expires && maxAgeMs ? new Date(expires - maxAgeMs).toISOString() : null,
-        current: auth.sessionId === currentSessionId,
-      };
-    })
-    .sort((left, right) => String(right.lastActiveAt).localeCompare(String(left.lastActiveAt)));
-}
-
-/** End one other session of this member, identified by its public session ID. */
-export async function revokeUserSession(userId, sessionId) {
-  const result = await nativeDb()
-    .collection('sessions')
-    .deleteOne({ 'session.auth.userId': userId, 'session.auth.sessionId': sessionId });
-  return result.deletedCount === 1;
-}
-
-/** Revoke every server session for a user (membership revocation, password change). */
-export async function revokeUserSessions(userId, exceptSessionId = null) {
-  const filter = { 'session.auth.userId': userId };
-  if (exceptSessionId) filter._id = { $ne: exceptSessionId };
-  await nativeDb().collection('sessions').deleteMany(filter);
 }
 
 /**
@@ -508,58 +411,6 @@ export async function deleteUnconfirmedSignups({ days = 7, now = new Date() } = 
     removed += 1;
   }
   return removed;
-}
-
-/* ------------------------- first authenticator for an administrator ------------------------- */
-// A stolen admin password alone must not be enough to add an authenticator (which unlocks every
-// admin change). So an administrator without one first needs a one-time code that only the real
-// owner can get: by email, or from the server itself (scripts/admin-setup-code.js).
-
-// The user id is part of the hash: two administrators can get the same 8 digits.
-const setupCodeHash = (userId, code) => sha256Hex(`admin-mfa\0${userId}\0${code}`);
-
-/** A new 8-digit, 15-minute setup code for this administrator; earlier unused codes stop working. */
-export async function issueAdminSetupCode(user) {
-  const code = String(randomInt(0, 100_000_000)).padStart(8, '0');
-  await AuthToken.updateMany(
-    { userId: user._id, purpose: 'admin-mfa', usedAt: null },
-    { $set: { usedAt: new Date() } },
-  );
-  await AuthToken.create({
-    tokenHash: setupCodeHash(user._id, code),
-    purpose: 'admin-mfa',
-    userId: user._id,
-    email: user.email,
-    expiresAt: new Date(Date.now() + ADMIN_SETUP_TTL_MS),
-  });
-  return code;
-}
-
-/** Emails a setup code to the administrator (callers check isMailConfigured first). */
-export async function emailAdminSetupCode(user) {
-  const code = await issueAdminSetupCode(user);
-  await sendMail({
-    to: user.email,
-    subject: 'Your Pirento Blank authenticator setup code',
-    text: `Someone signed in to your administrator account with Google and wants to add an authenticator.\n\nSetup code (valid 15 minutes): ${code}\n\nIf this was not you, secure your Google account now and tell the other administrators.`,
-  });
-}
-
-/** Uses up a setup code; true only for this administrator's latest unexpired, unused code. */
-export async function consumeAdminSetupCode(user, code) {
-  if (!/^\d{8}$/.test(String(code ?? ''))) return false;
-  const now = new Date();
-  const record = await AuthToken.findOneAndUpdate(
-    {
-      tokenHash: setupCodeHash(user._id, String(code)),
-      purpose: 'admin-mfa',
-      userId: user._id,
-      usedAt: null,
-      expiresAt: { $gt: now },
-    },
-    { $set: { usedAt: now } },
-  );
-  return Boolean(record);
 }
 
 /**

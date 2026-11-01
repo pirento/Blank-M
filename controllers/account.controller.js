@@ -33,10 +33,10 @@ import {
   listLiveOrders,
   liveTradingState,
   placeLiveOrder,
-  placeStopTargetGtt,
   setLiveOrderBroker,
   setLiveTrading,
 } from '../services/broker/live-orders.js';
+import { placeStopTargetGtt } from '../services/broker/live-gtt.js';
 import { BROKER_PROVIDERS } from '../shared/broker-portfolio.js';
 import { HttpError } from '../services/errors.js';
 import { submitProblemReport } from '../services/admin/problem-reports.js';

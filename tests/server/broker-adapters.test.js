@@ -44,7 +44,7 @@ const { exportOrderPlanRecords, saveOrderPlan, setOrderPlanReviewed } =
 const { calculateRiskPlan } = await import('../../shared/risk-calculator.js');
 const { DEFAULT_CHARGES } = await import('../../shared/types.js');
 const { currentStep, totpCode } = await import('../../services/auth/totp.js');
-const { placePendingAutoGtts } = await import('../../services/broker/live-orders.js');
+const { placePendingAutoGtts } = await import('../../services/broker/live-gtt.js');
 const { setBrokerAdapterForTests } = await import('../../services/broker/adapters/index.js');
 const { BrokerConnection, LiveOrder } = await import('../../models/index.js');
 
