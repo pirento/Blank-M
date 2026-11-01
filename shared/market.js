@@ -87,7 +87,8 @@ export const NSE_HOLIDAYS = new Set([
 
 /**
  * NSE session state at an instant: 'open', 'closed-weekend', 'closed-holiday' or 'closed-hours'.
- * The 15:30 IST minute still counts as open; holidays come from NSE_HOLIDAYS.
+ * The session runs from 09:15 up to (not including) 15:30 IST, when the exchange stops taking
+ * orders; holidays come from NSE_HOLIDAYS.
  */
 export function getMarketStatus(instant = new Date()) {
   const ist = toIst(instant);
@@ -96,7 +97,7 @@ export function getMarketStatus(instant = new Date()) {
   if (NSE_HOLIDAYS.has(ist.date)) return 'closed-holiday';
   if (
     ist.minutesSinceMidnight < MARKET_OPEN_MINUTE ||
-    ist.minutesSinceMidnight > MARKET_CLOSE_MINUTE
+    ist.minutesSinceMidnight >= MARKET_CLOSE_MINUTE
   ) {
     return 'closed-hours';
   }

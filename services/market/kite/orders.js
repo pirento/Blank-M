@@ -111,7 +111,7 @@ export async function placeKiteLimitOrder(userId, order) {
   return { orderId: data.order_id };
 }
 
-/** Latest state of one order: { status, quantity, filledQuantity, averagePrice }. */
+/** Latest state of one order: { status, quantity, filledQuantity, averagePrice, message }. */
 export async function readKiteOrder(userId, orderId) {
   if (!/^[A-Za-z0-9_-]{1,100}$/.test(String(orderId))) {
     throw new MarketDataError('Invalid order ID.', 400);
@@ -128,6 +128,11 @@ export async function readKiteOrder(userId, orderId) {
     quantity: Number(latest.quantity),
     filledQuantity: Number(latest.filled_quantity),
     averagePrice: Number(latest.average_price),
+    // Why Zerodha (or the exchange) rejected or cancelled it, e.g. insufficient funds.
+    message:
+      typeof latest.status_message === 'string' && latest.status_message.trim()
+        ? latest.status_message.trim().slice(0, 200)
+        : null,
   };
 }
 

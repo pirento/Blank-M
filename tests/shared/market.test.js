@@ -45,10 +45,11 @@ describe('getMarketStatus', () => {
     expect(getMarketStatus(utc('2026-08-10T11:00:00Z'))).toBe('closed-hours');
   });
 
-  it('is open exactly at the boundaries', () => {
-    // 03:45 UTC = 09:15 IST, 10:00 UTC = 15:30 IST.
+  it('opens at 09:15 and stops taking orders at 15:30', () => {
+    // 03:45 UTC = 09:15 IST, 09:59 UTC = 15:29 IST, 10:00 UTC = 15:30 IST.
     expect(getMarketStatus(utc('2026-08-10T03:45:00Z'))).toBe('open');
-    expect(getMarketStatus(utc('2026-08-10T10:00:00Z'))).toBe('open');
+    expect(getMarketStatus(utc('2026-08-10T09:59:59Z'))).toBe('open');
+    expect(getMarketStatus(utc('2026-08-10T10:00:00Z'))).toBe('closed-hours');
   });
 
   it('follows the 2026 NSE holiday list', () => {
