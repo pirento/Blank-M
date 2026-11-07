@@ -24,6 +24,7 @@ import { formatPlanningMoney, formatPlanningPrice } from '../../../shared/risk-c
 import { createOrderPlanStore, planSyncMessage } from '../lib/order-plans-store.js';
 import { createBrokerPortfolio } from '../components/broker-portfolio.js';
 import { openGtt, openLiveOrder } from './orders/live-dialogs.js';
+import { openPlanCheck } from './orders/plan-check.js';
 
 const data = pageData();
 const istTime = formatIstDateTime;
@@ -344,6 +345,11 @@ function planCard(plan) {
           },
           'Place live order',
         ),
+        button([icon('bot', 14, 'mr-2'), t('AI check')], {
+          variant: 'outline',
+          'aria-label': `AI check of the ${plan.symbol} plan against your rules and record`,
+          onclick: () => openPlanCheck(plan),
+        }),
         button([icon('beaker', 14, 'mr-2'), 'Paper trade'], {
           variant: 'outline',
           'aria-label': `Paper trade the ${plan.symbol} plan`,

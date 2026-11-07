@@ -17,6 +17,12 @@ test('calculator plan appears in order review and the planning report', async ({
   await page.waitForURL('**/orders');
   await expect(page.locator('[data-plans]')).toContainText('RELIANCE · BUY · MIS');
   await expect(page.locator('[data-sync-status]')).toContainText('synced', { timeout: 20_000 });
+  // The pre-trade check answers the journal facts even with AI switched off here.
+  await page.getByRole('button', { name: /AI check of the RELIANCE plan/ }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toContainText('AI is not set up on this server.');
+  await expect(dialog).toContainText('Your record');
+  await page.keyboard.press('Escape');
   await page.goto('/reports');
   await expect(page.locator('.rr-table tbody')).toContainText('RELIANCE');
 });

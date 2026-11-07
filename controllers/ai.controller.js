@@ -4,7 +4,7 @@
  * - chat.js            streaming coach chat with optional statement attachment
  * - research.js        stock picks from the NIFTY 500 universe (saved research runs)
  * - drafting.js        symbol lookup, rule drafting and report insights
- * - coach.js           daily briefing, trade review, chart analysis, coach reviews
+ * - coach.js           daily briefing, trade review, chart analysis, coach reviews, plan check
  * - voice.js           voice-note transcription
  * - journal-search.js  private journal search (embeddings)
  *
@@ -32,6 +32,7 @@ export {
   handleBriefing,
   handleCoachReview,
   handleCoachReviews,
+  handlePlanCheck,
   handleReview,
 } from './ai/coach.js';
 export { handleChat } from './ai/chat.js';

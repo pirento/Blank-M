@@ -70,6 +70,7 @@ router.post('/ai/rule', requireApiAuth, premium.ai, wrap(ai.handleRule));
 router.post('/ai/insights', requireApiAuth, premium.ai, wrap(ai.handleInsights));
 router.post('/ai/coach-review', requireApiAuth, premium.ai, wrap(ai.handleCoachReview));
 router.get('/ai/coach-reviews', requireApiAuth, premium.ai, wrap(ai.handleCoachReviews));
+router.post('/ai/plan-check', requireApiAuth, premium.ai, wrap(ai.handlePlanCheck));
 
 /* --------------------------------- Zerodha Kite ------------------------------- */
 router.all('/kite/authorize', requireApiAuth, premium.brokers, wrap(kite.authorize));
