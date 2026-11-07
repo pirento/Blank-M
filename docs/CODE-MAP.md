@@ -260,6 +260,7 @@ Common browser helpers live in `public/js/core/` (`dom.js` element builder, card
 | `options.js`                        | Options payoff page: F&O legs, payoff at expiry and today, Greeks.    |
 | `orders.js`                         | Order review page                                                     |
 | `orders/live-dialogs.js`            | Live order and stop/target GTT dialogs                                |
+| `orders/plan-check.js`              | AI check dialog: warnings, record and AI review of a saved plan       |
 | `reports.js`                        | Reports page                                                          |
 | `rules.js`                          | Rules page                                                            |
 | `settings.js`                       | Settings page entry                                                   |
@@ -456,6 +457,7 @@ The admin panel's browser modules (one per page in `views/admin/`, plus `shell.j
 | `openai-key.js`             | Reads the OpenAI API key from the server environment. |
 | `openai.js`                 | OpenAI access for Blank AI                            |
 | `premarket-plan.js`         | Pre-market plan on Telegram before the open           |
+| `plan-check.js`             | Pre-trade check of a saved plan: facts + AI review    |
 | `research-archive-store.js` | Saved research runs in MongoDB.                       |
 | `research-archive.js`       | Saved research runs                                   |
 | `research-universe.js`      | The NIFTY 500 research universe                       |
@@ -543,6 +545,7 @@ The admin panel's browser modules (one per page in `views/admin/`, plus `shell.j
 | `csv.js`                | Parsing and normalising broker trade exports.                                            |
 | `edge-map.js`           | Net P&L by weekday × entry time and best/worst setups, mistakes, emotions, symbols.      |
 | `risk-limits.js`        | Daily loss / trades-per-day limits and monthly goal; the status that pauses live orders. |
+| `plan-check.js`         | Facts and warnings for a saved plan from the member's journal and limits (no AI).        |
 | `trade-execution.js`    | Stop-loss, entry/exit times, partial exits and orders per side                           |
 | `strategy-stages.js`    | Strategy stages: draft → backtested → paper → live → retired                             |
 | `tradebook.js`          | Recognises fill-per-row broker tradebooks and pairs them into same-day round trips.      |

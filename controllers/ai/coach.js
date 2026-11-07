@@ -1,6 +1,7 @@
 /**
  * Coaching endpoints: the daily market briefing, trade review, chart/
- * screenshot analysis and the saved AI coach reviews of a day or week.
+ * screenshot analysis, the saved AI coach reviews of a day or week, and the
+ * pre-trade check of a saved order plan.
  */
 import { readJsonBody, requireMethod } from '../../services/http.js';
 import { authenticateRequest } from '../../services/auth/request-auth.js';
@@ -18,6 +19,8 @@ import {
 import { attachmentInput, handleFailure } from './shared.js';
 import { structured } from '../../services/ai/openai.js';
 import { listCoachReviews, runCoachReview } from '../../services/ai/coach-review.js';
+import { checkPlan } from '../../services/ai/plan-check.js';
+import { z } from 'zod';
 
 /** POST /api/ai/briefing: a pre-market briefing from web search, with de-duplicated citations. */
 export async function handleBriefing(req, res) {
@@ -179,6 +182,21 @@ export async function handleCoachReviews(req, res) {
   try {
     const { user } = await authenticateRequest(req);
     res.status(200).json({ reviews: await listCoachReviews(user.id) });
+  } catch (error) {
+    handleFailure(res, error);
+  }
+}
+
+/** POST /api/ai/plan-check { planId }: facts, warnings and an AI review of one synced plan. */
+export async function handlePlanCheck(req, res) {
+  if (!requireMethod(req, res, 'POST')) return;
+  try {
+    const { user } = await authenticateRequest(req);
+    const body = z.object({ planId: z.string().min(1).max(300) }).safeParse(readJsonBody(req));
+    if (!body.success) {
+      throw Object.assign(new Error('Choose a saved plan to check.'), { status: 400 });
+    }
+    res.status(200).json(await checkPlan(user.id, body.data.planId));
   } catch (error) {
     handleFailure(res, error);
   }
