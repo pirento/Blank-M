@@ -184,7 +184,7 @@ export function createTradeForm({
       {
         type: 'button',
         class:
-          'focus-ring rounded-full border border-line-strong px-3 py-1 text-xs text-muted aria-pressed:border-negative aria-pressed:bg-negative-soft aria-pressed:text-negative',
+          'focus-ring min-h-9 rounded-full border border-line-strong px-3.5 py-1.5 text-sm text-muted aria-pressed:border-negative aria-pressed:bg-negative-soft aria-pressed:text-negative',
         'aria-pressed': String(form.mistakeTags.includes(mistake)),
         'data-mistake': mistake,
         onclick: (event) => {

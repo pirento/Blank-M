@@ -348,11 +348,11 @@ textarea {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 32px;
-  padding: 7px 11px;
+  min-height: 40px;
+  padding: 8px 14px;
   border: 1px solid var(--color-line-strong);
   border-radius: 3px;
-  font-size: 12px;
+  font-size: 13px;
   background: var(--color-surface);
   color: var(--color-fg);
 }
@@ -598,26 +598,27 @@ textarea {
   }
   .workspace-topbar-control {
     border: 0;
-    padding: 7px 0;
-    font-size: 11px;
-    gap: 5px;
+    min-height: 44px;
+    padding: 8px 2px;
+    font-size: 13px;
+    gap: 6px;
   }
   .workspace-topbar-control svg {
-    width: 13px;
+    width: 16px;
   }
   .workspace-avatar {
-    width: 24px;
-    height: 24px;
-    font-size: 10px;
+    width: 32px;
+    height: 32px;
+    font-size: 12px;
   }
   .workspace-environment-strip {
     padding: 7px 17px;
-    font-size: 10px;
+    font-size: 12px;
     gap: 0;
     line-height: 1.5;
   }
   .workspace-environment-strip b {
-    font-size: 9px;
+    font-size: 10px;
     margin-right: 8px;
   }
   .workspace-environment-strip .status-end {
@@ -635,8 +636,8 @@ textarea {
     margin-bottom: 5px;
   }
   .workspace-pagehead p {
-    font-size: 12px;
-    max-width: 240px;
+    font-size: 14px;
+    max-width: none;
     line-height: 1.5;
   }
   .workspace-pagehead > div:last-child:not(:first-child) {
@@ -644,9 +645,9 @@ textarea {
   }
   .workspace-pagehead button,
   .workspace-pagehead a {
-    font-size: 11px;
-    padding: 9px 11px;
-    min-height: 34px;
+    font-size: 14px;
+    padding: 10px 16px;
+    min-height: 44px;
   }
   .workspace-shell {
     padding-bottom: 89px;
@@ -685,7 +686,7 @@ textarea {
     font-size: 19px;
   }
   .workspace-topbar-control {
-    font-size: 10px;
+    font-size: 12px;
   }
   .workspace-pagehead {
     align-items: flex-start;

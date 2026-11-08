@@ -876,9 +876,9 @@ td small {
     font-size: 9px;
   }
   .research-panel .panel-heading > button {
-    font-size: 10px;
-    padding: 8px;
-    min-height: 32px;
+    font-size: 13px;
+    padding: 10px 14px;
+    min-height: 44px;
   }
   .stock-table {
     font-size: 12px;
@@ -902,12 +902,12 @@ td small {
     font-size: 10px;
   }
   .stock-table button {
-    font-size: 11px;
-    padding: 8px 10px;
-    min-height: 32px;
+    font-size: 13px;
+    padding: 10px 12px;
+    min-height: 44px;
   }
   .stock-table .text-button {
-    font-size: 11px;
+    font-size: 13px;
   }
   .table-note {
     font-size: 11px;
