@@ -466,14 +466,14 @@ function paint() {
         'span',
         {
           class:
-            'flex items-center gap-1 rounded-full border border-line bg-elevated pr-1 pl-3 text-xs',
+            'flex items-center gap-1 rounded-full border border-line bg-elevated pr-1 pl-3 text-sm',
         },
         h(
           'button',
           {
             type: 'button',
             title: describeFilters(view.filters, strategyName),
-            class: 'focus-ring rounded-full py-1.5 font-medium text-fg',
+            class: 'focus-ring min-h-9 rounded-full py-1.5 font-medium text-fg',
             onclick: () => {
               state.filters = { ...view.filters };
               // A view saved with a since-deleted strategy would silently show nothing.
@@ -496,7 +496,8 @@ function paint() {
           {
             type: 'button',
             'aria-label': `Delete the ${view.name} view`,
-            class: 'focus-ring rounded-full p-1 text-subtle hover:text-negative',
+            class:
+              'focus-ring inline-flex h-9 w-9 items-center justify-center rounded-full text-subtle hover:text-negative',
             onclick: () => {
               persistViews(state.views.filter((entry) => entry.id !== view.id));
               paint();

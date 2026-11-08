@@ -68,7 +68,8 @@ export function paintChecklist() {
             type: 'button',
             onclick: dismiss,
             'aria-label': t('Dismiss the setup checklist'),
-            class: 'focus-ring rounded-control p-1.5 text-muted hover:bg-elevated hover:text-fg',
+            class:
+              'focus-ring inline-flex h-10 w-10 items-center justify-center rounded-control text-muted hover:bg-elevated hover:text-fg',
           },
           icon('x', 15),
         ),

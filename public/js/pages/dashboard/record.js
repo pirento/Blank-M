@@ -78,7 +78,7 @@ function paintRangePicker() {
           type: 'button',
           'aria-pressed': String(range === key),
           class: cn(
-            'focus-ring rounded-control px-3 py-1.5 text-xs font-medium transition-colors',
+            'focus-ring min-h-10 rounded-control px-3 py-2 text-sm font-medium transition-colors',
             range === key ? 'bg-surface text-fg shadow-sm' : 'text-muted hover:text-fg',
           ),
           onclick: () => {

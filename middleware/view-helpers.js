@@ -52,24 +52,25 @@ const BUTTON_VARIANTS = {
   destructive: 'bg-negative text-white hover:opacity-90',
 };
 const BUTTON_SIZES = {
-  sm: 'min-h-9 px-3 text-xs',
-  default: 'min-h-10 px-4 text-sm',
-  lg: 'min-h-12 px-6 text-sm',
-  icon: 'h-10 w-10',
+  sm: 'min-h-10 px-4 text-sm',
+  default: 'min-h-11 px-5 text-[15px]',
+  lg: 'min-h-12 px-6 text-base',
+  icon: 'h-11 w-11',
 };
 const BUTTON_BASE =
-  'inline-flex items-center justify-center rounded-control font-normal whitespace-nowrap transition-[background-color,color,border-color,transform,box-shadow] active:translate-y-px disabled:pointer-events-none disabled:opacity-50';
+  'inline-flex items-center justify-center rounded-control font-medium whitespace-nowrap transition-[background-color,color,border-color,transform,box-shadow] active:translate-y-px disabled:pointer-events-none disabled:opacity-50';
 
 /** Tailwind classes for a button of the given variant and size, plus any extra classes. */
 export function buttonClass(variant = 'default', size = 'default', className = '') {
   return cn(BUTTON_BASE, 'focus-ring', BUTTON_VARIANTS[variant], BUTTON_SIZES[size], className);
 }
 
+// 16px text on phones keeps iOS from zooming into a field when it is tapped.
 export const FIELD_CLASS =
-  'w-full rounded-control border bg-surface px-3 text-sm text-fg transition-colors placeholder:text-subtle disabled:cursor-not-allowed disabled:opacity-60 h-10 border-line-strong focus-ring';
+  'w-full rounded-control border bg-surface px-3 text-base sm:text-sm text-fg transition-colors placeholder:text-subtle disabled:cursor-not-allowed disabled:opacity-60 h-11 border-line-strong focus-ring';
 export const TEXTAREA_CLASS =
-  'w-full rounded-control border bg-surface px-3 text-sm text-fg transition-colors placeholder:text-subtle disabled:cursor-not-allowed disabled:opacity-60 min-h-20 py-2 leading-relaxed border-line-strong focus-ring';
-export const LABEL_CLASS = 'mb-1.5 block text-xs font-medium text-muted';
+  'w-full rounded-control border bg-surface px-3 text-base sm:text-sm text-fg transition-colors placeholder:text-subtle disabled:cursor-not-allowed disabled:opacity-60 min-h-20 py-2 leading-relaxed border-line-strong focus-ring';
+export const LABEL_CLASS = 'mb-1.5 block text-sm font-medium text-muted';
 
 /** Two-letter initials from the member's email, e.g. ravi.kumar@… → RK. */
 export function initialsFor(email) {
