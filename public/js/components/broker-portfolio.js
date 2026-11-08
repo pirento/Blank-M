@@ -111,7 +111,7 @@ export function createBrokerPortfolio({ available = true, onFillsJournaled } = {
     state.brokers.find((broker) => broker.provider === provider)?.label ??
     (provider === 'kite' ? 'Zerodha' : provider);
   const subtitle = h('p', { class: 'mt-1 text-xs text-muted' });
-  const pickerSlot = h('div');
+  const pickerSlot = h('div', { class: 'contents' });
   const refreshButton = button('', {
     variant: 'outline',
     className: 'max-w-full whitespace-normal text-left',

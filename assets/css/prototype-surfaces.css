@@ -453,7 +453,7 @@ td small {
   margin-top: 26px;
 }
 .chat-prompts button {
-  font-size: 12px;
+  font-size: 14px;
   gap: 22px;
 }
 .message {
@@ -922,7 +922,7 @@ td small {
     font-size: 13px;
   }
   .empty button {
-    font-size: 12px;
+    font-size: 14px;
   }
   .summary {
     position: static;
@@ -954,7 +954,7 @@ td small {
     gap: 9px;
   }
   .chat-prompts button {
-    font-size: 11px;
+    font-size: 14px;
   }
   .message {
     padding: 14px;
