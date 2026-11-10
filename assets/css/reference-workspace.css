@@ -73,7 +73,7 @@
 }
 .reference-ledger-hint {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   color: var(--color-muted);
 }
 .reference-journal-ledger {
@@ -386,7 +386,7 @@
   justify-content: space-between;
   gap: 15px;
   align-items: center;
-  font: 10px var(--font-mono);
+  font: 11px var(--font-mono);
   color: var(--color-muted);
 }
 .reference-chart-foot > span {
@@ -525,7 +525,7 @@
 }
 .reference-stock-table thead th {
   text-align: left;
-  font: 10px var(--font-mono);
+  font: 11px var(--font-mono);
   text-transform: uppercase;
   letter-spacing: 0.35px;
   color: var(--color-muted);
@@ -647,7 +647,7 @@
   }
   .reference-instrument-row small {
     max-width: 86px;
-    font-size: 10px;
+    font-size: 11px;
   }
   .reference-chart-surface {
     padding: 19px 17px 13px;
@@ -728,7 +728,7 @@
     letter-spacing: -0.8px;
   }
   .reference-ledger-hint {
-    font-size: 9px;
+    font-size: 11px;
   }
   .reference-market-workspace > .reference-panel-heading {
     padding: 15px;
@@ -737,7 +737,7 @@
     font-size: 14px;
   }
   .reference-panel-heading .reference-pill {
-    font-size: 9px;
+    font-size: 10px;
   }
   .reference-market-split {
     display: flex;
@@ -803,7 +803,7 @@
     font-size: 13px;
   }
   .reference-instrument-title small {
-    font-size: 10px;
+    font-size: 11px;
   }
   .reference-chart-price {
     font-size: 27px;
@@ -817,7 +817,7 @@
   }
   .reference-chart-foot {
     gap: 10px;
-    font-size: 10px;
+    font-size: 11px;
     line-height: 1.5;
   }
   .reference-chart-foot > span {
@@ -853,7 +853,7 @@
     margin: 13px 0 8px;
   }
   .reference-strategy-card .reference-pill {
-    font-size: 8px;
+    font-size: 10px;
     padding: 4px 5px;
   }
   .reference-strategy-card > p:not(.reference-eyebrow) {
@@ -888,7 +888,7 @@
     font-size: 12px;
   }
   .reference-stock-table thead th {
-    font-size: 9px;
+    font-size: 11px;
   }
   .reference-stock-table td,
   .reference-stock-table tbody th {
@@ -898,7 +898,7 @@
     gap: 10px;
   }
   .reference-stock-table small {
-    font-size: 10px;
+    font-size: 11px;
   }
   .reference-watch-add form {
     display: flex;

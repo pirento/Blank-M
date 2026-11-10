@@ -14,8 +14,18 @@ function token(name, fallback) {
 export const chartPositive = () => token('--color-positive', '#446e47');
 export const chartNegative = () => token('--color-negative', '#bb3348');
 
-/** Default y-axis tick format: rupees rounded to thousands, e.g. "₹12k". */
-export const thousands = (value) => `₹${Math.round(Number(value) / 1000)}k`;
+/**
+ * Default y-axis tick format (a Chart.js tick callback): "₹12k" when the ticks are thousands apart,
+ * "₹99.4k" or whole rupees on a tighter axis, so neighbouring ticks never read the same.
+ */
+export function thousands(value, _index, ticks) {
+  const number = Number(value);
+  const step = ticks?.length > 1 ? Math.abs(ticks[1].value - ticks[0].value) : 1000;
+  const sign = number < 0 ? '−' : '';
+  const size = Math.abs(number);
+  if (size < 1000 || step < 100) return `${sign}₹${Math.round(size).toLocaleString('en-IN')}`;
+  return `${sign}₹${(size / 1000).toFixed(step >= 1000 ? 0 : 1)}k`;
+}
 
 function baseOptions({ yFormatter, tooltip, showX = false, xFormatter }) {
   const muted = token('--color-muted', '#5f6c70');
@@ -72,7 +82,8 @@ export function areaChart(
           borderColor: stroke,
           borderWidth: 1.5,
           pointRadius: 0,
-          tension: 0.3,
+          // Smooth, but never above or below the real values (a plain curve overshoots them).
+          cubicInterpolationMode: 'monotone',
           fill: true,
           backgroundColor: (context) => {
             const { chart } = context;

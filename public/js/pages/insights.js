@@ -45,9 +45,6 @@ const workspace = data.workspace ?? { trades: [], strategies: [] };
 const root = $('[data-insights]');
 const periodSelect = $('[data-period]');
 
-/** Axis labels: whole rupees below ₹1,000 ("₹0k" would hide small journals), else thousands. */
-const axisRupees = (value) =>
-  Math.abs(Number(value)) >= 1000 ? thousands(value) : `₹${Math.round(Number(value))}`;
 const emotionLabel = (value) => EMOTIONS.find((emotion) => emotion.value === value)?.label ?? value;
 
 /** Trades inside the selected period (dates are IST calendar dates). */
@@ -433,7 +430,7 @@ function paint() {
     tooltip: (value, context) =>
       `${formatCurrency(Number(value))} · ${weekdays[context.dataIndex].count} trades`,
     xFormatter: (label) => label,
-    yFormatter: axisRupees,
+    yFormatter: thousands,
   });
   if (r.count) {
     barChart(rChart.canvas, {
@@ -451,7 +448,7 @@ function paint() {
   ].sort();
   lineChart(curveChart.canvas, {
     labels: dates,
-    yFormatter: axisRupees,
+    yFormatter: thousands,
     series: curves.slice(0, 6).map((curve) => {
       const byDate = new Map(curve.points.map((point) => [point.date, point.value]));
       let last = null;

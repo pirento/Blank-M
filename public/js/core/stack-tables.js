@@ -5,7 +5,10 @@
  * beside the value. Tables are re-labelled whenever pages re-render them.
  */
 function label(table) {
-  const headings = [...table.querySelectorAll('thead th')].map((th) => th.textContent.trim());
+  // Without a sort arrow: a sortable heading carries one after its name.
+  const headings = [...table.querySelectorAll('thead th')].map((th) =>
+    th.textContent.trim().replace(/\s*[↑↓]$/, ''),
+  );
   for (const row of table.querySelectorAll('tbody tr')) {
     [...row.children].forEach((cell, index) => {
       const heading = headings[index];

@@ -98,7 +98,8 @@ function planCard() {
       max: '100000',
       step: '1',
       value: String(plan.freeQuota?.[feature.key] ?? 0),
-      class: 'w-24',
+      // className, not class: `class` would replace the field's own styling (it looked like plain text).
+      className: 'max-w-24',
       'aria-label': `Free uses per month: ${feature.label}`,
     });
     return {
@@ -107,7 +108,7 @@ function planCard() {
       freeUses,
       element: h(
         'div',
-        { class: 'flex flex-wrap items-start justify-between gap-3' },
+        { class: 'flex flex-wrap items-center justify-between gap-3' },
         toggle.element,
         h(
           'label',

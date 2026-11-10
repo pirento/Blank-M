@@ -181,7 +181,8 @@ function sortableHeader(text, key, align = 'left') {
       'button',
       {
         type: 'button',
-        class: 'focus-ring tracking-wide uppercase transition-opacity hover:opacity-100',
+        class:
+          'focus-ring -mx-2 -my-2 px-2 py-2 tracking-wide uppercase transition-opacity hover:opacity-100',
         onclick: () => {
           if (active) state.sortDirection = state.sortDirection === 'asc' ? 'desc' : 'asc';
           else {
