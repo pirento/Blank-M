@@ -154,7 +154,7 @@
   background: #eef3ec;
 }
 .strategy-card .eyebrow {
-  font-size: 9px;
+  font-size: 10px;
 }
 .strategy-card h3 {
   font-size: 19px;
@@ -168,7 +168,7 @@
   margin: 14px 0 9px;
 }
 .strategy-card .pill {
-  font-size: 9px;
+  font-size: 10px;
 }
 .strategy-card .text-button {
   font-size: 12px;
@@ -186,7 +186,7 @@ table {
 }
 th {
   text-align: left;
-  font: 10px var(--mono);
+  font: 11px var(--mono);
   text-transform: uppercase;
   color: var(--muted);
   letter-spacing: 0.35px;
@@ -253,7 +253,7 @@ td small {
 }
 .research-strip small {
   display: block;
-  font: 10px var(--mono);
+  font: 11px var(--mono);
 }
 .research-strip strong {
   display: block;
@@ -506,7 +506,7 @@ td small {
 .login-aside .fineprint {
   color: #99b898;
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: 11px;
 }
 .login {
   width: 100%;
@@ -743,13 +743,13 @@ td small {
     letter-spacing: -0.8px;
   }
   .card > small:last-child {
-    font-size: 9px;
+    font-size: 10px;
   }
   .panel-heading h2 {
     font-size: 14px;
   }
   .panel-heading .pill {
-    font-size: 8px;
+    font-size: 10px;
   }
   .instrument-list {
     border-right: 0;
@@ -762,7 +762,7 @@ td small {
     padding: 16px 13px;
   }
   .strategy-card .eyebrow {
-    font-size: 8px;
+    font-size: 10px;
   }
   .strategy-card h3 {
     font-size: 19px;
@@ -770,16 +770,16 @@ td small {
     margin: 13px 0 8px;
   }
   .strategy-card .pill {
-    font-size: 7px;
+    font-size: 10px;
     padding: 4px 5px;
   }
   .strategy-card p {
-    font-size: 10px;
+    font-size: 11px;
     line-height: 1.6;
     margin: 12px 0 7px;
   }
   .strategy-card .text-button {
-    font-size: 10px;
+    font-size: 11px;
     gap: 6px;
   }
   .strategy-card .text-button .icon {
@@ -820,7 +820,7 @@ td small {
     border-bottom: 1px solid var(--line);
   }
   .research-strip small {
-    font-size: 8px;
+    font-size: 11px;
   }
   .research-strip strong {
     font-size: 18px;
@@ -870,10 +870,10 @@ td small {
   }
   .research-method > div > span {
     padding-top: 3px;
-    font-size: 10px;
+    font-size: 11px;
   }
   .research-method > .eyebrow {
-    font-size: 9px;
+    font-size: 10px;
   }
   .research-panel .panel-heading > button {
     font-size: 13px;
@@ -884,7 +884,7 @@ td small {
     font-size: 12px;
   }
   .stock-table th {
-    font-size: 9px;
+    font-size: 11px;
   }
   .stock-table td {
     padding: 17px 10px;
@@ -896,10 +896,10 @@ td small {
     gap: 10px;
   }
   .stock-number {
-    font-size: 9px;
+    font-size: 10px;
   }
   .symbol-cell small {
-    font-size: 10px;
+    font-size: 11px;
   }
   .stock-table button {
     font-size: 13px;
@@ -984,7 +984,7 @@ td small {
     display: none;
   }
   .login-aside .section-index {
-    font-size: 8px;
+    font-size: 10px;
   }
   .login {
     padding: 25px 22px 40px;
@@ -1023,7 +1023,7 @@ td small {
     font-size: 23px;
   }
   .strategy-card .eyebrow {
-    font-size: 9px;
+    font-size: 10px;
   }
   .strategy-card .text-button {
     font-size: 12px;
@@ -1047,10 +1047,10 @@ td small {
     font-size: 11px;
   }
   .strategy-card .eyebrow {
-    font-size: 9px;
+    font-size: 10px;
   }
   .research-strip small {
-    font-size: 10px;
+    font-size: 11px;
   }
   .feature-list p {
     font-size: 14px;
@@ -1095,13 +1095,13 @@ td small {
   }
   table {
     white-space: normal;
-    font-size: 10px;
+    font-size: 11px;
   }
   .card .value {
     font-size: 20px;
   }
   .card > small {
-    font-size: 10px;
+    font-size: 11px;
   }
   @page {
     size: A4;

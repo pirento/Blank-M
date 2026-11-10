@@ -238,6 +238,12 @@ textarea {
   scrollbar-width: none;
 }
 
+/* Screen-reader-only text is absolutely positioned. Without a positioned scroller it escapes a
+   sideways-scrolling table and widens the whole page on phones (Insights did). */
+.overflow-x-auto {
+  position: relative;
+}
+
 /* Exact reference proportions, with responsive utilities in the account menu. */
 :root {
   --ink: var(--color-fg);
@@ -473,7 +479,7 @@ textarea {
 }
 .workspace-dock-caption {
   flex-shrink: 0;
-  font: 9px var(--font-mono);
+  font: 10px var(--font-mono);
   letter-spacing: 1px;
   color: #9db99c;
   text-transform: uppercase;
@@ -529,7 +535,7 @@ textarea {
   content: '';
 }
 .workspace-dock-link sup {
-  font: 9px var(--font-mono);
+  font: 10px var(--font-mono);
   position: absolute;
   right: 10px;
   top: 6px;
@@ -680,7 +686,7 @@ textarea {
   .workspace-dock-link sup {
     right: 7px;
     top: 4px;
-    font-size: 8px;
+    font-size: 10px;
   }
   .workspace-dock-link[aria-current='page']::after {
     left: 14px;
@@ -791,7 +797,7 @@ textarea {
 }
 .blank-login .login-aside .fineprint {
   color: var(--color-peach);
-  font: 10px var(--font-mono);
+  font: 11px var(--font-mono);
 }
 .blank-login .back-link {
   display: inline-flex;
@@ -838,7 +844,7 @@ textarea {
     margin: 17px 0 0;
   }
   .blank-login .login-aside .section-index {
-    font-size: 8px;
+    font-size: 10px;
   }
   .blank-login .login-form input {
     font-size: 16px;

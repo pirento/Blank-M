@@ -63,24 +63,27 @@
           <h2><%= t('Trading account') %></h2>
           <%- icon('link-2', { size: 15, className: 'text-muted' }) %>
         </div>
-        <p class="mt-1 text-[11px] leading-5 text-muted"><%= t('Link your broker to bring your fills into the journal automatically.') %></p>
+        <p class="mt-1 text-xs leading-5 text-muted"><%= t('Link your broker to bring your fills into the journal automatically.') %></p>
         <ul class="mt-3 divide-y divide-line" aria-live="polite" data-broker-list>
           <% for (const [key, provider, name] of [['zerodha', 'kite', 'Zerodha'], ['dhan', 'dhan', 'Dhan'], ['upstox', 'upstox', 'Upstox'], ['fyers', 'fyers', 'Fyers'], ['angel', 'angel', 'Angel One']]) { %>
           <% const can = brokerCapabilities[provider] ?? {}; %>
-          <li class="flex items-center justify-between gap-3 py-2.5" data-broker-row="<%= key %>">
-            <div class="flex min-w-0 items-center gap-3">
-              <span class="reference-broker-initial" aria-hidden="true"><%= name[0] %></span>
-              <div class="min-w-0">
-                <p class="text-sm font-medium"><%= name %></p>
-                <p class="text-[11px] text-muted" data-broker-state><%= t('Checking…') %></p>
-                <p class="text-[11px] text-muted"><%= [t('Journal import'), can.balance && t('Balance'), can.portfolio && t('Holdings'), can.orders && t('Live orders'), can.stopTarget && t('Stop & target')].filter(Boolean).join(' · ') %></p>
+          <li class="py-3" data-broker-row="<%= key %>">
+            <div class="flex items-center justify-between gap-3">
+              <div class="flex min-w-0 items-center gap-3">
+                <span class="reference-broker-initial" aria-hidden="true"><%= name[0] %></span>
+                <div class="min-w-0">
+                  <p class="text-sm font-medium"><%= name %></p>
+                  <p class="text-xs text-muted" data-broker-state><%= t('Checking…') %></p>
+                </div>
               </div>
+              <a href="/settings#broker-<%= key %>" class="<%= buttonClass('outline', 'sm') %>" data-broker-action><%= t('Connect') %></a>
             </div>
-            <a href="/settings#broker-<%= key %>" class="<%= buttonClass('outline', 'sm') %>" data-broker-action><%= t('Connect') %></a>
+            <%# Under the row, so the list of what the broker supports gets the card's full width. %>
+            <p class="mt-2 text-xs leading-5 text-muted"><%= [t('Journal import'), can.balance && t('Balance'), can.portfolio && t('Holdings'), can.orders && t('Live orders'), can.stopTarget && t('Stop & target')].filter(Boolean).join(' · ') %></p>
           </li>
           <% } %>
         </ul>
-        <p class="mt-3 text-[11px] leading-5 text-muted">
+        <p class="mt-3 text-xs leading-5 text-muted">
           <%= t('Each broker lists what it supports here. Live orders stay off until you turn them on in Settings. Your funds stay with your broker.') %>
         </p>
       </section>

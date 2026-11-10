@@ -27,6 +27,9 @@ export function mountBackup() {
     type: 'file',
     accept: 'application/json,.json',
     class: 'sr-only',
+    // Opened by the Restore button; kept out of the tab order like the import page's input.
+    tabindex: '-1',
+    'aria-hidden': 'true',
   });
   const includeSettings = h('input', { type: 'checkbox', class: 'mt-1' });
   const LABELS = {
