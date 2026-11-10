@@ -181,7 +181,7 @@ export function paintRecord() {
     `Deepest fall from a peak within this period: ${formatCurrency(worstDrawdown)}`,
     280,
   );
-  const symbolData = pnlBySymbol(ranged).slice(0, 8);
+  const symbolData = pnlBySymbol(ranged).slice(0, 10);
   const weekdayData = pnlByWeekday(ranged);
   const distribution = pnlDistribution(ranged);
   const symbolCard = chartCard('P&L by symbol', 'Where the money is actually made and lost', 240);
@@ -319,7 +319,7 @@ export function paintRecord() {
     values: symbolData.map((entry) => entry.netPnl),
     colors: symbolData.map((entry) => (entry.netPnl >= 0 ? chartPositive() : chartNegative())),
     tooltip: netTooltip,
-    xFormatter: (label) => String(label).slice(0, 8),
+    xFormatter: (label) => String(label).slice(0, 10),
   });
   barChart(weekdayCard.canvas, {
     labels: weekdayData.map((entry) => entry.key),

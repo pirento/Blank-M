@@ -263,8 +263,9 @@ export function createMarketHistoryChart({
     refresh.disabled = !allowed() || loading;
     render(
       refresh,
-      icon('refresh-cw', 13, loading ? 'animate-spin' : ''),
-      requests ? ' Refresh chart' : ' Load history',
+      // The gap is a margin: a leading space collapses inside the flex button.
+      icon('refresh-cw', 13, loading ? 'mr-2 animate-spin' : 'mr-2'),
+      requests ? 'Refresh chart' : 'Load history',
     );
     const span = interval === '1d' ? '180 calendar days' : '7 calendar days';
     note.textContent = live
