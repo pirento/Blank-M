@@ -487,3 +487,141 @@ describe('live orders through an adapter', () => {
     expect(state).toMatchObject({ enabled: true, broker: { provider: 'kite' } });
   });
 });
+
+describe('exiting a live position', () => {
+  const position = (product, quantity) => ({
+    symbol: 'RELIANCE',
+    exchange: 'NSE',
+    product,
+    quantity,
+    averagePrice: 100,
+    lastPrice: 100.2,
+  });
+  /** The broker shows `net` as the member's open positions, with the entry fully filled. */
+  function brokerShows(net, filledQuantity) {
+    dhan.readOrder.mockResolvedValue({
+      status: 'complete',
+      filledQuantity,
+      averagePrice: 100,
+      message: null,
+    });
+    dhan.readPortfolio.mockResolvedValue({
+      holdings: [],
+      positions: { net, day: [] },
+      orders: [],
+      trades: [],
+    });
+  }
+  const exit = (account, order, confirmSymbol = 'RELIANCE') =>
+    account.send('post', `/api/live-orders/${order.id}/exit`, { confirmSymbol });
+
+  it('sells the filled intraday quantity once, priced through the current price', async () => {
+    const account = await dhanTrader();
+    const plan = await syncedPlan(account);
+    const order = (await place(account, plan)).body.order;
+    const quantity = plan.estimate.quantity;
+    brokerShows([position('MIS', quantity)], quantity);
+
+    expect((await exit(account, order, 'TCS')).status).toBe(400);
+    const response = await exit(account, order);
+    expect(response.status).toBe(200);
+    expect(response.body.order.exit).toMatchObject({
+      status: 'placed',
+      quantity,
+      price: 99.7,
+      brokerOrderId: 'DHAN-1',
+    });
+    // ₹100.20 less 0.5% is ₹99.699: ₹99.70 on the ₹0.05 tick, below the last price.
+    expect(dhan.placeLimitOrder).toHaveBeenLastCalledWith(account.userId, {
+      symbol: 'RELIANCE',
+      exchange: 'NSE',
+      side: 'SELL',
+      product: 'MIS',
+      quantity,
+      price: 99.7,
+      tag: 'blankexit',
+    });
+    expect((await exit(account, order)).status).toBe(409);
+    expect(dhan.placeLimitOrder).toHaveBeenCalledTimes(2);
+  });
+
+  it('sends nothing for a position already closed, an entry still open or a closed market', async () => {
+    const account = await dhanTrader();
+    const plan = await syncedPlan(account);
+    const order = (await place(account, plan)).body.order;
+    const quantity = plan.estimate.quantity;
+
+    brokerShows([position('MIS', 0)], quantity);
+    const closed = await exit(account, order);
+    expect(closed.status).toBe(409);
+    expect(closed.body.error).toMatch(/no open RELIANCE MIS position/);
+
+    // Only part closed at the broker: only the rest is exited.
+    brokerShows([position('MIS', 3)], quantity);
+    dhan.readOrder.mockResolvedValueOnce({
+      status: 'open',
+      filledQuantity: 3,
+      averagePrice: 100,
+      message: null,
+    });
+    expect((await exit(account, order)).body.error).toMatch(/still open/);
+
+    kite.market.status = 'closed-hours';
+    expect((await exit(account, order)).status).toBe(409);
+    kite.market.status = 'open';
+
+    dhan.readPortfolio.mockRejectedValueOnce(new Error('timeout'));
+    expect((await exit(account, order)).status).toBe(503);
+    expect(dhan.placeLimitOrder).toHaveBeenCalledOnce();
+
+    const partly = await exit(account, order);
+    expect(partly.body.order.exit).toMatchObject({ status: 'placed', quantity: 3 });
+  });
+
+  it('never exits and places a stop-loss GTT for the same shares', async () => {
+    const account = await dhanTrader();
+    const plan = await syncedPlan(account, { product: 'CNC', takeProfit: '110' });
+    const order = (await place(account, plan, { autoStopTarget: true })).body.order;
+    const quantity = plan.estimate.quantity;
+    brokerShows([position('CNC', quantity)], quantity);
+
+    expect((await exit(account, order)).body.order.exit.status).toBe('placed');
+    // The automatic stop/target skips an exited order, and one by hand is refused.
+    expect(await placePendingAutoGtts()).toMatchObject({ checked: 0 });
+    const gtt = await account.send('post', `/api/live-orders/${order.id}/gtt`, {
+      confirmSymbol: 'RELIANCE',
+    });
+    expect(gtt.status).toBe(409);
+    expect(gtt.body.error).toMatch(/already exited/);
+    expect(dhan.placeStopTarget).not.toHaveBeenCalled();
+
+    // The other way round: a standing GTT blocks the exit.
+    const other = await syncedPlan(account, { product: 'CNC', takeProfit: '110', symbol: 'INFY' });
+    const second = (await place(account, other)).body.order;
+    await LiveOrder.updateOne({ _id: second.id }, { $set: { gttStatus: 'placed' } });
+    const blocked = await exit(account, second, 'INFY');
+    expect(blocked.status).toBe(409);
+    expect(blocked.body.error).toMatch(/GTT stands/);
+  });
+
+  it('counts delivery shares held, settling (T1) and bought or sold today', async () => {
+    const { openQuantity } = await import('../../services/broker/live-exit.js');
+    const order = { symbol: 'INFY', product: 'CNC', side: 'BUY' };
+    const holding = (quantity, t1Quantity) => ({
+      symbol: 'INFY',
+      exchange: 'NSE',
+      quantity,
+      t1Quantity,
+    });
+    const net = (quantity) => ({ symbol: 'INFY', exchange: 'NSE', product: 'CNC', quantity });
+    const snapshot = (holdings, positions) => ({
+      holdings,
+      positions: { net: positions, day: [] },
+    });
+    expect(openQuantity(snapshot([holding(5, 2)], [net(3)]), order)).toBe(10);
+    expect(openQuantity(snapshot([holding(5, 0)], [net(-5)]), order)).toBe(0);
+    const short = { symbol: 'INFY', product: 'MIS', side: 'SELL' };
+    expect(openQuantity(snapshot([], [{ ...net(-4), product: 'MIS' }]), short)).toBe(4);
+    expect(openQuantity(snapshot([], [{ ...net(4), product: 'MIS' }]), short)).toBe(0);
+  });
+});

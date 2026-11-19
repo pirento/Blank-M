@@ -34,6 +34,12 @@ const liveOrderSchema = new mongoose.Schema(
     gttStop: { type: Number, default: null },
     gttTarget: { type: Number, default: null },
     gttError: { type: String, default: null },
+    /** The exit sent from Blank: one opposite LIMIT order for the filled quantity. */
+    exitStatus: { type: String, enum: ['placed', 'rejected', 'unknown', null], default: null },
+    exitBrokerOrderId: { type: String, default: null },
+    exitQuantity: { type: Number, default: null },
+    exitPrice: { type: Number, default: null },
+    exitError: { type: String, default: null },
   },
   { timestamps: true },
 );

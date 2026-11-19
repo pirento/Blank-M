@@ -8,7 +8,8 @@ import { fields, inputs, state } from './shared.js';
 
 /**
  * Reads the broker's available balance and copies it into account size and available
- * capital. Skips the update if the user edited those fields while the request was out.
+ * capital; from then on the planning capital follows the broker (read-only, refreshed with the
+ * same button). Skips the update if the user edited those fields while the request was out.
  */
 export async function syncBalance() {
   if (state.syncing) return;
@@ -32,7 +33,10 @@ export async function syncBalance() {
     fields.availableCapital = String(balance.liveBalance);
     inputs.accountSize.value = fields.accountSize;
     inputs.availableCapital.value = fields.availableCapital;
-    state.syncMessage = `${balance.label} INR balance read ${formatIstDateTime(balance.fetchedAt)} IST. This snapshot does not verify margin for a planned order.`;
+    // The broker's money is what it says: add funds in the broker, then refresh here.
+    state.brokerCapital = true;
+    inputs.accountSize.readOnly = true;
+    state.syncMessage = `${balance.label} INR balance read ${formatIstDateTime(balance.fetchedAt)} IST. Planning capital now follows your broker: add funds in ${balance.label}, then refresh. You can still plan with less in available capital.`;
   } catch (error) {
     state.syncMessage =
       error instanceof Error

@@ -175,6 +175,15 @@ export function toLiveOrder(row) {
           error: row.gttError,
         }
       : null,
+    exit: row.exitStatus
+      ? {
+          status: row.exitStatus,
+          brokerOrderId: row.exitBrokerOrderId,
+          quantity: row.exitQuantity,
+          price: row.exitPrice,
+          error: row.exitError,
+        }
+      : null,
   };
 }
 

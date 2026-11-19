@@ -64,11 +64,12 @@ export async function completeBrokerConnect() {
 }
 
 /**
- * Promise of the live INR balance payload from the member's default balance broker (`label` names
- * it); throws if any field fails validation.
+ * Promise of the live INR balance payload from `provider`, or the member's default balance broker
+ * (`label` names it); throws if any field fails validation.
  */
-export async function fetchBrokerBalance() {
-  const payload = await getJson('/api/kite/balance', { timeout: 30_000 });
+export async function fetchBrokerBalance(provider) {
+  const query = provider ? `?provider=${encodeURIComponent(provider)}` : '';
+  const payload = await getJson(`/api/kite/balance${query}`, { timeout: 30_000 });
   if (
     typeof payload?.source !== 'string' ||
     typeof payload.label !== 'string' ||

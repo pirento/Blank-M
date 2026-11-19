@@ -37,6 +37,7 @@ import {
   setLiveTrading,
 } from '../services/broker/live-orders.js';
 import { placeStopTargetGtt } from '../services/broker/live-gtt.js';
+import { exitLiveOrder } from '../services/broker/live-exit.js';
 import { BROKER_PROVIDERS } from '../shared/broker-portfolio.js';
 import { HttpError } from '../services/errors.js';
 import { submitProblemReport } from '../services/admin/problem-reports.js';
@@ -322,6 +323,18 @@ export async function createLiveOrder(req, res) {
 export async function createLiveOrderGtt(req, res) {
   const { user, session } = req.member;
   const order = await placeStopTargetGtt({
+    user,
+    session,
+    orderId: req.params.id,
+    confirmSymbol: req.body?.confirmSymbol,
+  });
+  res.json({ order });
+}
+
+/** POST /api/live-orders/:id/exit { confirmSymbol }: one opposite LIMIT order for the filled quantity. */
+export async function exitLiveOrderPosition(req, res) {
+  const { user, session } = req.member;
+  const order = await exitLiveOrder({
     user,
     session,
     orderId: req.params.id,

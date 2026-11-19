@@ -58,7 +58,11 @@ export function paintQuote() {
 /** Updates the broker balance sync button and its status note. */
 export function paintSync() {
   syncButton.disabled = state.syncing || !accountId;
-  syncButton.textContent = state.syncing ? 'Reading broker balance…' : 'Sync broker balance';
+  syncButton.textContent = state.syncing
+    ? 'Reading broker balance…'
+    : state.brokerCapital
+      ? 'Refresh broker balance'
+      : 'Sync broker balance';
   syncNote.textContent = state.syncMessage;
   syncNote.hidden = !state.syncMessage;
 }
