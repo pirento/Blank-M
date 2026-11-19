@@ -46,7 +46,7 @@
     "lightweight-charts": "^5.2.1",
     "lucide-static": "^0.546.0",
     "marked": "^15.0.12",
-    "mongoose": "^8.18.0",
+    "mongoose": "^8.24.10",
     "multer": "^2.5.0",
     "nodemailer": "^10.2.1",
     "openai": "^7.5.0",

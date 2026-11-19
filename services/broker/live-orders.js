@@ -221,6 +221,34 @@ async function settleRejectedOrders(userId) {
 }
 
 /**
+ * How many rupees short the member's broker balance is for `record` (0 when it is enough, null
+ * when the balance cannot be read). The balance is read fresh. This member's other orders that
+ * are still being sent are not in it yet, so their funds count as spoken for: of two orders sent
+ * at once that the balance covers only one of, one gives way (or both, never neither).
+ */
+async function fundsShortfall(userId, adapter, record) {
+  let available;
+  try {
+    available = Number((await adapter.readBalance(userId)).available);
+  } catch {
+    return null;
+  }
+  if (!Number.isFinite(available)) return null;
+  const others = await LiveOrder.find(
+    {
+      userId,
+      tradingDate: record.tradingDate,
+      status: 'submitting',
+      _id: { $ne: record._id },
+    },
+    { fundsNeeded: 1, orderValue: 1 },
+  ).lean();
+  const spokenFor = others.reduce((sum, row) => sum + (row.fundsNeeded ?? row.orderValue), 0);
+  const free = available - spokenFor;
+  return free >= record.fundsNeeded ? 0 : Math.ceil((record.fundsNeeded - free) * 100) / 100;
+}
+
+/**
  * Send one reviewed plan to the member's live-order broker as a regular DAY LIMIT
  * order at the plan's entry price. Every safety check runs on the server against
  * the frozen plan; the browser only names the plan and confirms its symbol.
@@ -233,6 +261,15 @@ export async function placeLiveOrder({
   idempotencyKey,
   autoStopTarget = false,
 }) {
+  // A retry of a request that already went through gets that same order back, before any check
+  // that could now refuse it (the daily limit it used up, a market that has since closed…).
+  const replay = await LiveOrder.findById(idempotencyKey).lean();
+  if (replay) {
+    if (replay.userId !== user._id || replay.planId !== planId) {
+      throw new HttpError('This order request was already used.', 409);
+    }
+    return toLiveOrder(replay);
+  }
   // Real money: read the admin's live-trading switch and limits fresh, not a cached copy.
   await applyPlatformSettings();
   await settleRejectedOrders(user._id);
@@ -247,13 +284,6 @@ export async function placeLiveOrder({
     throw new HttpError(`${state.risk.reasons[0]} No more live orders today.`, 403);
   }
 
-  const replay = await LiveOrder.findById(idempotencyKey).lean();
-  if (replay) {
-    if (replay.userId !== user._id || replay.planId !== planId) {
-      throw new HttpError('This order request was already used.', 409);
-    }
-    return toLiveOrder(replay);
-  }
   const active = await LiveOrder.findOne({
     userId: user._id,
     planId,
@@ -319,6 +349,10 @@ export async function placeLiveOrder({
     }
   }
   const orderValue = Math.round(quantity * priceValue * 100) / 100;
+  // What the broker blocks: the full value for delivery, the plan's margin for intraday (the
+  // member's own margin figure, so the broker's real margin check still has the last word).
+  const plannedMargin = Number(plan.estimate?.requiredMarginPaise) / 100;
+  const fundsNeeded = plannedMargin > 0 ? plannedMargin : orderValue;
   if (orderValue > state.maxOrderValue) {
     throw new HttpError(
       `Order value ₹${orderValue.toLocaleString('en-IN')} exceeds the live order limit of ₹${state.maxOrderValue.toLocaleString('en-IN')}.`,
@@ -356,6 +390,7 @@ export async function placeLiveOrder({
       quantity,
       price,
       orderValue,
+      fundsNeeded,
       referencePrice,
       tradingDate: todayInIst(),
       autoGtt: Boolean(autoStopTarget),
@@ -371,13 +406,31 @@ export async function placeLiveOrder({
     tradingDate: record.tradingDate,
     status: { $in: ['submitting', 'placed', 'unknown'] },
   });
+  const giveWay = () => LiveOrder.deleteOne({ _id: record._id, status: 'submitting' });
   if (usedNow > state.dailyLimit) {
-    await LiveOrder.deleteOne({ _id: record._id, status: 'submitting' });
+    await giveWay();
     throw new HttpError(`Daily live order limit reached (${state.dailyLimit}).`, 429);
   }
 
+  const adapter = await brokerAdapter(broker.provider);
+  if (adapter.capabilities.balance) {
+    const shortBy = await fundsShortfall(user._id, adapter, record);
+    if (shortBy !== 0) {
+      await giveWay();
+      if (shortBy === null) {
+        throw new HttpError(
+          `Your ${adapter.label} balance could not be read, so no order was sent.`,
+          503,
+        );
+      }
+      throw new HttpError(
+        `Not enough funds in ${adapter.label}: this order needs ₹${fundsNeeded.toLocaleString('en-IN')}, ₹${shortBy.toLocaleString('en-IN')} more than is free. No order was sent.`,
+        409,
+      );
+    }
+  }
+
   try {
-    const adapter = await brokerAdapter(broker.provider);
     const { orderId } = await adapter.placeLimitOrder(user._id, {
       symbol,
       exchange: 'NSE',

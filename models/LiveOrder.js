@@ -20,6 +20,8 @@ const liveOrderSchema = new mongoose.Schema(
     quantity: { type: Number, required: true },
     price: { type: String, required: true },
     orderValue: { type: Number, required: true },
+    /** Rupees the broker blocks for it (order value for CNC, planned margin for MIS). */
+    fundsNeeded: { type: Number, default: null },
     referencePrice: { type: Number, default: null },
     brokerOrderId: { type: String, default: null },
     error: { type: String, default: null },
