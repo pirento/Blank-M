@@ -24,19 +24,30 @@ export function exitLimitPrice(side, lastPrice) {
 }
 
 /**
- * Shares of the order's position still open at the broker, in the entry's direction. Intraday:
- * the net MIS position. Delivery: holdings (settled and T1) plus today's net CNC position.
+ * Shares of the order's position still open at the broker, in the entry's direction, less any
+ * exit already waiting there (an order the member placed in the broker app that has not filled
+ * yet). Intraday: the net MIS position. Delivery: holdings (settled and T1) plus today's net CNC
+ * position.
  */
 export function openQuantity(portfolio, order) {
   const same = (item) => item.exchange === 'NSE' && item.symbol === order.symbol;
+  const sameProduct = (item) => same(item) && item.product === order.product;
   const net = portfolio.positions.net
-    .filter((item) => same(item) && item.product === order.product)
+    .filter(sameProduct)
     .reduce((sum, item) => sum + item.quantity, 0);
-  if (order.product === 'MIS') return Math.max(0, order.side === 'BUY' ? net : -net);
-  const held = portfolio.holdings
-    .filter(same)
-    .reduce((sum, item) => sum + item.quantity + (item.t1Quantity ?? 0), 0);
-  return Math.max(0, held + net);
+  const exitSide = order.side === 'BUY' ? 'SELL' : 'BUY';
+  const waiting = portfolio.orders
+    .filter((item) => sameProduct(item) && item.side === exitSide)
+    .reduce((sum, item) => sum + item.pendingQuantity, 0);
+  const open =
+    order.product === 'MIS'
+      ? order.side === 'BUY'
+        ? net
+        : -net
+      : portfolio.holdings
+          .filter(same)
+          .reduce((sum, item) => sum + item.quantity + (item.t1Quantity ?? 0), net);
+  return Math.max(0, open - waiting);
 }
 
 /**

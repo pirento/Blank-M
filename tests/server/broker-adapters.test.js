@@ -614,14 +614,26 @@ describe('exiting a live position', () => {
       t1Quantity,
     });
     const net = (quantity) => ({ symbol: 'INFY', exchange: 'NSE', product: 'CNC', quantity });
-    const snapshot = (holdings, positions) => ({
+    const snapshot = (holdings, positions, orders = []) => ({
       holdings,
       positions: { net: positions, day: [] },
+      orders,
     });
     expect(openQuantity(snapshot([holding(5, 2)], [net(3)]), order)).toBe(10);
     expect(openQuantity(snapshot([holding(5, 0)], [net(-5)]), order)).toBe(0);
     const short = { symbol: 'INFY', product: 'MIS', side: 'SELL' };
     expect(openQuantity(snapshot([], [{ ...net(-4), product: 'MIS' }]), short)).toBe(4);
     expect(openQuantity(snapshot([], [{ ...net(4), product: 'MIS' }]), short)).toBe(0);
+    // A sell the member already left waiting in the broker app is not sold twice.
+    const waiting = (side, pendingQuantity) => ({
+      symbol: 'INFY',
+      exchange: 'NSE',
+      product: 'CNC',
+      side,
+      pendingQuantity,
+    });
+    expect(openQuantity(snapshot([holding(5, 0)], [], [waiting('SELL', 3)]), order)).toBe(2);
+    expect(openQuantity(snapshot([holding(5, 0)], [], [waiting('SELL', 9)]), order)).toBe(0);
+    expect(openQuantity(snapshot([holding(5, 0)], [], [waiting('BUY', 3)]), order)).toBe(5);
   });
 });
