@@ -17,13 +17,15 @@ import {
   badge,
   render,
   formatIstDateTime,
+  formatCurrency,
 } from '../core/dom.js';
 import { api, errorMessage } from '../core/api.js';
 import { notify, notifyError } from '../core/toast.js';
 import { formatPlanningMoney, formatPlanningPrice } from '../../../shared/risk-calculator.js';
+import { fetchBrokerBalance } from '../lib/quotes.js';
 import { createOrderPlanStore, planSyncMessage } from '../lib/order-plans-store.js';
 import { createBrokerPortfolio } from '../components/broker-portfolio.js';
-import { openGtt, openLiveOrder } from './orders/live-dialogs.js';
+import { openExit, openGtt, openLiveOrder } from './orders/live-dialogs.js';
 import { openPlanCheck } from './orders/plan-check.js';
 
 const data = pageData();
@@ -31,6 +33,8 @@ const istTime = formatIstDateTime;
 let mutationError = null;
 let store = null;
 const live = { state: null, orders: [], error: '' };
+/** The live-order broker's balance: read from the broker only, never typed in Blank. */
+const funds = { balance: null, busy: false, error: '' };
 const ACTIVE = new Set(['submitting', 'placed', 'unknown']);
 const STATUS_LABELS = {
   submitting: (label) => `Sending to ${label}`,
@@ -56,6 +60,67 @@ async function loadLive() {
     live.error = errorMessage(error, 'Live order status could not be loaded.');
   }
   paint();
+  if (live.state?.broker?.connected && !funds.balance && !funds.busy) void refreshFunds();
+}
+
+async function refreshFunds() {
+  funds.busy = true;
+  funds.error = '';
+  paintFunds();
+  try {
+    funds.balance = await fetchBrokerBalance(live.state.broker.provider);
+  } catch (error) {
+    funds.error = errorMessage(error, 'The broker balance could not be read.');
+  } finally {
+    funds.busy = false;
+    paintFunds();
+  }
+}
+
+/**
+ * The funds box: the live-order broker's balance as the broker reports it, with a refresh. Money
+ * is added in the broker, never here; every live order re-reads it before it is sent.
+ */
+function paintFunds() {
+  const broker = live.state?.broker;
+  if (!broker?.connected) {
+    render($('[data-broker-funds]'), null);
+    return;
+  }
+  const { balance } = funds;
+  render(
+    $('[data-broker-funds]'),
+    h(
+      'div',
+      {
+        class:
+          'flex flex-wrap items-center justify-between gap-3 border border-line bg-surface px-4 py-3',
+        role: 'status',
+        'aria-live': 'polite',
+      },
+      h(
+        'div',
+        { class: 'min-w-0 space-y-1' },
+        h('p', { class: 'text-xs text-muted' }, `Funds in ${broker.label}`),
+        h(
+          'p',
+          { class: 'tnum text-lg text-fg' },
+          balance ? formatCurrency(balance.liveBalance) : funds.busy ? 'Reading…' : '—',
+        ),
+        h(
+          'p',
+          { class: 'text-xs leading-5 text-muted' },
+          funds.error ||
+            `${balance ? `Read ${istTime(balance.fetchedAt)} IST. ` : ''}Add money in ${broker.label}, then refresh. Every live order checks this balance again before it is sent.`,
+        ),
+      ),
+      button([icon('refresh-cw', 14, 'mr-2'), funds.busy ? 'Refreshing…' : 'Refresh funds'], {
+        variant: 'outline',
+        disabled: funds.busy,
+        onclick: () => void refreshFunds(),
+      }),
+    ),
+  );
 }
 
 /** Why the live order button is unavailable for this plan, or null when it can be used. */
@@ -114,6 +179,7 @@ function liveOrderLine(plan) {
         ),
         order.error ? h('span', { class: 'w-full text-xs text-negative' }, order.error) : null,
         gttLine(plan, order),
+        exitLine(order),
       ),
     ),
   );
@@ -165,6 +231,54 @@ function gttLine(plan, order) {
           variant: 'outline',
           size: 'sm',
           onclick: () => openGtt(plan, order, { broker, onDone: loadLive }),
+        })
+      : null,
+  );
+}
+
+const EXIT_LABELS = {
+  placed: () => 'Exit order placed',
+  rejected: () => 'Exit rejected',
+  unknown: (label) => `Exit outcome unknown — check ${label}`,
+};
+const SENT = new Set(['placed', 'unknown']);
+
+/** Exit status for a live order, and the button that exits its position from here. */
+function exitLine(order) {
+  const broker = brokerOf(order.provider);
+  const { exit } = order;
+  const canExit =
+    order.status === 'placed' &&
+    !SENT.has(exit?.status) &&
+    !SENT.has(order.gtt?.status) &&
+    live.state?.marketOpen;
+  if (!exit && !canExit) return null;
+  return h(
+    'div',
+    { class: 'flex w-full flex-wrap items-center gap-2' },
+    exit
+      ? [
+          badge(
+            EXIT_LABELS[exit.status]?.(broker.label) ?? exit.status,
+            exit.status === 'placed'
+              ? 'positive'
+              : exit.status === 'rejected'
+                ? 'negative'
+                : 'caution',
+          ),
+          h(
+            'span',
+            { class: 'text-xs text-muted' },
+            `${order.side === 'BUY' ? 'SELL' : 'BUY'} ${exit.quantity} @ ₹${exit.price}${exit.brokerOrderId ? ` · order ${exit.brokerOrderId}` : ''}`,
+          ),
+          exit.error ? h('span', { class: 'w-full text-xs text-negative' }, exit.error) : null,
+        ]
+      : null,
+    canExit
+      ? button(t('Exit position'), {
+          variant: 'destructive',
+          size: 'sm',
+          onclick: () => openExit(order, { broker, onDone: loadLive }),
         })
       : null,
   );
@@ -367,6 +481,7 @@ function planCard(plan) {
 
 function paint() {
   if (!store) return;
+  paintFunds();
   const status = store.syncStatus;
   render(
     $('[data-sync-status]'),

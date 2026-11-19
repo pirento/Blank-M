@@ -261,6 +261,12 @@ router.post(
   premium.liveOrders,
   wrap(account.createLiveOrderGtt),
 );
+router.post(
+  '/live-orders/:id/exit',
+  requireApiAuth,
+  premium.liveOrders,
+  wrap(account.exitLiveOrderPosition),
+);
 router.get('/username', requireApiAuth, wrap(username.getUsername));
 router.post('/username', requireApiAuth, wrap(username.claimUsername));
 

@@ -1,6 +1,7 @@
 /**
  * Order review dialogs that reach the member's broker: placing a reviewed plan
- * as a live LIMIT order, and the stop-loss/target GTT for a filled delivery buy.
+ * as a live LIMIT order, the stop-loss/target GTT for a filled delivery buy, and
+ * exiting a placed order's position.
  * Each names the broker (`broker`: { label, capabilities } from the live order
  * state), asks the member to type the symbol, and `onDone` reloads the state.
  */
@@ -245,6 +246,105 @@ export function openGtt(plan, order, { broker, onDone }) {
         h(
           'div',
           { class: 'flex gap-2' },
+          button(t('Cancel'), { variant: 'outline', onclick: close }),
+          submit,
+        ),
+      );
+    },
+  });
+}
+
+/** Percent the exit's limit sits through the last price (EXIT_PRICE_BUFFER_PERCENT on the server). */
+const EXIT_BUFFER = 0.5;
+
+/**
+ * Opens the dialog that exits a placed order's position with one opposite LIMIT order for the
+ * quantity the broker filled. The user must retype the symbol before it POSTs to
+ * /api/live-orders/:id/exit; then calls `onDone`.
+ */
+export function openExit(order, { broker, onDone }) {
+  const side = order.side === 'BUY' ? 'SELL' : 'BUY';
+  openModal({
+    title: t('Exit {symbol} on {broker}', { symbol: order.symbol, broker: broker.label }),
+    description: t('This sends a real order that closes your position.'),
+    content: (close) => {
+      const confirmField = input({
+        id: 'exit-confirm-symbol',
+        autocomplete: 'off',
+        placeholder: order.symbol,
+      });
+      const submit = button(t('Exit position'), { variant: 'destructive', disabled: true });
+      const message = h('p', { role: 'alert', class: 'text-sm text-negative', hidden: true });
+      const sync = () => {
+        submit.disabled = confirmField.value.trim().toUpperCase() !== order.symbol;
+      };
+      confirmField.addEventListener('input', sync);
+      submit.addEventListener('click', async () => {
+        submit.disabled = true;
+        submit.textContent = 'Exiting…';
+        message.hidden = true;
+        try {
+          const result = await api(`/api/live-orders/${encodeURIComponent(order.id)}/exit`, {
+            method: 'POST',
+            body: { confirmSymbol: confirmField.value },
+            timeout: 45_000,
+          });
+          close();
+          const exit = result.order.exit;
+          if (exit?.status === 'placed')
+            notify(
+              `Exit placed with ${broker.label}: ${side} ${exit.quantity} @ ₹${exit.price} (order ${exit.brokerOrderId}).`,
+              'success',
+            );
+          else if (exit?.status === 'rejected')
+            notify(exit.error || 'The exit was not placed.', 'error');
+          else notify(pending(broker.label), 'error');
+          await onDone();
+        } catch (error) {
+          // A timeout or lost connection does not mean the broker never got the exit.
+          message.textContent = [0, 504].includes(error?.status)
+            ? pending(broker.label)
+            : errorMessage(error, 'The position could not be exited.');
+          message.hidden = false;
+          submit.textContent = 'Exit position';
+          sync();
+        }
+      });
+      const row = (term, text) =>
+        h(
+          'div',
+          { class: 'flex justify-between gap-3 border-b border-line py-2 text-sm' },
+          h('dt', { class: 'text-muted' }, term),
+          h('dd', { class: 'tnum text-right' }, text),
+        );
+      return h(
+        'div',
+        { class: 'space-y-4' },
+        h(
+          'dl',
+          {},
+          row('Broker', broker.label),
+          row('Instrument', `NSE · ${order.symbol} · ${order.product}`),
+          row('Side', side),
+          row('Quantity', `Filled quantity, up to ${order.quantity.toLocaleString('en-IN')}`),
+          row('Order type', 'LIMIT · DAY'),
+          row('Limit price', `${EXIT_BUFFER}% through the current price`),
+        ),
+        h(
+          'p',
+          { class: 'text-xs leading-5 text-muted' },
+          `The quantity is read from ${broker.label} when you confirm. The limit is set ${EXIT_BUFFER}% ${side === 'SELL' ? 'below' : 'above'} the current price so it fills at once, but never at any price: in a fast market it may not fill, so check ${broker.label}. If the entry is still partly open, cancel that part in ${broker.label} first.`,
+        ),
+        h(
+          'div',
+          { class: 'space-y-2' },
+          label(`Type ${order.symbol} to confirm`, confirmField.id),
+          confirmField,
+        ),
+        message,
+        h(
+          'div',
+          { class: 'flex flex-wrap justify-end gap-2' },
           button(t('Cancel'), { variant: 'outline', onclick: close }),
           submit,
         ),

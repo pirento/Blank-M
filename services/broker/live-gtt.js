@@ -50,6 +50,9 @@ export async function placeStopTargetGtt({ user, session, orderId, confirmSymbol
   if (order.gttStatus === 'placed' || order.gttStatus === 'unknown') {
     throw new HttpError('A GTT was already sent for this order.', 409);
   }
+  if (order.exitStatus === 'placed' || order.exitStatus === 'unknown') {
+    throw new HttpError('This position was already exited, so it needs no GTT.', 409);
+  }
   if (
     String(confirmSymbol || '')
       .trim()
@@ -115,7 +118,13 @@ async function sendStopTargetGtt(user, order, adapter) {
 
   // Claim the order atomically so two requests can never send two GTTs.
   const claimed = await LiveOrder.findOneAndUpdate(
-    { _id: order._id, userId: user._id, gttStatus: { $in: [null, 'rejected'] } },
+    // An exit sent from Blank already sold these shares.
+    {
+      _id: order._id,
+      userId: user._id,
+      gttStatus: { $in: [null, 'rejected'] },
+      exitStatus: { $in: [null, 'rejected'] },
+    },
     { $set: { gttStatus: 'unknown', gttStop: stop, gttTarget: target, gttError: null } },
     { new: true },
   );
@@ -160,6 +169,8 @@ export async function placePendingAutoGtts({ limit = 100 } = {}) {
     autoGtt: true,
     status: 'placed',
     gttStatus: null,
+    // Exited from Blank already: there are no shares left to protect.
+    exitStatus: null,
     createdAt: { $gte: new Date(Date.now() - AUTO_GTT_WINDOW_MS) },
   })
     .limit(limit)

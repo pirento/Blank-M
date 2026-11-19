@@ -39,6 +39,8 @@ export const state = {
   syncing: false,
   syncMessage: '',
   capitalRevision: 0,
+  // Planning capital came from the broker: it is the broker's money, so it is not typed over.
+  brokerCapital: false,
 };
 // The order-plan store, created at start-up by the page entry (calculator.js).
 export const storeRef = { current: null };

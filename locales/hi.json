@@ -349,5 +349,8 @@
   "Answer before you place it": "ऑर्डर लगाने से पहले जवाब दें",
   "Your record": "आपका रिकॉर्ड",
   "A check of your own plan and rules, not investment advice. No order is sent from here.": "यह आपके अपने प्लान और नियमों की जाँच है, निवेश सलाह नहीं। यहाँ से कोई ऑर्डर नहीं जाता।",
-  "Checking your plan…": "आपका प्लान जाँचा जा रहा है…"
+  "Checking your plan…": "आपका प्लान जाँचा जा रहा है…",
+  "Exit {symbol} on {broker}": "{broker} पर {symbol} से बाहर निकलें",
+  "This sends a real order that closes your position.": "यह एक असली ऑर्डर भेजता है जो आपकी पोज़िशन बंद करता है।",
+  "Exit position": "पोज़िशन से बाहर निकलें"
 }
