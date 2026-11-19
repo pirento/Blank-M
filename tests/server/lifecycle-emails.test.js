@@ -182,7 +182,11 @@ describe('one-click unsubscribe', () => {
     const { user } = await createMember();
     const token = unsubscribeToken(user._id, 'announcements');
     const forged = token.replace('.announcements.', '.weekly.');
-    for (const bad of ['', 'nonsense', forged, `${token.slice(0, -1)}A`]) {
+    // Change the signature's first character: all of its bits count. (Swapping the last one for
+    // 'A' left the token unchanged, or equal once decoded, whenever it already ended in A–D.)
+    const cut = token.lastIndexOf('.') + 1;
+    const tampered = `${token.slice(0, cut)}${token[cut] === 'A' ? 'B' : 'A'}${token.slice(cut + 1)}`;
+    for (const bad of ['', 'nonsense', forged, tampered]) {
       expect((await request(app).get(`/email/unsubscribe?t=${bad}`)).status).toBe(400);
       expect((await request(app).post(`/email/unsubscribe?t=${bad}`)).status).toBe(400);
     }
