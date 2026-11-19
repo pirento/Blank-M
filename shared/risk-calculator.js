@@ -13,7 +13,9 @@ const MAX_SAFE = BigInt(Number.MAX_SAFE_INTEGER);
  * The bounds also prevent unbounded BigInt work on malformed persisted input.
  */
 function parseDecimal(raw, allowZero = false) {
-  const text = raw.trim();
+  // Plans arrive as strings; anything else (a number from an old backup, a missing field) is read
+  // as text so it is validated rather than crashing the calculation.
+  const text = String(raw ?? '').trim();
   if (text.length === 0 || text.length > 400) return null;
   const match = /^(?:\+)?(\d+(?:\.\d*)?|\.\d+)(?:e([+-]?\d+))?$/i.exec(text);
   const value = Number(text);

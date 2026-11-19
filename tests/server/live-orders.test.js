@@ -7,6 +7,7 @@ const broker = vi.hoisted(() => ({
   quote: vi.fn(),
   gtt: vi.fn(),
   read: vi.fn(),
+  balance: vi.fn(),
   market: { status: 'open' },
 }));
 vi.mock('../../services/market/kite.js', async (original) => ({
@@ -14,6 +15,7 @@ vi.mock('../../services/market/kite.js', async (original) => ({
   placeKiteLimitOrder: broker.place,
   placeKiteGtt: broker.gtt,
   readKiteOrder: broker.read,
+  readBrokerBalance: broker.balance,
 }));
 vi.mock('../../services/market/index.js', async (original) => ({
   ...(await original()),
@@ -77,6 +79,7 @@ beforeEach(async () => {
     filledQuantity: 1,
     averagePrice: 100,
   });
+  broker.balance.mockReset().mockResolvedValue({ liveBalance: 1_000_000 });
   broker.market.status = 'open';
   telegram.sent = [];
   const store = new Map();
@@ -237,6 +240,75 @@ describe('live orders', () => {
     const first = await place(account, plan, { idempotencyKey });
     const retry = await place(account, plan, { idempotencyKey });
     expect(retry.body.order.id).toBe(first.body.order.id);
+    expect(broker.place).toHaveBeenCalledOnce();
+  });
+
+  it('still returns the placed order on a retry after the daily loss limit is hit', async () => {
+    const { Trade } = await import('../../models/index.js');
+    const { todayInIst } = await import('../../shared/market.js');
+    const account = await trader();
+    await account.send('put', '/api/settings', { riskLimits: { dailyLossLimit: '2000' } });
+    const plan = await syncedPlan(account);
+    const idempotencyKey = randomUUID();
+    const first = await place(account, plan, { idempotencyKey });
+    expect(first.body.order.status).toBe('placed');
+    // The reply was lost; meanwhile another trade used up the day's loss limit.
+    await Trade.create({
+      _id: randomUUID(),
+      userId: account.userId,
+      tradeDate: todayInIst(),
+      symbol: 'INFY',
+      direction: 'Long',
+      entryPrice: 100,
+      exitPrice: 90,
+      quantity: 250,
+      grossPnl: -2500,
+      charges: 0,
+    });
+    const retry = await place(account, plan, { idempotencyKey });
+    expect(retry.status).toBe(201);
+    expect(retry.body.order.id).toBe(first.body.order.id);
+    expect(broker.place).toHaveBeenCalledOnce();
+  });
+
+  it('checks the broker balance fresh and sends nothing when funds are short', async () => {
+    const account = await trader();
+    const plan = await syncedPlan(account);
+    // The plan needs about ₹20,000 (all of its available capital at 100% margin).
+    broker.balance.mockResolvedValueOnce({ liveBalance: 5_000 });
+    const short = await place(account, plan);
+    expect(short.status).toBe(409);
+    expect(short.body.error).toMatch(/Not enough funds in Zerodha/);
+
+    broker.balance.mockRejectedValueOnce(new Error('timeout'));
+    const unread = await place(account, plan);
+    expect(unread.status).toBe(503);
+    expect(unread.body.error).toMatch(/balance could not be read/);
+    expect(broker.place).not.toHaveBeenCalled();
+    // Nothing was kept: the plan can be sent once the funds are there.
+    expect(await LiveOrder.countDocuments()).toBe(0);
+    expect((await place(account, plan)).body.order.status).toBe('placed');
+  });
+
+  it('counts funds of an order still being sent as spoken for', async () => {
+    const account = await trader();
+    const plan = await syncedPlan(account);
+    const other = await syncedPlan(account);
+    const needs = plan.estimate.requiredMarginPaise / 100;
+    broker.balance.mockResolvedValue({ liveBalance: needs * 1.5 });
+    // The first order is still on its way to the broker when the second one is checked.
+    let release;
+    broker.place.mockImplementationOnce(
+      () => new Promise((resolve) => (release = () => resolve({ orderId: '1' }))),
+    );
+    // supertest sends only once awaited, so start it now.
+    const first = place(account, plan).then((response) => response);
+    await vi.waitFor(() => expect(release).toBeTypeOf('function'));
+    const second = await place(account, other);
+    expect(second.status).toBe(409);
+    expect(second.body.error).toMatch(/Not enough funds/);
+    release();
+    expect((await first).body.order.status).toBe('placed');
     expect(broker.place).toHaveBeenCalledOnce();
   });
 

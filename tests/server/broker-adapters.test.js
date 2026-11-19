@@ -121,7 +121,7 @@ function fakeDhan(overrides = {}) {
         },
       ],
     })),
-    readBalance: vi.fn(async () => ({ available: 12345.5, used: 100 })),
+    readBalance: vi.fn(async () => ({ available: 52345.5, used: 100 })),
     placeLimitOrder: vi.fn(async () => ({ orderId: 'DHAN-1' })),
     readOrder: vi.fn(async () => ({
       status: 'open',
@@ -317,7 +317,7 @@ describe('portfolio and balance dispatch', () => {
     expect(picked.body).toMatchObject({
       source: 'dhan',
       label: 'Dhan',
-      liveBalance: 12345.5,
+      liveBalance: 52345.5,
       used: 100,
       currency: 'INR',
     });

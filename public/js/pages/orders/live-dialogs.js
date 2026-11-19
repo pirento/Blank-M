@@ -107,6 +107,8 @@ export function openLiveOrder(plan, { broker, onDone }) {
           row('Quantity', quantity.toLocaleString('en-IN')),
           row('Limit price', formatPlanningPrice(plan.inputs.entryPrice)),
           row('Order value', formatCurrency(value)),
+          // The server checks this against a fresh read of the broker balance before sending.
+          row('Funds needed', formatCurrency(plan.estimate.requiredMarginPaise / 100)),
         ),
         h(
           'p',
